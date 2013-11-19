@@ -124,9 +124,8 @@ module CreateInitialNests
         max = MD_Move(1,1)
         min = MD_Move(1,2)
         linSamp = linSpacing(max, min, NoNests) ! linear splitting of Design Space/Movement Domain
-        dbound = abs((linSamp(1) - linSamp(2))/2)
         
-        !! Find maximum minimum distance between Points/Nests
+        !! Find maximum minimum distance between Points/Nests to redefine limits
         dlS = linSamp(1) - linSamp(2)
         ds = dlS/100000
         do i = 1, 100000
@@ -143,23 +142,32 @@ module CreateInitialNests
             end if
                 
         end do
-            
+        
+        ! Calculate Spacing with new limits
         first = max - dL
         last = min + dL
         linSamp = linSpacing(first, last, NoNests)
         
-        ! Simplified version: Redefine Domain boundaries(max/min) to receive Midpoint Spacing        
+        ! Simplified version: Redefine Limits(max/min) via Midpoint Calculation        
+        linSamp2 = linSpacing(max, min, (NoNests + 1))
+        dbound = abs((linSamp2(1) - linSamp2(2))/2)
         max = max - dbound
         min = min + dbound
-        linSamp2 = linSpacing(max, min, NoNests)
+        linSamp2 = linSpacing(max, min, NoNests) ! Calculate Spacing with new limits
         
         ! Test simplified version vs complicated version
         k = 0
         do i = 1, NoNests
-            if (abs(linSamp(i) - linSamp2(i)) < (10**(-1))) then
+            if (abs(linSamp(i) - linSamp2(i))/xmax < 1D-6) then
                     k = k + 1                
             end if
         end do
+        if (k == NoNests) then
+            print *, 'Simplified Version WORKS'
+        else
+            print *, 'Simplified Version FAILED'
+            print *, k
+        end if
         
         ! Execute Random Permutation of distributed Nests for each Control Point
         do i = 1, NoCP               
@@ -168,13 +176,6 @@ module CreateInitialNests
                 FinalSampPoints(j,i) = linSamp(rp(j)) ! Randomly permuted integers applied as indices (rp)                               
             end do                
         end do
-
-        if (k == NoNests) then
-            print *, 'Simplified Version WORKS'
-        else
-            print *, 'Simplified Version FAILED'
-            print *, k
-        end if
         
         ! Output to Check
         write (*,1) transpose(FinalSampPoints)
