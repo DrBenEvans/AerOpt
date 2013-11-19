@@ -3,7 +3,7 @@ program AerOpt
     ! Initializing Parameters and Implement Modules
     use CreateInitialNests
     use Toolbox
-    integer :: i, j, k                ! Simple Loop Variables
+    integer :: i, j, k                ! Simple Loop Variables   
     
     ! User Input
 !!! TO-DO: create text files including the input data of meshmat & datamat
@@ -22,7 +22,8 @@ program AerOpt
     integer, parameter :: NoDim = 2        ! Number of Dimensions
     character (len=4), parameter :: filename = 'case'   ! filename of Meshfiles 
     character, parameter :: runOnCluster = 'Y'
-
+    integer, dimension(NoNests) :: rp
+    integer, dimension(NoCP) :: ones
     
     !! PLOT initial Mesh: Actual and Coarse Mesh! --> MATLAB output file?
     
@@ -30,9 +31,13 @@ program AerOpt
     !***********included in CreateInitialNests module**************
     
     call RANDOM_SEED    ! Automatically generates a random initial number based on time and date
-    !call RANDOM_NUMBER (rn)
     
-    call SubCreateInitialNests(NoNests, NoDim, NoCP, xmax, ymax, zmax)                !Sampling of initial points/nests via LHC    
+    !call SubCreateInitialNests(NoNests, NoDim, NoCP, xmax, ymax, zmax)                !Sampling of initial points/nests via LHC    
     ! Output:
-    
+    call randperm(NoNests, rp)
+    write (*,2) rp
+    ones = (/ (0, i=1,NoCP) /)
+    write (*,2) ones
+2   format(1i3)
+        
 end program AerOpt
