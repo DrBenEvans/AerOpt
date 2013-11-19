@@ -2,6 +2,7 @@ program AerOpt
    
     ! Initializing Parameters and Implement Modules
     use CreateInitialNests
+    use Toolbox
     integer :: i, j, k                ! Simple Loop Variables
     
     ! User Input
@@ -11,7 +12,7 @@ program AerOpt
     !pathexec2 = '/eng/cvcluster/egmanon/Duct2d'
     
     real, parameter :: Ma = 0.5            ! Mach Number
-    real, parameter :: xmax = 0.00         ! Maximum horizontal displacement of Control Nodes
+    real, parameter :: xmax = 0.02         ! Maximum horizontal displacement of Control Nodes
     real, parameter :: ymax = 0.02         ! Maximum vertical displacement of Control Nodes
     real, parameter :: zmax = 0.05         ! Maximum lateral displacement of Control Nodes
     real, parameter :: engFMF = 1.0        ! What is it?

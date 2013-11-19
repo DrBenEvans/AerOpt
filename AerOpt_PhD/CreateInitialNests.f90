@@ -1,10 +1,11 @@
 module CreateInitialNests
     
+        use Toolbox   
         real :: rn                                            ! Counts random numbers
         real, dimension(:,:), allocatable :: MxDisp           ! Matrix with min/max Displacements
-        real, dimension(:,:), allocatable :: MxDisp_NonMov    ! Matrix with min/max Displacements
+        real, dimension(:,:), allocatable :: MxDisp_Move      ! Matrix with only moving min/max Displacements
         integer, dimension(:), allocatable :: cond            ! Identifies zero/non-zero values
-        integer :: av                                         ! Allocater Variable
+        integer :: av                                         ! Allocater Variable       
         
     contains
     
@@ -45,103 +46,141 @@ module CreateInitialNests
         if (zmax /= 0.00 .and. NoDim == 3) then
             av = av + 1
         end if
-        allocate(MxDisp_NonMov(av*NoCP,2))
+        allocate(MxDisp_Move(av*NoCP,2))
         
-        ! Reduce Matrix
-        ! MxDisp_NonMov = MxDisp(cond,:)        
+        ! Reduce Matrix     
         j = 1
         do i = 1, size(cond)            
             if (cond(i) == -1) then
-                MxDisp_NonMov(j,:) = MxDisp(i,:)
+                MxDisp_Move(j,:) = MxDisp(i,:)
                 j = j + 1
             end if
         end do
         !**END Reduction of...**!
         
         write(*,*), 'Reduced Matrix'
-        print *, MxDisp_NonMov        
+        print *, MxDisp_Move        
 
-        ! Execute Latin Hypercube Sampling with min/max Displacements
-        call LHS(MxDisp_NonMov, NoNests, NoCP)       
-        ! Output:
+        ! Execute Latin Hypercube Sampling with movable min/max Displacements
+        call LHS(MxDisp_Move, NoNests, NoCP)     
+        ! Output: FinalSamplingPoints - an initial Sampling
         
-        ! Remember to empty MxDisp_NonMov to safe storage
+        ! Remember to empty MxDisp_Move to safe storage
     end subroutine SubCreateInitialNests
     
-    subroutine LHS(MxDisp_NonMov, NoNests, NoCP)
+    subroutine LHS(MxDisp_Move, NoNests, NoCP)
     
-        ! Variables
-        real, dimension(NoCP*av,2) :: MxDisp_NonMov
-        double precision, dimension(NoNests) :: linSamp, linLoop
-        real, dimension(NoNests, NoCP) :: FinalSampPoints
+        ! Variables      
         integer :: ms
-        integer, dimension(NoNests) :: rp
-        double precision :: max, min, first, last, dx, dlS, ds, dlL_test, dlL1, dlL2, dL, a
+        real, dimension(NoCP*av,2) :: MxDisp_Move
     
         ! Body of LHS
-        ms = size(MxDisp_NonMov,1)
-
+        !!*** Based on the Dimension, the LHS is performed 1,2 or 3 times. ***!!
+        !!**** The size of MxDisp_Move indicates the number of Dimensions ****!!
+        ms = size(MxDisp_Move,1)
         if ( ms == NoCP) then
             
-            ! Implement Section as Sub and Implement it in other Cases 2 or 3 times respectively
-            max = MxDisp_NonMov(1,1)
-            min = MxDisp_NonMov(1,2)
-            dx = max - min
-            do i = 0, (NoNests - 1)
-                a = i/ real(NoNests - 1)
-                linSamp(i+1) = max - dx*a              
-            end do
-            dlS = linSamp(1) - linSamp(2)
-            ds = dlS/100000
-            do i = 1, 100000
-                
-                first = max - ds*i
-                last = min + ds*i
-                do j = 0, (NoNests - 1)
-                    a = j/ real(NoNests - 1)  
-                    linLoop(j+1) = first - (first - last)*a
-                end do
-                dlL1 = max - linLoop(1)
-                dlL2 = (linLoop(3) - linLoop(2))/2
-                dlL_test = (linLoop(2) - linLoop(1))/2
-                if ((dlL1 + dlL2) > 10**(-6)) then
-                    dL = max - linLoop(1)
-                    exit
-                end if
-                
-            end do
-            
-            first = max - dL
-            last = min + dL
-            do i = 0, (NoNests - 1)
-                a = i/ real(NoNests - 1)  
-                linLoop(i+1) = first - (first - last)*a
-            end do
-            
-            print *, size(linLoop)
-            print *, NoNests
-            
-            do i = 1, NoCP               
-                call randperm(NoNests, rp)
-                do j = 1, NoNests                   
-                    FinalSampPoints(j,i) = linLoop(rp(j))
-                end do
-                
-            end do
-            
             print *, 'Case 1'
-            print *, FinalSampPoints
+            call LHS_1D(MxDisp_Move, NoNests, NoCP)
             
         elseif (ms == NoCP*2) then
+            
             print *, 'Case 2'
+            call LHS_1D(MxDisp_Move(1:NoCP,:), NoNests, NoCP)
+            print *, 'Part 2'
+            call LHS_1D(MxDisp_Move((NoCP+1):ms,:), NoNests, NoCP)
+            
         elseif (ms == NoCP*3) then
+            
             print *, 'Case 3'
+            call LHS_1D(MxDisp_Move(1:NoCP,:), NoNests, NoCP)
+            print *, 'Part 2'
+            call LHS_1D(MxDisp_Move((NoCP+1):(2*NoCP),:), NoNests, NoCP)
+            print *, 'Part 3'
+            call LHS_1D(MxDisp_Move((2*NoCP+1):ms,:), NoNests, NoCP)
+            
         else
             print *, 'Impossible Number of Dimensions.'
             stop
         end if
-    
+        !Output: FinalSamplingPoints - an initial Sampling
+        
     end subroutine LHS
+    
+    subroutine LHS_1D(MD_Move, NoNests, NoCP)
+    
+        ! Variables
+        integer, dimension(NoNests) :: rp
+        real, dimension(NoCP,2) :: MD_Move
+        double precision, dimension(NoNests) :: linSamp, linSamp2
+        real, dimension(NoNests, NoCP) :: FinalSampPoints, FinalSampPoints2
+        double precision :: max, min, first, last, dlS, ds, dlL1, dlL2, dL, dbound
+    
+        ! Body of LHS_1D
+        !!************** A complicated way of applying LHS for a 1D sampling. *************!!
+        !!********* The idea is to maximize the minimum distance between points. **********!!
+        !!****** However, that only plays a role in case of non-uniform distribution. *****!!
+        !! Here, a uniform distribution (linSpacing) by picking the Midpoints is selected. !!        
+        max = MD_Move(1,1)
+        min = MD_Move(1,2)
+        linSamp = linSpacing(max, min, NoNests) ! linear splitting of Design Space/Movement Domain
+        dbound = abs((linSamp(1) - linSamp(2))/2)
+        
+        !! Find maximum minimum distance between Points/Nests
+        dlS = linSamp(1) - linSamp(2)
+        ds = dlS/100000
+        do i = 1, 100000
+                
+            first = max - ds*i
+            last = min + ds*i
+            linSamp = linSpacing(first, last, NoNests)
+                
+            dlL1 = max - linSamp(1)
+            dlL2 = (linSamp(2) - linSamp(1))/2
+            if ((dlL1 + dlL2) > 10**(-6)) then
+                dL = max - linSamp(1)
+                exit
+            end if
+                
+        end do
+            
+        first = max - dL
+        last = min + dL
+        linSamp = linSpacing(first, last, NoNests)
+        
+        ! Simplified version: Redefine Domain boundaries(max/min) to receive Midpoint Spacing        
+        max = max - dbound
+        min = min + dbound
+        linSamp2 = linSpacing(max, min, NoNests)
+        
+        ! Test simplified version vs complicated version
+        k = 0
+        do i = 1, NoNests
+            if (abs(linSamp(i) - linSamp2(i)) < (10**(-1))) then
+                    k = k + 1                
+            end if
+        end do
+        
+        ! Execute Random Permutation of distributed Nests for each Control Point
+        do i = 1, NoCP               
+            call randperm(NoNests, rp) ! see Subroutine, Output are integers
+            do j = 1, NoNests               
+                FinalSampPoints(j,i) = linSamp(rp(j)) ! Randomly permuted integers applied as indices (rp)                               
+            end do                
+        end do
+
+        if (k == NoNests) then
+            print *, 'Simplified Version WORKS'
+        else
+            print *, 'Simplified Version FAILED'
+            print *, k
+        end if
+        
+        ! Output to Check
+        write (*,1) transpose(FinalSampPoints)
+1           format(7f10.5)
+    
+    end subroutine LHS_1D
     
     subroutine randperm(N, p)
     
