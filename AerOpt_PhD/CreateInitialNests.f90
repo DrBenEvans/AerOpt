@@ -5,22 +5,22 @@ module CreateInitialNests
         real, dimension(:,:), allocatable :: MxDisp           ! Matrix with min/max Displacements
         real, dimension(:,:), allocatable :: MxDisp_Move      ! Matrix with only moving min/max Displacements
         integer, dimension(:), allocatable :: cond            ! Identifies zero/non-zero values
-        integer :: av                                         ! Allocater Variable       
+        real, dimension(:,:), allocatable :: InitialNests        
         
     contains
     
     subroutine SubCreateInitialNests(NoNests, NoDim, NoCP, xmax, ymax, zmax)
     
         ! Variables
-        integer, dimension(NoCP) :: ones
+        integer, dimension(NoCP) :: ones                      ! Vector with Ones
+        integer :: av                                         ! Allocater Variable
         allocate(MxDisp((NoCP*NoDim),2))
         allocate(cond(NoCP*NoDim))
+        allocate(InitialNests(NoNests,NoDim*NoCP))
 
         
         !!****Body of SubCreateInitialNests****!!      
-        do i = 1, NoCP           
-            ones(i) = 1
-        end do
+        ones = (/ (1, i=1,NoCP) /)
         
         ! Initialize min/max Displacement Matrix
         ! NoDim automatically defines the size of the Matrix
@@ -40,7 +40,7 @@ module CreateInitialNests
         if (xmax /= 0.00) then
             av = av + 1
         end if
-        if (ymax /= 0.00) then
+        if (ymax /= 0.00 .and. NoDim > 1) then
             av = av + 1
         end if
         if (zmax /= 0.00 .and. NoDim == 3) then
@@ -62,58 +62,104 @@ module CreateInitialNests
         print *, MxDisp_Move        
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
-        call LHS(MxDisp_Move, NoNests, NoCP)     
-        ! Output: FinalSamplingPoints - an initial Sampling
+        call LHS(av, MxDisp_Move, NoNests, NoCP, NoDim, xmax, ymax, zmax)     
+        !Output: InitialNests - an initial Sampling vis LHS
         
+        ! Resize InitialNests due to a possible reduction of MxDisp to MxDisp_Move
+
         ! Remember to empty MxDisp_Move to safe storage
     end subroutine SubCreateInitialNests
     
-    subroutine LHS(MxDisp_Move, NoNests, NoCP)
+    subroutine LHS(av, MxDisp_Move, NoNests, NoCP, NoDim, xmax, ymax, zmax)
     
         ! Variables      
-        integer :: ms
+        integer :: ms, av
         real, dimension(NoCP*av,2) :: MxDisp_Move
-    
+        real, dimension(NoNests,NoCP) :: InitialNests_1D
+        integer, dimension(NoNests) :: zeros
+        
         ! Body of LHS
-        !!*** Based on the Dimension, the LHS is performed 1,2 or 3 times. ***!!
-        !!**** The size of MxDisp_Move indicates the number of Dimensions ****!!
+        !!*** Based on the degrees of freedom(xmax, ymax & zmax definition ****!!
+        !!*** & Dimension restriction) the LHS is performed 1,2 or 3 times. ***!!
+        !!**** The size of MxDisp_Move indicates the degrees of freedom ****!!
+        zeros = (/ (0, i=1,NoNests) /)
         ms = size(MxDisp_Move,1)
         if ( ms == NoCP) then
             
             print *, 'Case 1'
-            call LHS_1D(MxDisp_Move, NoNests, NoCP)
+            call LHS_1D(MxDisp_Move, NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+                       
+            ! Based on the Number of Dimensions, NonMoving Columns need to be filled with zeros
+            j = 1
+            do i = 1, size(cond)            
+                if (cond(i) == -1) then
+                    InitialNests(:,i) = InitialNests_1D(:,j)
+                    j = j + 1
+                else
+                    InitialNests(:,i) =  zeros ! Non Moving
+                end if
+            end do            
             
         elseif (ms == NoCP*2) then
             
-            print *, 'Case 2'
-            call LHS_1D(MxDisp_Move(1:NoCP,:), NoNests, NoCP)
-            print *, 'Part 2'
-            call LHS_1D(MxDisp_Move((NoCP+1):ms,:), NoNests, NoCP)
+            ! All possible combinations of Number of Dimensions and Moving/Non-Moving restrictions are considered.
+            print *, 'Case 2, Part 1'
+            call LHS_1D(MxDisp_Move(1:NoCP,:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            if (xmax == 0) then
+                InitialNests(:,(NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
+                do i = 1, NoCp
+                InitialNests(:,i) = zeros ! Non Moving
+                end do
+            else
+                InitialNests(:,1:NoCP) = InitialNests_1D ! Write Data in x-Matrix section
+            end if
             
+            print *, 'Case 2,Part 2'
+            call LHS_1D(MxDisp_Move((NoCP+1):ms,:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            if (xmax == 0) then
+                InitialNests(:,(2*NoCP+1):3*NoCP) = InitialNests_1D ! Write Data in z-Matrix section                         
+            elseif (ymax == 0) then
+                do i = 1, NoCp
+                    InitialNests(:,(NoCP+i)) = zeros ! Non Moving
+                end do
+                InitialNests(:,(2*NoCP+1):3*NoCP) = InitialNests_1D ! Write Data in z-Matrix section
+            elseif (NoDim == 2) then
+                InitialNests(:,(NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
+            else
+                InitialNests(:,(NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
+                do i = 1, NoCp
+                    InitialNests(:,(2*NoCP+i)) = zeros ! Non Moving
+                end do
+            end if    
+                    
         elseif (ms == NoCP*3) then
-            
-            print *, 'Case 3'
-            call LHS_1D(MxDisp_Move(1:NoCP,:), NoNests, NoCP)
-            print *, 'Part 2'
-            call LHS_1D(MxDisp_Move((NoCP+1):(2*NoCP),:), NoNests, NoCP)
-            print *, 'Part 3'
-            call LHS_1D(MxDisp_Move((2*NoCP+1):ms,:), NoNests, NoCP)
+        
+            ! Only one combination possible --> Fixed
+            print *, 'Case 3, Part 1'
+            call LHS_1D(MxDisp_Move(1:NoCP,:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            InitialNests(:,1:NoCP) = InitialNests_1D
+            print *, 'Case 3, Part 2'
+            call LHS_1D(MxDisp_Move((NoCP+1):(2*NoCP),:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            InitialNests(:,(NoCP+1):(NoCP*2)) = InitialNests_1D
+            print *, 'Case 3, Part 3'
+            call LHS_1D(MxDisp_Move((2*NoCP+1):ms,:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            InitialNests(:,(NoCP*2+1):ms) = InitialNests_1D
             
         else
             print *, 'Impossible Number of Dimensions.'
             stop
         end if
-        !Output: FinalSamplingPoints - an initial Sampling
+        !Output: InitialNests - an initial Sampling vis LHS
         
     end subroutine LHS
     
-    subroutine LHS_1D(MD_Move, NoNests, NoCP)
+    subroutine LHS_1D(MD_Move, NoNests, NoCP,InitialNests_1D)
     
         ! Variables
+        real, dimension(NoNests,NoCP), intent(out) :: InitialNests_1D
         integer, dimension(NoNests) :: rp
-        real, dimension(NoCP,2) :: MD_Move
+        real, dimension(NoCP,2) :: MD_Move 
         double precision, dimension(NoNests) :: linSamp, linSamp2
-        real, dimension(NoNests, NoCP) :: FinalSampPoints, FinalSampPoints2
         double precision :: max, min, first, last, dlS, ds, dlL1, dlL2, dL, dbound
     
         ! Body of LHS_1D
@@ -173,13 +219,14 @@ module CreateInitialNests
         do i = 1, NoCP               
             call randperm(NoNests, rp) ! see Subroutine, Output are integers
             do j = 1, NoNests               
-                FinalSampPoints(j,i) = linSamp(rp(j)) ! Randomly permuted integers applied as indices (rp)                               
+                InitialNests_1D(j,i) = linSamp(rp(j)) ! Randomly permuted integers applied as indices (rp)                               
             end do                
         end do
         
         ! Output to Check
-        write (*,1) transpose(FinalSampPoints)
-1           format(7f10.5)
+        write (*,1) transpose(InitialNests_1D)
+1       format(7f10.5)
+        
     
     end subroutine LHS_1D
     
