@@ -53,8 +53,26 @@
         
         end function DistP2P
         
-        !subroutine RectCheck
-        !    
-        !
-        !end subroutine RectCheck
+        function RectCheck(r, p)
+            ! Variables
+            real, dimension(2) :: AB, BC, AP, BP, p
+            real, dimension(8) :: r
+            logical :: Rectcheck
+            
+            ! Body or RectCheck
+            Rectcheck = 0
+            AB = (/(r(3)-r(1)), (r(4) - r(2))/) ! B-A -> (x,y)
+            BC = (/(r(5)-r(3)), (r(6) - r(4))/) ! C-B -> (x,y)
+            AP = (/(p(1)-r(1)), (p(2) - r(2))/)
+            BP = (/(p(1)-r(3)), (p(2) - r(4))/)
+            
+            if (0 <= dot_product(AB, AP) .and. &
+                dot_product(AB, AP) <= dot_product(AB, AB) .and. &
+                0 <= dot_product(BC, BP) .and. &
+                dot_product(BC, BP) <= dot_product(BC, BC)) then
+            Rectcheck = 1
+            end if          
+        
+        end function RectCheck
+        
     end module Toolbox
