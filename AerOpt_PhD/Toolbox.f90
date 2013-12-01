@@ -18,24 +18,8 @@
     
         end function linSpacing
         
-        subroutine MsgBox(ShowText, TitleCaption)
-        !! Objective: Output a MsgBox to better inform the User. Also breaks the program.
-        
-            ! Variables
-            use ifwin 
-            integer(SINT) :: ret
-            character (len=60) :: ShowText
-            character (len=15) :: TitleCaption  
-             
-            ! Body of MsgBox
-            ret = MessageBox ( & GetForegroundWindow(), &   ! Handle to window 
-            ShowText, &                                     ! Text (don't forget C-string) 
-            TitleCaption, &                                 ! Caption for title bar 
-            MB_ICONINFORMATION + MB_OK)                     ! Type flags
-            
-        end subroutine MsgBox
-        
         function DistP2P (NoDim, Xa, Xb, Ya, Yb, Za, Zb)
+        !! Objective: Calculate the Distance in any Dimension
         
             ! Variables
             optional :: Ya, Yb, Za, Zb
@@ -54,6 +38,8 @@
         end function DistP2P
         
         function RectCheck(r, p)
+        !! Objective: Check of values to be positioned in a Rectangle
+        
             ! Variables
             real, dimension(2) :: AB, BC, AP, BP, p
             real, dimension(8) :: r
@@ -63,8 +49,8 @@
             Rectcheck = 0
             AB = (/(r(3)-r(1)), (r(4) - r(2))/) ! B-A -> (x,y)
             BC = (/(r(5)-r(3)), (r(6) - r(4))/) ! C-B -> (x,y)
-            AP = (/(p(1)-r(1)), (p(2) - r(2))/)
-            BP = (/(p(1)-r(3)), (p(2) - r(4))/)
+            AP = (/(p(1)-r(1)), (p(2) - r(2))/) ! P-A -> (x,y)
+            BP = (/(p(1)-r(3)), (p(2) - r(4))/) ! P-B -> (x,y)
             
             if (0 <= dot_product(AB, AP) .and. &
                 dot_product(AB, AP) <= dot_product(AB, AB) .and. &

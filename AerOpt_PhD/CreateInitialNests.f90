@@ -5,15 +5,15 @@ module CreateInitialNests
         real, dimension(:,:), allocatable :: MxDisp           ! Matrix with min/max Displacements
         real, dimension(:,:), allocatable :: MxDisp_Move      ! Matrix with only moving min/max Displacements
         integer, dimension(:), allocatable :: cond            ! Identifies zero/non-zero values
-        real, dimension(:,:), allocatable :: InitialNests        
+        real, dimension(:,:), allocatable :: InitialNests     ! Matrix containing the initial Nests
+        integer :: av                                         ! Allocater Variable
         
     contains
     
     subroutine SubCreateInitialNests(NoNests, NoDim, NoCP, xmax, ymax, zmax)
     
         ! Variables
-        integer, dimension(NoCP) :: ones                      ! Vector with Ones
-        integer :: av                                         ! Allocater Variable
+        integer, dimension(NoCP) :: ones                      ! Vector with Ones                                    
         allocate(MxDisp((NoCP*NoDim),2))
         allocate(cond(NoCP*NoDim))
         allocate(InitialNests(NoNests,NoDim*NoCP))
