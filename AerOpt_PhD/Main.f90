@@ -13,9 +13,10 @@ program AerOpt
     !pathexec = '/eng/cvcluster/egevansbj/codes/prepro/2Dprepro_duct'
     !pathexec2 = '/eng/cvcluster/egmanon/Duct2d'
     
-    real, parameter :: Ma = 0.5            ! Mach Number
+    !real, parameter :: Mach = 0.5            ! Mach Number
     real, parameter :: xmax = 0.00         ! Maximum horizontal displacement of Control Nodes
     real, parameter :: ymax = 0.02         ! Maximum vertical displacement of Control Nodes
+    real, parameter :: hMa = 0.5         ! Maximum vertical displacement of Control Nodes
     real, parameter :: zmax = 0.04         ! Maximum lateral displacement of Control Nodes
     real, parameter :: engFMF = 1.0        ! What is it?
     integer, parameter :: NoNests = 30     ! Number of Nests (Cuckoo Search)
@@ -60,25 +61,25 @@ program AerOpt
     !!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
     
     ! ****Generate initial Meshes/Snapshots**** !
-    allocate(coord_temp(np,NoDim))
-    do i = 1, NoNests
-        print *, "Generating Mesh", i, "/", NoNests
-        coord_temp = coord
-        call SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP,Rect, InitialNests(i,:))
-        ! Output: New Coordinates - 30 Snapshots with moved boundaries based on initial nests
-         
-        ! Safe Snapshot in Text File
-        write( istr, '(I2)' )  i
-        open(99, file='Output_Data/Snapshot'//istr//'.txt')         
-        write(99,10) transpose(coord_temp)
-10      format(2f12.7)        
-        close(99)
-    end do
+!    allocate(coord_temp(np,NoDim))
+!    do i = 1, NoNests
+!        print *, "Generating Mesh", i, "/", NoNests
+!        coord_temp = coord
+!        call SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP,Rect, InitialNests(i,:))
+!        ! Output: New Coordinates - 30 Snapshots with moved boundaries based on initial nests
+!         
+!        ! Safe Snapshot in Text File
+!        write( istr, '(I2)' )  i
+!        open(99, file='Output_Data/Snapshot'//istr//'.txt')         
+!        write(99,10) transpose(coord_temp)
+!10      format(2f12.7)        
+!        close(99)
+!    end do
     
     !!!!! IMPLEMENT Mesh Quality Test
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
-    call SubOptimization(NoNests, NoCP, NoDim, cond, InitialNests, av, MxDisp_Move)
+    call SubOptimization(NoNests, NoCP, NoDim, cond, InitialNests, MxDisp_Move, np, xmax, hMa)
     ! Output: Optimized mesh via Cuckoo Search and POD
     
     
