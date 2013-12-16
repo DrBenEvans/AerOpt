@@ -53,9 +53,8 @@ contains
             else
                 size_ib(i) = k - 15
             end if
-            ! print *, IB(1:k,i)
+
         end do       
-        !print *, mind
         
         ! Relocating boundary nodes based on their distance to Control node
         ! Method: Gaussian RBF function
@@ -65,7 +64,6 @@ contains
                 dis = coord_temp(mind(i),1) - coord_temp(IB(j,i),1)   ! Distance of Control Node to a Node in the Influence Box         
                 w = exp(-(dis**2)/(c**2))   ! Gaussian
                 coord_temp(IB(j,i),:) = (/(coord_temp(IB(j,i),1) + w*NestDisp(i)),(coord_temp(IB(j,i),2) + w*NestDisp(NoCP+i))/)   ! New coordinates
-                ! print *, coord(IB(j,i),:)
             end do
         end do
         
@@ -89,7 +87,7 @@ contains
     end subroutine SubGenerateInitialMeshes
         
     subroutine ReadData(NoCP, NoDim)
-    !! Objective: Reads the Mesh data and Control Points Coordinates
+    ! Objective: Reads the Mesh data and Control Points Coordinates
     
         ! Body of ReadData
         open(1, file='Input_Data/Mesh_fine.txt')

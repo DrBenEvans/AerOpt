@@ -161,12 +161,13 @@ contains
     End Subroutine PRINT_MATRIX
         
     recursive subroutine QSort(a,na)
- 
-        ! DUMMY ARGUMENTS
+    ! Objective: Sort/Order an Array in ascending order
+    
+        ! Dummy Arguments
         integer, intent(in) :: nA
         real, dimension(nA), intent(in out) :: A
  
-        ! LOCAL VARIABLES
+        ! Local Variables
         integer :: left, right
         real :: random
         real :: pivot
@@ -189,6 +190,8 @@ contains
                 do while (A(left) < pivot)
                     left = left + 1
                 end do
+                
+                ! Swap numbers
                 if (left < right) then
                     temp = A(left)
                     A(left) = A(right)
@@ -202,14 +205,43 @@ contains
                 marker = left
             end if
  
-            call QSort(A(:marker-1),marker-1)
-            call QSort(A(marker:),nA-marker+1)
+            call QSort(A(:marker-1),marker-1) !recursive call -1
+            call QSort(A(marker:),nA-marker+1) ! recursive call +1
  
         end if
  
     end subroutine QSort
 
+    subroutine Unique(vector_in, sz, vector_out)
+    
+        ! Variables
+        integer :: sz
+        real, dimension(sz), intent(in) :: vector_in
+        real, dimension(:), allocatable, intent(out) :: vector_out
+        integer, dimension(sz) :: marker
+    
+        ! Body of Unique
+        j = 1
+        marker(1) = 0
+        do i = 2, sz
+            if (vector_in(i) == vector_in(i-1)) then
+                marker(i) = 1
+            else
+                marker(i) = 0
+                j = j + 1
+            end if   
+        end do
         
+        allocate(vector_out(j))
+        j = 1
+        do i = 1, sz            
+            if (marker(i) == 0) then
+                vector_out(j) = vector_in(i)
+                j = j + 1
+            end if
+        end do
+    
+    end subroutine Unique    
         !******************************************************************************
         !  Given a matrix A, with logical dimensions M by N and physical dimensions MP by NP, this
         !  routine computes its singular value decomposition, A = U.W.V'. The matrix U replaces 
