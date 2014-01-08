@@ -27,13 +27,8 @@ module CreateInitialNests
         MxDisp(:,1) = (/xmax*ones, ymax*ones, zmax*ones/)
         MxDisp(:,2) = (/xmax*(-1)*ones, ymax*(-1)*ones, zmax*(-1)*ones/)
         
-        write(*,*), 'Full Matrix'
-        print *, MxDisp
-        
         !**Reduction of MxDisp to Nonzero Values - (only for LHS-routine to reduce processing time)**!
         cond = MxDisp(:,1) /= MxDisp(:,2)
-        write(*,*), 'Zero/Nonzero'
-        print *, cond
         
         ! Derive size for reduced Matrix
         av = 0
@@ -57,17 +52,12 @@ module CreateInitialNests
             end if
         end do
         !**END Reduction of...**!
-        
-        write(*,*), 'Reduced Matrix'
-        print *, MxDisp_Move        
+               
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
         call LHS(av, MxDisp_Move, NoNests, NoCP, NoDim, xmax, ymax, zmax)     
         !Output: InitialNests - an initial Sampling vis LHS
-        
-        ! Resize InitialNests due to a possible reduction of MxDisp to MxDisp_Move
 
-        ! Remember to empty MxDisp_Move to safe storage
     end subroutine SubCreateInitialNests
     
     subroutine LHS(av, MxDisp_Move, NoNests, NoCP, NoDim, xmax, ymax, zmax)
@@ -221,39 +211,8 @@ module CreateInitialNests
             do j = 1, NoNests               
                 InitialNests_1D(j,i) = linSamp(rp(j)) ! Randomly permuted integers applied as indices (rp)                               
             end do                
-        end do
-        
-        ! Output to Check
-        write (*,1) transpose(InitialNests_1D)
-1       format(7f10.5)
-        
+        end do        
     
     end subroutine LHS_1D
-    
-    subroutine randperm(N, p)
-    
-!! Source: coding.derkeiler.com/Archive/Fortran/comp.lang.fortran/2006-03/msg00748.html
-!! Based on Knuth's algorithm
-
-        integer, intent(in) :: N
-        integer, dimension(:), intent(out) :: p
-
-        integer :: temp
-
-        p = (/ (i, i=1,N) /)
-
-        do j=N,2,-1
-
-            call random_number(rn)
-            k = floor(j*rn) + 1
-
-            ! exchange p(k) and p(j)
-            temp = p(k)
-            p(k) = p(j)
-            p(j) = temp
-
-        end do
-
-        end subroutine randperm
     
 end module CreateInitialNests

@@ -60,84 +60,6 @@ contains
         end if          
         
     end function RectCheck
-        
-    Subroutine SVD(A, M, N, V2)
-    
-        ! f90 mkl_lapack95_lp64.lib mkl_intel_lp64.lib mkl_core.lib mkl_sequential.lib
-   
-        !     .. Parameters ..
-        integer          LDA, LDU, LDVT
-        integer          LWMAX
-        parameter        ( LWMAX = 10000)
-
-        !     .. Local Scalars ..
-        integer          INFO, LWORK
-
-        !     .. Local Arrays ..
-        double precision, dimension(N, N) :: V2
-        double precision, dimension(:,:), allocatable :: U, VT
-        double precision, dimension (:), allocatable :: S
-        double precision, intent(in) ::                             A( M, N )
-        double precision ::                             WORK( LWMAX )
-
-        !call PRINT_MATRIX( 'Initial Matrix A', &
-        !        M, N, A, LDA )
-        
- 
-        !     .. Executable Statements ..
-        write(*,*)'DGESVD Program Results'
-
-        ! Define Array Size
-        LDA = M
-        LDU = M
-        LDVT = N
-        if (M > 1000) then
-            LDU = 1
-            allocate(U(LDU,M))
-        else
-            allocate(U(LDU,M))
-        end if
-        allocate(VT(LDVT,N))
-        allocate(S(N))            
-            
-        !     Query the optimal workspace.
-        LWORK = -1
-        call DGESVD( 'N', 'All', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, INFO )
-        LWORK = min( LWMAX, int( WORK( 1 ) ) )
-
-        !     Compute SVD.
-        call DGESVD( 'N', 'All', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, INFO )
-
-        !     Check for convergence.
-        if( INFO.GT.0 ) then
-        write(*,*)'The algorithm computing SVD failed to converge.'
-        stop
-        end if
-            
-        !!     Print singular values.
-        !call PRINT_MATRIX( 'Singular values', 1, N, S, 1 )
-        !
-        !!     Print left singular vectors.
-        !call PRINT_MATRIX( 'Left singular vectors (stored columnwise)', &
-        !        M, N, U, LDU )
-        !
-        !!     Print right singular vectors.
-        !call PRINT_MATRIX( 'Right singular vectors (stored rowwise)', &
-        !        N, N, VT, LDVT )
-        !
-        !     Print right singular vectors transposed.
-        !call PRINT_MATRIX( 'Right singular vectors (stored rowwise), Transposed', &
-        !        N, N, transpose(VT), LDVT )
-            
-        !Output: V Matrix
-        open(23,file='Output_Data\VMatrixhigh.txt')
-        write(23,'(30f12.7)') transpose(VT)            
-        close(23)
-
-        V2 = transpose(VT)
-            
-    End Subroutine SVD
-
 
     Subroutine PRINT_MATRIX( DESC, M, N, A, LDA )
     ! Objective: Print a Matrix
@@ -160,12 +82,14 @@ contains
             
     End Subroutine PRINT_MATRIX
         
-    recursive subroutine QSort(a,na)
+    recursive subroutine QSort(a,na, sel, ind)
     ! Objective: Sort/Order an Array in ascending order
     
         ! Dummy Arguments
         integer, intent(in) :: nA
         real, dimension(nA), intent(in out) :: A
+        integer, dimension(nA), intent(in out), optional :: ind
+        character(len=1), optional :: sel
  
         ! Local Variables
         integer :: left, right
@@ -196,6 +120,11 @@ contains
                     temp = A(left)
                     A(left) = A(right)
                     A(right) = temp
+                    if (sel == 'y') then
+                        temp = ind(left)
+                        ind(left) = ind(right)
+                        ind(right) = temp
+                    end if
                 end if
             end do
  
@@ -205,8 +134,8 @@ contains
                 marker = left
             end if
  
-            call QSort(A(:marker-1),marker-1) !recursive call -1
-            call QSort(A(marker:),nA-marker+1) ! recursive call +1
+            call QSort(A(:marker-1),marker-1, sel, ind(:marker-1)) !recursive call -1
+            call QSort(A(marker:),nA-marker+1, sel, ind(marker:)) ! recursive call +1
  
         end if
  
@@ -241,7 +170,119 @@ contains
             end if
         end do
     
-    end subroutine Unique    
+    end subroutine Unique
+    
+    subroutine randperm(N, p)
+    
+    !! Source: coding.derkeiler.com/Archive/Fortran/comp.lang.fortran/2006-03/msg00748.html
+    !! Based on Knuth's algorithm
+
+    integer, intent(in) :: N
+    integer, dimension(:), intent(out) :: p
+
+    integer :: temp
+
+    p = (/ (i, i=1,N) /)
+
+    do j=N,2,-1
+
+        call random_number(rn)
+        k = floor(j*rn) + 1
+
+        ! exchange p(k) and p(j)
+        temp = p(k)
+        p(k) = p(j)
+        p(j) = temp
+
+    end do
+
+    end subroutine randperm
+    
+    subroutine inverse(a,c,n)
+    
+        !============================================================
+        ! Inverse matrix
+        ! Method: Based on Doolittle LU factorization for Ax=b
+        ! Alex G. December 2009
+        ! http://ww2.odu.edu/~agodunov/computing/programs/book2/Ch06/Inverse.f90
+        !-----------------------------------------------------------
+        ! input ...
+        ! a(n,n) - array of coefficients for matrix A
+        ! n      - dimension
+        ! output ...
+        ! c(n,n) - inverse matrix of A
+        ! comments ...
+        ! the original matrix a(n,n) will be destroyed 
+        ! during the calculation
+        !===========================================================
+        implicit none 
+        integer n
+        double precision :: a(n,n)
+        double precision, intent(out) :: c(n,n)
+        double precision L(n,n), U(n,n), b(n), d(n), x(n)
+        double precision coeff
+        integer i, j, k
+
+        ! step 0: initialization for matrices L and U and b
+        ! Fortran 90/95 aloows such operations on matrices
+        L=0.0
+        U=0.0
+        b=0.0
+
+        ! step 1: forward elimination
+        do k=1, n-1
+           do i=k+1,n
+              coeff=a(i,k)/a(k,k)
+              L(i,k) = coeff
+              do j=k+1,n
+                 a(i,j) = a(i,j)-coeff*a(k,j)
+              end do
+           end do
+        end do
+
+        ! Step 2: prepare L and U matrices 
+        ! L matrix is a matrix of the elimination coefficient
+        ! + the diagonal elements are 1.0
+        do i=1,n
+          L(i,i) = 1.0
+        end do
+        ! U matrix is the upper triangular part of A
+        do j=1,n
+          do i=1,j
+            U(i,j) = a(i,j)
+          end do
+        end do
+
+        ! Step 3: compute columns of the inverse matrix C
+        do k=1,n
+          b(k)=1.0
+          d(1) = b(1)
+        ! Step 3a: Solve Ld=b using the forward substitution
+          do i=2,n
+            d(i)=b(i)
+            do j=1,i-1
+              d(i) = d(i) - L(i,j)*d(j)
+            end do
+          end do
+        ! Step 3b: Solve Ux=d using the back substitution
+          x(n)=d(n)/U(n,n)
+          do i = n-1,1,-1
+            x(i) = d(i)
+            do j=n,i+1,-1
+              x(i)=x(i)-U(i,j)*x(j)
+            end do
+            x(i) = x(i)/u(i,i)
+          end do
+        ! Step 3c: fill the solutions x(n) into column k of C
+          do i=1,n
+            c(i,k) = x(i)
+          end do
+          b(k)=0.0
+        end do
+        
+    end subroutine inverse
+
+
         !******************************************************************************
         !  Given a matrix A, with logical dimensions M by N and physical dimensions MP by NP, this
         !  routine computes its singular value decomposition, A = U.W.V'. The matrix U replaces 

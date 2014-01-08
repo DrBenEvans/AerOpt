@@ -5,6 +5,7 @@ program AerOpt
     use GenerateInitialMeshes
     use Toolbox
     use Optimization
+    use ReadData
     
     implicit none
     integer :: i, j, k                ! Simple Loop Variables
@@ -24,6 +25,11 @@ program AerOpt
     integer, parameter :: NoCP = 7         ! Number of Control Points
     integer, parameter :: NoDim = 2        ! Number of Dimensions
     integer, parameter :: NoG = 5            ! Number of Generations
+    integer, parameter :: NoPOMod = -1      ! No of POD Modes considered
+    integer, parameter :: NoLeviSteps = 100 ! Number of Levy walks per movement
+    logical, parameter :: constrain = 1
+    real :: Aconst = 0.01                        ! Levy Flight parameter (determined emperical) 
+    real, parameter :: p = 0.75             ! Fraction of Top to Low Nests
     ! 1D: only x considered, 2D: x & y considered, 3D: x, y & z considered
      
     character, parameter :: runOnCluster = 'Y'
@@ -50,13 +56,14 @@ program AerOpt
     call RANDOM_SEED    
     
     ! ****Sub-Section: Create Initial Nests for the CFD Solver****** ! 
-    ! ***********included in CreateInitialNests module************** !  
+    ! ***********included in CreateInitialNests module************** !
+    print *, 'Start LHS Sampling - Create Initial Nests'
     call SubCreateInitialNests(NoNests, NoDim, NoCP, xmax, ymax, zmax)                !Sampling of initial points/nests via LHC    
     ! Output: InitialNests - Sampling Points for initial Nests
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
     print *, 'Start Read Data'
-    call ReadData(NoCP, NoDim)
+    call SubReadData(NoCP, NoDim)
     ! Output: Boundf, Coord, Connecf, Coord_CP
     
     !!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
@@ -80,8 +87,21 @@ program AerOpt
     !!!!! IMPLEMENT Mesh Quality Test
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
-    call SubOptimization(NoNests, NoCP, NoDim, cond, InitialNests, MxDisp_Move, np, xmax, hMa)
+    print *, 'Start Optmization'
+    call SubOptimization(NoNests, NoCP, NoDim, cond, InitialNests, MxDisp_Move, np, xmax, hMa, p, Aconst, NoPOMod, NoLeviSteps, NoG, constrain)
     ! Output: Optimized mesh via Cuckoo Search and POD
     
+    coord_temp = coord
+    call SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP, Rect, NestOpt)
+    ! Output: Optimum Coordinates - 1 Mesh with moved boundaries based on optimum Control Point Coordinates
+     
+    ! Safe Optimum Geometry in Text File
+    open(99, file='Output_Data/OptimumMesh.txt')         
+    write(99,'(1I8)') np
+    write(99,'(1I8)') ne
+    write(99,10) transpose(coord_temp)
+    write(99,11) connecf
+11  format(3I8)
+    close(99)
     
 end program AerOpt
