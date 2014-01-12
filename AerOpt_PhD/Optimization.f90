@@ -85,6 +85,8 @@ contains
             !    ind_Fi(j) = ind_Fi(NoNests-j+1)
             !end do
             print *, 'Current best solution:' , Fi(1)
+            open(19,file='Output_Data/Fitness.txt')
+            write(19,'(1f13.10)') Fi(1)                    
             
             newNests_Move = InitialNests_Move(ind_Fi,:)
             newNests = InitialNests(ind_Fi,:)
@@ -218,11 +220,14 @@ contains
             end do
                      
         end do
-        print *, 'Finished Cuckoo Search'
+        print *, 'Finished Cuckoo Search'   
         
-        ! Find Optimum Cuckoo
+        ! Find Optimum Cuckoo and write in File
         call QSort(Fi,size(Fi, dim = 1), 'y', ind_Fi)
         Fopt = Fi(1)
+        write(19,'(1f13.10)') Fi(1)
+        close(19)
+        
         NestOpt = newNests(ind_Fi(1),:)
         
         print *, 'Optimum Fitness found:', Fopt
@@ -296,7 +301,7 @@ contains
            
             
         ! Output: Modes and Coefficients of POD       
-        open(23,file='G:/Coefficients.txt')
+        open(23,file='Output_Data/Coefficients.txt')
         write(23,'(30f12.7)') coeff            
         close(23)
         print *, 'All Modes and Coefficients Calculated'
@@ -342,16 +347,16 @@ contains
             do j = 1, (NoEngIN - 2)
                 Area(j) = sqrt((Pmid_x(j) - Pmid_x(j+1))**2 + (Pmid_y(j) - Pmid_y(j+1))**2)
             end do
-            
-            print *, 'Area:'
-            print *, Area
+            !
+            !print *, 'Area:'
+            !print *, Area
             
             ! Area Weighted Average Pressure (calculated based on the Areas)
             Press_mid = pressure(engInNodes(2:(NoEngIN-1)),i) ! Extract Pressure of middle engine Inlet Nodes
             Press_ave = sum(Press_mid*Area, dim = 1)/sum(Area, dim = 1)
             
             ! Calculate Pressure Deviation
-            print *, pressure(engInNodes,i)
+            ! print *, pressure(engInNodes,i)
             do j = 1, (NoEngIN)
                 dPress(j) = abs(pressure(engInNodes(j),i) - Press_ave)            
             end do
@@ -467,7 +472,7 @@ contains
         !call PRINT_MATRIX( 'Right singular vectors (stored rowwise), Transposed', N, N, transpose(VT), LDVT )
             
         !Output: V Matrix
-        open(23,file='Output_Data/VMatrixhigh.txt')
+        open(23,file='Output_Data/VMatrix.txt')
         write(23,'(30f12.7)') transpose(VT)            
         close(23)
 
@@ -582,12 +587,12 @@ contains
         ! Body of PressInterp
         
         
-        open(99, file='G:/InitialNests.txt')         
+        open(99, file='Output_Data/InitialNests.txt')         
         write(99,10) transpose(InitNests)
 10      format(14f12.7)        
         close(99)
         
-        open(15, file='G:/tempNests.txt')         
+        open(15, file='Output_Data/tempNests.txt')         
         write(15,15) tempNests
 15      format(1f12.7)        
         close(15)

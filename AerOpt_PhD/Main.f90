@@ -100,7 +100,6 @@ program AerOpt
     write(99,'(1I8)') np
     write(99,'(1I8)') ne
     write(99,10) transpose(coord_temp)
-    write(99,11) connecf
 11  format(3I8)
     close(99)
     
