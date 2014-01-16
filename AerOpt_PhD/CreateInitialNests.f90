@@ -7,6 +7,7 @@ module CreateInitialNests
         integer, dimension(:), allocatable :: cond            ! Identifies zero/non-zero values
         real, dimension(:,:), allocatable :: InitialNests     ! Matrix containing the initial Nests
         integer :: av                                         ! Allocater Variable
+        integer, dimension(:,:), allocatable :: boundff       ! Boundary faces including boundary flags
         
     contains
     
@@ -214,5 +215,26 @@ module CreateInitialNests
         end do        
     
     end subroutine LHS_1D
+    
+    subroutine IdentifyBoundaryFlags()
+    
+        ! Variables
+        use ReadData
+        real, dimension(2) :: point
+    
+        ! Body of IdentifyBoundaryFlags
+        do k = 1, nbf
+            point(1) = (coord(boundf(k,1),1)*15 + coord(boundf(k,2),1)*15)/2.0
+            point(2) = (coord(boundf(k,1),2)*15 + coord(boundf(k,2),2)*15)/2.0
+            if (point(1) < 20 .and. point(1) > 0 .and. point(2) < 3 .and. point(2) > (-2)) then
+                boundff(k,3) = 6    ! Adiabatic Viscous Wall
+            elseif (point(1) == 0 .and. point(2) < 1 .and. point(2) > 0) then
+                boundff(k,3) = 8    ! Engine Inlet
+            else    
+                boundff(k,3) = 3    ! Far Field
+            end if       
+        end do
+    
+    end subroutine IdentifyBoundaryFlags
     
 end module CreateInitialNests

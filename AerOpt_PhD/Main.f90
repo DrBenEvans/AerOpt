@@ -11,7 +11,6 @@ program AerOpt
     integer :: i, j, k                ! Simple Loop Variables
 
     ! User Input
-    !pathexec = '/eng/cvcluster/egevansbj/codes/prepro/2Dprepro_duct'
     !pathexec2 = '/eng/cvcluster/egmanon/Duct2d'
     
     !real, parameter :: Mach = 0.5            ! Mach Number
@@ -33,8 +32,13 @@ program AerOpt
     ! 1D: only x considered, 2D: x & y considered, 3D: x, y & z considered
      
     character, parameter :: runOnCluster = 'Y'
-    character(len=2) :: istr
+    character, parameter :: IsLin = 'N'             ! Windows('N') or Linux('Y') System to run on? (Cluster = Linux, Visual Studio = Windows)
+    character(len=:), allocatable :: istr, strPrepro
     character(len=1) :: ShowText
+    character(len=51) :: pathLin
+    character(len=8), parameter :: filename = 'Snapshot'
+    character(len=7) :: pathWin
+    integer :: PreInt
     
     ! Check xmax, ymax, zmax & NoDim Input
     select case (NoDim)
@@ -70,19 +74,91 @@ program AerOpt
     
     ! ****Generate initial Meshes/Snapshots**** !
     allocate(coord_temp(np,NoDim))
+    allocate(boundff(nbf,(NoDim+1)))
+    boundff(:,1:2) = boundf
     do i = 1, NoNests
         print *, "Generating Mesh", i, "/", NoNests
         coord_temp = coord
         call SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP,Rect, InitialNests(i,:))
         ! Output: New Coordinates - 30 Snapshots with moved boundaries based on initial nests
-         
-        ! Safe Snapshot in Text File
-        write( istr, '(I2)' )  i
-        open(99, file='Output_Data/Snapshot'//istr//'.txt')         
-        write(99,10) transpose(coord_temp)
+        
+        call IdentifyBoundaryFlags()
+        ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundff)
+        
+        ! Safe Snapshot in Data File
+        if (i < 10) then
+            allocate(character(len=1) :: istr)
+            write( istr, '(I1)' )  i
+        else
+            allocate(character(len=2) :: istr)
+            write( istr, '(I2)' )  i
+        end if
+        open(99, file='Output_Data/Snapshot'//istr//'.dat')
+        write(99,*) 1
+        write(99,*) 'David Naumann'
+        write(99,*) 'NoTrgElem NoNodes NoBound'        
+        write(99,*) ne, np, nbf
+        write(99,*) 'Connectivities'
+        do j = 1, ne
+            write(99,*) j, connecf(j,:)
+        end do
+        write(99,*) 'Coordinates'
+        do j = 1, np
+            write(99,*) j, coord_temp(j,:)
+        end do
+        write(99,*) 'Boundary Faces'
+        do j = 1, nbf
+            write(99,*) boundff(j,:)
+        end do
 10      format(2f12.7)        
         close(99)
+        deallocate (istr)
     end do
+    
+    ! ****Call 2D Preprocessor and pass on input parameters**** !
+    print *, 'Start Preprocessing'
+    pathLin = '/eng/cvcluster/egevansbj/codes/prepro/2Dprepro_duct'
+    pathWin = ''   
+    do i = 1, NoNests
+        ! Determine correct String      
+        if (i < 10) then
+            allocate(character(len=1) :: istr)
+            write( istr, '(I1)' )  i
+        else
+            allocate(character(len=2) :: istr)
+            write( istr, '(I2)' )  i
+        end if
+        
+        if (IsLin == 'N') then
+            
+            ! write Inputfile (for Windows)
+            open(11, file='Input_Data\PreprocessingInput.txt')        
+            write(11,*) 'Output_Data\', filename, istr, '.dat'
+            write(11,*) 'f'
+            write(11,*) 1
+            write(11,*) 0
+            write(11,*) 0
+            write(11,*) 'Output_Data\', filename, istr, '.sol'
+            close(11)
+            allocate(character(len=29) :: strPrepro)
+            strPrepro = 'Flite2D\PreProcessing'
+            
+        else
+            
+            ! write command (for Linux)
+            PreInt = 59 + 3*len(filename) + 3*len(istr) + len(pathLin)
+            allocate(character(len=PreInt) :: strPrepro)
+            strPrepro = '/bin/echo -e "Output_Data/'//filename//istr//'.dat\nf\n1\n0\n0\n' &        ! Assemble system command string
+            //filename//istr//'.sol\n" | '//pathLin//'/Aggl2d > '//filename//istr//'.outpre'
+            
+        end if
+        print *, 'Preprocessing Snapshot', i
+        print *, ' '
+        call system(strPrepro)   ! System operating command called to activate fortran       
+        deallocate (istr)
+        deallocate (strPrepro)
+    end do
+    print *, 'Finished Preprocessing'
     
     !!!!! IMPLEMENT Mesh Quality Test
     
