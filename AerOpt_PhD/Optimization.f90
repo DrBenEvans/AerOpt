@@ -79,18 +79,19 @@ contains
             ind_Fi = (/ (i, i=1,NoNests) /)
             call QSort(Fi,size(Fi), 'y', ind_Fi) ! Result in Ascending order
             
-            ! Change to Descending Order
+            !! Change to Descending Order in Case of Maximization Problem
             !do j = 1, nint(NoNests/2.0)
             !    Fi(j) = Fi(NoNests-j+1)
             !    ind_Fi(j) = ind_Fi(NoNests-j+1)
             !end do
+            
             print *, 'Current best solution:' , Fi(1)
             open(19,file='Output_Data/Fitness.txt')
             write(19,'(1f13.10)') Fi(1)                    
             
             newNests_Move = InitialNests_Move(ind_Fi,:)
             newNests = InitialNests(ind_Fi,:)
-            !!!!! If necessary, record Initial Nests (newnests) --> Output Text file
+!!!!! If necessary, record Initial Nests (newnests) --> Output Text file
             
             !!*** Loop over Discarded Nests ***!!
             print *, 'Modify Discarded Cuckoos'
@@ -234,7 +235,7 @@ contains
         print *, 'Optimum Geometry:'
         print *, NestOpt
         
-        !!! Calculate Error??
+!!! Calculate Error??
         
     end subroutine SubOptimization
         
