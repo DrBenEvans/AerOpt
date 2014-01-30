@@ -7,7 +7,7 @@ module Optimization
     real, dimension(:), allocatable :: engInNodes                       ! Engine inlet Nodes
     double precision, dimension(:,:), allocatable :: pressure           ! Pressure of All initial Snapshots
     real, dimension(:), allocatable :: Fi                               ! Vector with all current Fitness values
-    real, dimension(:), allocatable :: NestOpt                                       ! Control Point Coordinates of Optimum Geometry
+    real, dimension(:), allocatable :: NestOpt                          ! Control Point Coordinates of Optimum Geometry
         
 contains
     
@@ -277,7 +277,7 @@ contains
             end do
                 
             pressure(:,i) = Output(:,5) + (1.0/2.0)*(hMa**2)*Output(:,1)*(Output(:,2)*Output(:,2)+Output(:,3)*Output(:,3)) !! Bernoulli Equation to calculate non-dimensional pressure            
-            !!!!! Implement new pressure Calculation
+!!!!! Implement new pressure Calculation
             close(8)
             print *,'Pressure Snapshot', i 
                 
@@ -302,9 +302,9 @@ contains
            
             
         ! Output: Modes and Coefficients of POD       
-        open(23,file='Output_Data/Coefficients.txt')
-        write(23,'(30f12.7)') coeff            
-        close(23)
+        !open(23,file='Output_Data/Coefficients.txt')
+        !write(23,'(30f12.7)') coeff            
+        !close(23)
         print *, 'All Modes and Coefficients Calculated'
                       
     end subroutine POD
@@ -410,9 +410,7 @@ contains
     end subroutine getengineInlet
         
     subroutine SVD(A, M, N, V2)
-    
-        ! f90 mkl_lapack95_lp64.lib mkl_intel_lp64.lib mkl_core.lib mkl_sequential.lib
-   
+
         ! Parameters
         integer          LDA, LDU, LDVT
         integer          LWMAX
@@ -473,9 +471,9 @@ contains
         !call PRINT_MATRIX( 'Right singular vectors (stored rowwise), Transposed', N, N, transpose(VT), LDVT )
             
         !Output: V Matrix
-        open(23,file='Output_Data/VMatrix.txt')
-        write(23,'(30f12.7)') transpose(VT)            
-        close(23)
+        !open(23,file='Output_Data/VMatrix.txt')
+        !write(23,'(30f12.7)') transpose(VT)            
+        !close(23)
 
         V2 = transpose(VT)
             
@@ -586,17 +584,6 @@ contains
         real, dimension(np) :: newpressure
     
         ! Body of PressInterp
-        
-        
-        open(99, file='Output_Data/InitialNests.txt')         
-        write(99,10) transpose(InitNests)
-10      format(14f12.7)        
-        close(99)
-        
-        open(15, file='Output_Data/tempNests.txt')         
-        write(15,15) tempNests
-15      format(1f12.7)        
-        close(15)
         
         ! Sort InitNests Matrix
         coeff_temp = coeff

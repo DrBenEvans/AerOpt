@@ -57,7 +57,8 @@ module CreateInitialNests
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
         call LHS(av, MxDisp_Move, NoNests, NoCP, NoDim, xmax, ymax, zmax)     
-        !Output: InitialNests - an initial Sampling vis LHS
+        !Output: InitialNests - an initial Sampling via LHS
+        InitialNests(1,:) = (/ (0, i=1,(NoCP*NoDim)) /)
 
     end subroutine SubCreateInitialNests
     
@@ -107,16 +108,16 @@ module CreateInitialNests
             
             print *, 'Case 2,Part 2'
             call LHS_1D(MxDisp_Move((NoCP+1):ms,:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-            if (xmax == 0) then
+            if (xmax == 0) then     ! x: 0, y & z full
                 InitialNests(:,(2*NoCP+1):3*NoCP) = InitialNests_1D ! Write Data in z-Matrix section                         
-            elseif (ymax == 0) then
+            elseif (ymax == 0) then ! y: 0, x & z full
                 do i = 1, NoCp
                     InitialNests(:,(NoCP+i)) = zeros ! Non Moving
                 end do
                 InitialNests(:,(2*NoCP+1):3*NoCP) = InitialNests_1D ! Write Data in z-Matrix section
-            elseif (NoDim == 2) then
+            elseif (NoDim == 2) then ! just 2D - x & y full
                 InitialNests(:,(NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
-            else
+            else                     ! z: 0, x & y full  
                 InitialNests(:,(NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
                 do i = 1, NoCp
                     InitialNests(:,(2*NoCP+i)) = zeros ! Non Moving

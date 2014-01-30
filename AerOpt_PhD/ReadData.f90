@@ -101,13 +101,13 @@ contains
         character(len=*) :: istr
     
         ! Body of PreProInpFileWin
-        open(11, file='Input_Data\PreprocessingInput.txt')        
-        write(11,*) 'Output_Data\', filename, istr, '.dat'
-        write(11,*) 'f'
-        write(11,*) 1
-        write(11,*) 0
-        write(11,*) 0
-        write(11,*) 'Output_Data\', filename, istr, '.sol'
+        open(11, file='Input_Data/PreprocessingInput.txt')        
+        write(11,*) 'Output_Data/', filename, istr, '.dat'  ! Name of Input file
+        write(11,*) 'f'                                     ! Hybrid Mesh?
+        write(11,*) 1                                       ! Number of Grids
+        write(11,*) 0                                       ! Directionality Parameters
+        write(11,*) 0                                       ! Visualization Modes
+        write(11,*) 'Output_Data/', filename, istr, '.sol'  ! Output File name
         close(11)
     
     end subroutine PreProInpFileWin
@@ -119,9 +119,9 @@ contains
         character(len=*) :: filename
         character(len=*) :: istr
         character(len=:), allocatable :: fname
-        character(len=7) :: strEFMF, strMa
-        character(len=2) :: strNI
-        character(len=*) :: newdir
+        character(len=7) :: strEFMF, strMa      ! String for Ma number & Engine Inlet Front Mass Flow Number
+        character(len=2) :: strNI               ! String for Number of Iterations
+        character(len=*) :: newdir              ! New Directory
         integer :: fileLength
     
         ! Body of WriteSolverInpFile
@@ -174,12 +174,12 @@ contains
         close(5)
         
         ! Create Read File for Solver
-        open(1, file='Input_Data/SolverInput'//istr//'.txt')        
-        write(1,*) newdir, '/Input/', filename, istr, '.inp'
-        write(1,*) newdir, '/Input/', filename, istr, '.sol'
+        open(1, file='Input_Data/SolverInput.txt')        
+        write(1,*) '2DEngInlSim/', newdir, '/Input/', filename, istr, '.inp'    ! Control Filename
+        write(1,*) '2DEngInlSim/', newdir, '/Input/', filename, istr, '.sol'    ! Computation Filename
         write(1,*) ''
-        write(1,*) newdir, '/Output/', filename, istr, '.resp'
-        write(1,*) newdir, '/Output/', filename, istr, '.rsd'
+        write(1,*) '2DEngInlSim/', newdir, '/Output/', filename, istr, '.resp'  ! Result filename
+        write(1,*) '2DEngInlSim/', newdir, '/Output/', filename, istr, '.rsd'   ! Residual Filename
         close(1)
     
     end subroutine WriteSolverInpFile
@@ -202,16 +202,13 @@ contains
     
     end subroutine writeBatchFile
     
-    subroutine createDirectories(filename, istr, Username, Password, newdir)
+    subroutine createDirectoriesInit(newdir)
     ! Objective: Create Directories from Windows in Linux
     
         ! Variables
         character(len=255) :: currentDir
-        character(len=8) :: strin
-        character(len=5) :: strin1
-        character(len=3) :: strin2
         character(len=:), allocatable :: Output
-        character(len=*) :: Username, Password, filename, istr, newdir
+        character(len=*) :: newdir
         integer :: strOut
         
         ! Body of createDirectories
@@ -224,14 +221,36 @@ contains
         write(1,*) 'cd ', newdir
         write(1,*) 'mkdir Input'
         write(1,*) 'mkdir Output'
-        write(1,*) 'cd Input'
+        close(1)
+    
+    end subroutine createDirectoriesInit
+    
+    subroutine transferFilesWin(filename, istr, newdir)
+    ! Objective: Create Directories from Windows in Linux
+    
+        ! Variables
+        character(len=255) :: currentDir
+        character(len=:), allocatable :: Output
+        character(len=*) :: filename, istr, newdir
+        integer :: strOut
         
+        ! Body of createDirectories
+        call getcwd(currentDir)
+        open(1, file='FileCreateDir.scr')
+        write(1,*) 'cd '
+        write(1,*) 'cd ..'
+        write(1,*) 'cd egnaumann'
+        
+        ! Put in Solver Input File
         strOut = len(trim(currentDir)) + 33
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'\Input_Data\SolverInput'//istr//'.txt"'
+        Output = 'put "'//trim(currentDir)//'/Input_Data/SolverInput.txt"'
         write(1, '(A)') Output       
         deallocate(Output)
         
+        write(1,*) 'cd 2DEngInlSim/', newdir, '/Input'
+        
+        ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster        
         strOut = len(trim(currentDir)) + 22
         allocate(character(len=strOut) :: Output)
         Output = 'put "'//trim(currentDir)//'/Output_Data/'//filename//istr//'.sol"'
@@ -250,33 +269,30 @@ contains
         write(1, '(A)') Output
         close(1)
     
-    end subroutine createDirectories
+    end subroutine transferFilesWin
     
-    subroutine createDirectories2(filename, istr, Username, Password, newdir)
+    subroutine transferFilesLin(filename, istr, newdir)
     ! Objective: Create Directories from Linux in Linux
     
         ! Variables
         character(len=255) :: currentDir
-        character(len=*) :: Username, Password, filename, istr, newdir 
+        character(len=*) :: filename, istr, newdir 
+        
         ! Body of createDirectories
         call getcwd(currentDir)
         write(*,*) trim(currentDir)
         open(1, file='FileCreateDir.scr')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd egnaumann/2DEngInlSim'
-        write(1,*) 'mkdir ', newdir
-        write(1,*) 'cd ', newdir
-        write(1,*) 'mkdir Input'
-        write(1,*) 'mkdir Output'
-        write(1,*) 'cd Input'
+        write(1,*) 'cd egnaumann'
         write(1,*) 'mv ', currentDir, '/Input_Data/SolverInput.txt SolverInput.txt'
+        write(1,*) 'cd 2DEngInlSim/', newdir, '/Input'    
         write(1,*) 'mv ', currentDir, '/Output_Data/', filename, istr, '.sol ', filename, istr, '.sol'
         write(1,*) 'mv ', currentDir, '/Input_Data/', filename, istr, '.inp ', filename, istr, '.inp'
         write(1,*) 'mv ', currentDir, '/Input_Data/batchfile', istr, ' batchfile', istr
         close(1)
     
-    end subroutine createDirectories2
+    end subroutine transferFilesLin
     
     subroutine TriggerFile(filename, istr, newdir)
     ! Objectives: Triggerfile for Cluster Simulation & Parallelisation
@@ -289,24 +305,56 @@ contains
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd egnaumann/2DEngInlSim/', newdir, '/Input'
-        write(1,*) 'qsub_batchfile', filename, istr
+        write(1,*) 'qsub batchfile', istr, '.sh'
         close(1)
                         
     end subroutine TriggerFile
     
-    subroutine TriggerFile2(filename, istr, newdir)
+    subroutine TriggerFile2(filename, istr, path)
     ! Objectives: Triggerfile for noncluster Simulation
     
         ! Variables
-        character(len=*) :: filename, istr, newdir
+        character(len=*) :: filename, istr, path
     
         ! Body of TriggerFile
         open(1, file='Trigger.sh')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'egnaumann/2DEngInlSim/2DSolverLin'
+        write(1,*) 'cd ..'
+        write(1,*) 'cd ..'
+        write(1,*) path
         close(1)
                         
     end subroutine TriggerFile2
+    
+    subroutine CheckSimStatus(newdir, filename, NoNests)
+    
+        ! Variables
+        character(len=*) :: newdir, filename
+    
+        ! Body of CheckSimStatus
+        open(1, file='CheckStatus.scr')
+        write(1,*) 'cd '
+        write(1,*) 'cd ..'
+        write(1,*) 'cd egnaumann/2DEngInlSim/', newdir, '/Output'      
+        write(1,*) '[ -e ', filename, NoNests, '.rsd ] && echo 1 > check.txt || echo 0 > check.txt'
+        close(1)
+    
+    end subroutine CheckSimStatus
+    
+    subroutine CheckSimStatus2(newdir, filename, NoNests)
+    
+        ! Variables
+        character(len=*) :: newdir, filename
+    
+        ! Body of CheckSimStatus
+        open(1, file='CheckStatus.scr')
+        write(1,*) 'cd '
+        write(1,*) 'cd ..'
+        write(1,*) 'cd egnaumann/2DEngInlSim/Cases'
+        write(1,*) 'get check.txt'
+        close(1)
+    
+    end subroutine CheckSimStatus2
     
 end module ReadData

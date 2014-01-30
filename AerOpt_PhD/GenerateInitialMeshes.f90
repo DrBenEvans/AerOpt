@@ -62,7 +62,7 @@ contains
             end do
         end do
         
-        !!!!!! PLOT initial Nests --> MATLAB output file
+!!!!!! PLOT initial Nests --> MATLAB output file
         
         ! Relocation of the internal nodes(non-boundary)
         ! Method: Maintain the Area coefficient
