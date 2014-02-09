@@ -114,6 +114,7 @@ program AerOpt
 
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     ! Creates Directory file
+    print *, 'Create Directories'
     call createDirectoriesInit(newdir)
     if (IsLin == 'N')   then    ! AerOpt is executed from a Windows machine
                              
@@ -171,7 +172,7 @@ program AerOpt
         ! Determine correct String      
         call DetermineStrLen(istr, i)                      
         ! Creates the input file including Solver Parameters and a second file including I/O filenames
-        call WriteSolverInpFile(filename, istr, engFMF, hMa, NoIter, newdir)
+        call WriteSolverInpFile(filename, istr, engFMF, hMa, NoIter, newdir, NoNests)
         ! writes the batchfile to execute Solver on Cluster
         call writeBatchFile(filename, istr, pathLin_Solver)
 

@@ -112,7 +112,7 @@ contains
     
     end subroutine PreProInpFileWin
     
-    subroutine WriteSolverInpFile(filename, istr, engFMF, hMa, NoIter, newdir)
+    subroutine WriteSolverInpFile(filename, istr, engFMF, hMa, NoIter, newdir, NoNests)
     ! Objective: Create Solver Input files
     
         ! Variables
@@ -174,7 +174,9 @@ contains
         close(5)
         
         ! Create Read File for Solver
-        open(1, file='Input_Data/SolverInput.txt')        
+        open(1, file='Input_Data/SolverInput'//istr//'.txt')
+        write(1,*) NoNests
+        write(1,*) 'innocent'
         write(1,*) '2DEngInlSim/', newdir, '/Input/', filename, istr, '.inp'    ! Control Filename
         write(1,*) '2DEngInlSim/', newdir, '/Input/', filename, istr, '.sol'    ! Computation Filename
         write(1,*) ''
@@ -244,7 +246,7 @@ contains
         ! Put in Solver Input File
         strOut = len(trim(currentDir)) + 33
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/Input_Data/SolverInput.txt"'
+        Output = 'put "'//trim(currentDir)//'/Input_Data/SolverInput'//istr//'.txt"'
         write(1, '(A)') Output       
         deallocate(Output)
         
@@ -285,7 +287,7 @@ contains
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd egnaumann'
-        write(1,*) 'mv ', currentDir, '/Input_Data/SolverInput.txt SolverInput.txt'
+        write(1,*) 'mv ', currentDir, '/Input_Data/SolverInput.txt SolverInput', istr, '.txt'
         write(1,*) 'cd 2DEngInlSim/', newdir, '/Input'    
         write(1,*) 'mv ', currentDir, '/Output_Data/', filename, istr, '.sol ', filename, istr, '.sol'
         write(1,*) 'mv ', currentDir, '/Input_Data/', filename, istr, '.inp ', filename, istr, '.inp'
@@ -351,7 +353,7 @@ contains
         open(1, file='CheckStatus.scr')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd egnaumann/2DEngInlSim/Cases'
+        write(1,*) 'cd egnaumann/2DEngInlSim/', newdir, '/Output' 
         write(1,*) 'get check.txt'
         close(1)
     
