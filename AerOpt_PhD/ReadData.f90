@@ -13,6 +13,10 @@ contains
     subroutine SubReadData(NoCP, NoDim)
     ! Objective: Reads the Mesh data and Control Points Coordinates
     
+    ! Variables
+    implicit none
+    integer :: NoDim, i, NoCP
+    
     ! Body of ReadData
     open(1, file='Input_Data/Mesh_fine.txt')
     read(1, 11) ne
@@ -93,14 +97,14 @@ contains
     
     end subroutine InitSnapshots
     
-    subroutine PreProInpFileWin(filename, istr)
+    subroutine PreProInpFile(filename, istr)
     ! Objective: Create the Inputfile for the PreProcessor in Case of the Windows Executable
     
         ! Variables
         character(len=*) :: filename
         character(len=*) :: istr
     
-        ! Body of PreProInpFileWin
+        ! Body of PreProInpFile
         open(11, file='Input_Data/PreprocessingInput.txt')        
         write(11,*) 'Output_Data/', filename, istr, '.dat'  ! Name of Input file
         write(11,*) 'f'                                     ! Hybrid Mesh?
@@ -110,7 +114,7 @@ contains
         write(11,*) 'Output_Data/', filename, istr, '.sol'  ! Output File name
         close(11)
     
-    end subroutine PreProInpFileWin
+    end subroutine PreProInpFile
     
     subroutine WriteSolverInpFile(filename, istr, engFMF, hMa, NoIter, newdir, NoNests)
     ! Objective: Create Solver Input files
@@ -175,8 +179,6 @@ contains
         
         ! Create Read File for Solver
         open(1, file='Input_Data/SolverInput'//istr//'.txt')
-        write(1,*) NoNests
-        write(1,*) 'innocent'
         write(1,*) '2DEngInlSim/', newdir, '/Input/', filename, istr, '.inp'    ! Control Filename
         write(1,*) '2DEngInlSim/', newdir, '/Input/', filename, istr, '.sol'    ! Computation Filename
         write(1,*) ''
@@ -200,7 +202,7 @@ contains
         write(1,*) '#PBS -l mem=1gb'
         write(1,*) '#PBS -m bea'
         write(1,*) '#PBS -M 717761@swansea.ac.uk'
-        write(1,*) path
+        write(1,*) path,' < Input_Data/SolverInput', istr, '.txt'
     
     end subroutine writeBatchFile
     

@@ -9,6 +9,8 @@ contains
     subroutine SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP, Rect, NestDisp)
         
         ! Variables
+        implicit none
+        integer :: lb, i, j ,k, NoDim, NoCP
         real, dimension(np,NoDim) :: coord_temp
         real, dimension(NoCP, NoDim) :: Coord_CP
         real, dimension(NoCP,NoDim*4) :: Rect
@@ -21,7 +23,6 @@ contains
         integer, dimension(nbf,NoDim) :: boundf
         integer, dimension(NoCP) :: CP_ind, size_ib
         real :: c, w, dis, x1, y1, x2, y2, x3, y3, xp, yp
-        integer :: lb
 
         ! Body of GenerateInitialMeshes
         

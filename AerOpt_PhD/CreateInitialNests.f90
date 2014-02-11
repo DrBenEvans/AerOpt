@@ -14,6 +14,9 @@ module CreateInitialNests
     subroutine SubCreateInitialNests(NoNests, NoDim, NoCP, xmax, ymax, zmax)
     
         ! Variables
+        implicit none
+        integer :: NoDim, NoNests, NoCP, i, j, k
+        real :: xmax, ymax, zmax
         integer, dimension(NoCP) :: ones                      ! Vector with Ones                                    
         allocate(MxDisp((NoCP*NoDim),2))
         allocate(cond(NoCP*NoDim))

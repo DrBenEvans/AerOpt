@@ -41,7 +41,7 @@ program AerOpt
     character(len=:), allocatable :: istr                   ! Number of I/O file
     character, parameter :: runOnCluster = 'Y'              ! Run On Cluster or Run on Engine?
     character(len=:), allocatable :: strSystem              ! System Command string for communication with FLITE Solver
-    character, parameter :: IsLin = 'N'                     ! Windows('N') or Linux('Y') System to run on? (Cluster = Linux, Visual Studio = Windows)    
+    character, parameter :: IsLin = 'Y'                     ! Windows('N') or Linux('Y') System to run on? (Cluster = Linux, Visual Studio = Windows)    
     character(len=61) :: pathLin_Prepro                     ! Path to Linux preprocessor file
     character(len=55) :: pathLin_Solver                     ! Path to Linux Solver file
     character(len=21) :: pathWin                            ! Path to Windows preprocessor file
@@ -93,23 +93,23 @@ program AerOpt
     allocate(coord_temp(np,NoDim))
     allocate(boundff(nbf,(NoDim+1)))
     boundff(:,1:2) = boundf
-!    do i = 1, NoNests
-!        print *, "Generating Mesh", i, "/", NoNests
-!        coord_temp = coord
-!        call SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP,Rect, InitialNests(i,:))
-!        ! Output: New Coordinates - 30 Snapshots with moved boundaries based on initial nests
-!        
-!        call IdentifyBoundaryFlags()
-!        ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundff)
-!        
-!!!!!! IMPLEMENT Mesh Quality Test
-!
-!        ! Determine correct String      
-!        call DetermineStrLen(istr, i) 
-!        ! Write Snapshot to File
-!        call InitSnapshots(filename, istr, coord_temp, boundff, NoDim)
-!        deallocate (istr)
-!    end do
+    do i = 1, NoNests
+        print *, "Generating Mesh", i, "/", NoNests
+        coord_temp = coord
+        call SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP,Rect, InitialNests(i,:))
+        ! Output: New Coordinates - 30 Snapshots with moved boundaries based on initial nests
+        
+        call IdentifyBoundaryFlags()
+        ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundff)
+        
+!!!!! IMPLEMENT Mesh Quality Test
+
+        ! Determine correct String      
+        call DetermineStrLen(istr, i) 
+        ! Write Snapshot to File
+        call InitSnapshots(filename, istr, coord_temp, boundff, NoDim)
+        deallocate (istr)
+    end do
     
 
     ! ****Create Folder Structure for PrePro & Solver Output**** !
@@ -118,49 +118,48 @@ program AerOpt
     call createDirectoriesInit(newdir)
     if (IsLin == 'N')   then    ! AerOpt is executed from a Windows machine
                              
-            call communicateWin2Lin(Username, Password, 'FileCreateDir.scr', 'psftp')   ! Submits create directory file
+        call communicateWin2Lin(Username, Password, 'FileCreateDir.scr', 'psftp')   ! Submits create directory file
             
     else                        ! AerOpt is executed from a Linux machine
                             
-            call system('FileCreateDir.scr')    ! Submits create directory file
+        call system('chmod a+x ./FileCreateDir.scr')    
+        call system('./FileCreateDir.scr')    ! Submits create directory file
             
     end if
     
 
     ! ****Call 2D Preprocessor and pass on input parameters**** !
-    !print *, 'Start Preprocessing'
-    !pathLin_Prepro = '/eng/cvcluster/egnaumann/2DEngInlSim/PrePro/2DPreProcessorLin'
-    !pathWin = 'Flite2D\PreProcessing'   
-    !do i = 1, NoNests
-    !
-    !    ! Determine correct String      
-    !    call DetermineStrLen(istr, i)  
-    !    
-    !    if (IsLin == 'N') then
-    !        
-    !        ! write Inputfile (for Windows)
-    !        call PreProInpFileWin(filename, istr)
-    !
-    !        allocate(character(len=29) :: strSystem)
-    !        strSystem = pathWin
-    !        
-    !    else
-    !        
-    !        ! write command (for Linux)
-    !        IntSystem = 59 + 3*len(filename) + 3*len(istr) + len(pathLin_Prepro)
-    !        allocate(character(len=IntSystem) :: strSystem)
-    !        strSystem = '/bin/echo -e "Output_Data/'//filename//istr//'.dat\nf\n1\n0\n0\n' &        ! Assemble system command string
-    !        //filename//istr//'.sol\n" | '//pathLin_Prepro//' > '//filename//istr//'.outpre'
-    !        
-    !    end if
-    !    print *, 'Preprocessing Snapshot', i
-    !    print *, ' '
-    !    call system(strSystem)   ! System operating command called to activate fortran       
-    !    deallocate (istr)
-    !    deallocate (strSystem)
-    !
-    !end do
-    !print *, 'Finished Preprocessing'
+    print *, 'Start Preprocessing'
+    pathLin_Prepro = '/eng/cvcluster/egnaumann/2DEngInlSim/PrePro/2DPreProcessorLin'
+    pathWin = 'Flite2D\PreProcessing'   
+    do i = 1, NoNests
+    
+        ! Determine correct String      
+        call DetermineStrLen(istr, i)
+        ! write Inputfile
+        call PreProInpFile(filename, istr)
+        
+        if (IsLin == 'N') then
+             
+            allocate(character(len=29) :: strSystem)
+            strSystem = pathWin
+            
+        else
+            
+            ! write command (for Linux)
+            IntSystem = 10 + len(filename) + len(istr) + len(pathLin_Prepro)
+            allocate(character(len=IntSystem) :: strSystem)
+            strSystem = pathLin_Prepro//' > '//filename//istr//'.outpre'
+            
+        end if
+        print *, 'Preprocessing Snapshot', i
+        print *, ' '
+        call system(strSystem)   ! System operating command called to activate fortran       
+        deallocate (istr)
+        deallocate (strSystem)
+    
+    end do
+    print *, 'Finished Preprocessing'
     
     
     ! ****Call 2D FLITE Solver and pass on input parameters**** !
@@ -175,7 +174,7 @@ program AerOpt
         call WriteSolverInpFile(filename, istr, engFMF, hMa, NoIter, newdir, NoNests)
         ! writes the batchfile to execute Solver on Cluster
         call writeBatchFile(filename, istr, pathLin_Solver)
-
+    
         ! Is AerOpt executed from Linux or Windows?                
         if (IsLin == 'N')   then    ! AerOpt is executed from a Windows machine
             
@@ -196,7 +195,8 @@ program AerOpt
             
             ! Transfer Files in correct folder on Cluster
             call transferFilesLin(filename, istr, newdir)
-            call system('FileCreateDir.scr')
+            call system('chmod a+x ./FileCreateDir.scr')
+            call system('./FileCreateDir.scr')
             
             if (runOnCluster == 'Y') then
                 call Triggerfile(filename, istr, newdir)           ! Triggerfile for submission
@@ -205,7 +205,8 @@ program AerOpt
             end if
             
             ! Submits Batchfile
-            call system('Trigger.sh')
+            call system('chmod a+x ./Trigger.sh')
+            call system('./Trigger.sh')
                     
         end if
                 

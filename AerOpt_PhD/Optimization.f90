@@ -13,7 +13,10 @@ contains
     
     subroutine SubOptimization(NoNests, NoCP, NoDim, cond, InitialNests, MxDisp_Move, np, xmax, hMa, p, Aconst, NoPOMod, NoLeviSteps, NoG, constrain)
     
-        ! Variables       
+        ! Variables
+        implicit none
+        real :: p, Aconst, hMa, Ac, xmax
+        integer :: NoLeviSteps, NoPOMod, NoNests, NoSteps, NoCP, NoDim, i, j, k, np, NoG
         real, dimension(av*NoCP,2) :: MxDisp_Move
         real, dimension(av*NoCP) :: NormFact
         real, dimension(NoNests,NoDim*NoCP) :: InitialNests, newNests
@@ -576,10 +579,10 @@ contains
         ! Variables
         real, dimension(NoNests,NoDim*NoCP) :: InitNests ! = InitialNests, but will be manipulated in this function --> New Name, so it will not effect the InitialNests Array
         real, dimension(NoNests) :: Init_Nests_temp, Lambda, newCoeff
-        integer, dimension(NoNests) :: ind_IN
+        integer, dimension(NoNests) :: ind_IN, avec
         real, dimension(size(coeff, dim=1), size(coeff,dim=2)) :: coeff_temp
         real, dimension(NoDim*NoCP) :: tempNests
-        real :: a, b, d
+        real :: a, b, d, a2
         double precision, dimension(NoNests, NoNests) :: B_ar
         real, dimension(np) :: newpressure
     
@@ -598,8 +601,8 @@ contains
         b = 0
         do l = 1, (NoNests - 1)
             do m = (l+1), NoNests
-                a = a + norm2(InitNests(l,:)-InitNests(m,:))        ! Sum of all distances between points
-                b = b + 1                                           ! Amount of points considered  
+                a = a + sqrt(sum(((InitNests(l,:)-InitNests(m,:))**2), dim = 1))    ! Sum of all distances between points
+                b = b + 1                                                           ! Amount of points considered  
             end do    
         end do
         d = a/b             ! Mean Distance between Points
@@ -611,8 +614,8 @@ contains
             
             ! Compute Coefficients for Interpolation
             do m = 1, NoNests
-                do n = 1, NoNests
-                    a = norm2(InitNests(m,:)-InitNests(n,:))        ! Distance
+                do n = 1, NoNests       
+                    a = sqrt(sum(((InitNests(m,:)-InitNests(n,:))**2), dim = 1)) ! Distance
                     B_ar(m,n) = 1.0/d*exp(-(a**2)/d)           
                 end do     
             end do
@@ -621,11 +624,11 @@ contains
             Lambda = matmul(B_ar,coeff_temp(l,:))
             
             do m = 1, NoNests
-                a = norm2(tempNests-InitNests(m,:))                 ! Distance
+                a = sqrt(sum(((tempNests-InitNests(m,:))**2), dim = 1)) ! Distance
                 newCoeff(l) = newCoeff(l) + Lambda(m)*(1.0/d*exp(-(a**2)/d))
-            end do
-        newpressure = matmul(modes,newCoeff)
+            end do 
         end do
+        newpressure = matmul(modes,newCoeff)
     end subroutine PressInterp
 
 end module Optimization
