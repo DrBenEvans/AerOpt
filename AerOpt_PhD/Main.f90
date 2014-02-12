@@ -41,7 +41,7 @@ program AerOpt
     character(len=:), allocatable :: istr                   ! Number of I/O file
     character, parameter :: runOnCluster = 'Y'              ! Run On Cluster or Run on Engine?
     character(len=:), allocatable :: strSystem              ! System Command string for communication with FLITE Solver
-    character, parameter :: IsLin = 'Y'                     ! Windows('N') or Linux('Y') System to run on? (Cluster = Linux, Visual Studio = Windows)    
+    character, parameter :: IsLin = 'N'                     ! Windows('N') or Linux('Y') System to run on? (Cluster = Linux, Visual Studio = Windows)    
     character(len=61) :: pathLin_Prepro                     ! Path to Linux preprocessor file
     character(len=55) :: pathLin_Solver                     ! Path to Linux Solver file
     character(len=21) :: pathWin                            ! Path to Windows preprocessor file
@@ -113,7 +113,6 @@ program AerOpt
     
 
     ! ****Create Folder Structure for PrePro & Solver Output**** !
-    ! Creates Directory file
     print *, 'Create Directories'
     call createDirectoriesInit(newdir)
     if (IsLin == 'N')   then    ! AerOpt is executed from a Windows machine
@@ -130,35 +129,35 @@ program AerOpt
 
     ! ****Call 2D Preprocessor and pass on input parameters**** !
     print *, 'Start Preprocessing'
-    pathLin_Prepro = '/eng/cvcluster/egnaumann/2DEngInlSim/PrePro/2DPreProcessorLin'
-    pathWin = 'Flite2D\PreProcessing'   
-    do i = 1, NoNests
-    
-        ! Determine correct String      
-        call DetermineStrLen(istr, i)
-        ! write Inputfile
-        call PreProInpFile(filename, istr)
-        
-        if (IsLin == 'N') then
-             
-            allocate(character(len=29) :: strSystem)
-            strSystem = pathWin
-            
-        else
-            
-            ! write command (for Linux)
-            IntSystem = 10 + len(filename) + len(istr) + len(pathLin_Prepro)
-            allocate(character(len=IntSystem) :: strSystem)
-            strSystem = pathLin_Prepro//' > '//filename//istr//'.outpre'
-            
-        end if
-        print *, 'Preprocessing Snapshot', i
-        print *, ' '
-        call system(strSystem)   ! System operating command called to activate fortran       
-        deallocate (istr)
-        deallocate (strSystem)
-    
-    end do
+    !pathLin_Prepro = '/eng/cvcluster/egnaumann/2DEngInlSim/PrePro/2DPreProcessorLin'
+    !pathWin = 'Flite2D\PreProcessing'   
+    !do i = 1, NoNests
+    !
+    !    ! Determine correct String      
+    !    call DetermineStrLen(istr, i)
+    !    ! write Inputfile
+    !    call PreProInpFile(filename, istr)
+    !    
+    !    if (IsLin == 'N') then
+    !         
+    !        allocate(character(len=29) :: strSystem)
+    !        strSystem = pathWin
+    !        
+    !    else
+    !        
+    !        ! write command (for Linux)
+    !        IntSystem = 10 + len(filename) + len(istr) + len(pathLin_Prepro)
+    !        allocate(character(len=IntSystem) :: strSystem)
+    !        strSystem = pathLin_Prepro//' > '//filename//istr//'.outpre'
+    !        
+    !    end if
+    !    print *, 'Preprocessing Snapshot', i
+    !    print *, ' '
+    !    call system(strSystem)   ! System operating command called to activate fortran       
+    !    deallocate (istr)
+    !    deallocate (strSystem)
+    !
+    !end do
     print *, 'Finished Preprocessing'
     
     
@@ -173,7 +172,7 @@ program AerOpt
         ! Creates the input file including Solver Parameters and a second file including I/O filenames
         call WriteSolverInpFile(filename, istr, engFMF, hMa, NoIter, newdir, NoNests)
         ! writes the batchfile to execute Solver on Cluster
-        call writeBatchFile(filename, istr, pathLin_Solver)
+        call writeBatchFile(filename, istr, pathLin_Solver, newdir)
     
         ! Is AerOpt executed from Linux or Windows?                
         if (IsLin == 'N')   then    ! AerOpt is executed from a Windows machine
@@ -225,13 +224,35 @@ program AerOpt
         
         ! Check Status of Simulation by checking the existence of the last required outputfile
         call CheckSimStatus(newdir, filename, NoNests)  ! Creates File containing Linux commands to check for last file
-        call communicateWin2Lin(Username, Password, 'CheckStatus.scr', 'plink')
+        if (IsLin == 'N')   then
+            call communicateWin2Lin(Username, Password, 'CheckStatus.scr', 'plink')
+        else
+            call system('chmod a+x ./CheckStatus.scr')
+            call system('./CheckStatus.scr')
+        end if
         
-        call CheckSimStatus2(newdir, filename, NoNests) ! Creates File to transfer response from Windows to Linux
-        call communicateWin2Lin(Username, Password, 'CheckStatus.scr', 'psftp')
+        call CheckSimStatus2(newdir) ! Creates File to transfer response from Windows to Linux
+        if (IsLin == 'N')   then
+            call communicateWin2Lin(Username, Password, 'CheckStatus.scr', 'psftp')
+        end if
+
         open(1, file='check.txt')
         read(1,*) jobcheck
         close(1)
+        
+        ! Double-check all error files exist in case the last error file has been found
+        if (jobcheck == 1) then
+            do i = 1, NoNests
+                call CheckSimStatus(newdir, filename, i)
+                call CheckSimStatus2(newdir)
+                open(1, file='check.txt')
+                read(1,*) jobcheck
+                close(1)
+                if (jobcheck == 0) then
+                    STOP
+                end if
+            end do
+        end if
         
         waitTime = (delay/3600.0) + waitTime
         if (waitTime > waitMax) then
