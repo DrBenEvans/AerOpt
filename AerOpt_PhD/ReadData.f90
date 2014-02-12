@@ -188,10 +188,11 @@ contains
     
     end subroutine WriteSolverInpFile
     
-    subroutine writeBatchFile(filename, istr, path)
+    subroutine writeBatchFile(filename, istr, path, newdir)
     
         ! Variables
-        character(len=*) :: filename, istr, path
+        character(len=*) :: filename, istr, path, newdir
+        character(len=255) :: Output
     
         ! Body of writeBatchFile
         open(1, file='Input_Data/batchfile'//istr//'.sh')   
@@ -202,7 +203,8 @@ contains
         write(1,*) '#PBS -l mem=1gb'
         write(1,*) '#PBS -m bea'
         write(1,*) '#PBS -M 717761@swansea.ac.uk'
-        write(1,*) path,' < Input_Data/SolverInput', istr, '.txt'
+        Output = path//' < /eng/cvcluster/egnaumann/2DEngInlSim/'//newdir//'/Input/SolverInput'//istr//'.txt'
+        write(1,'(A)') trim(Output)
     
     end subroutine writeBatchFile
     
@@ -243,18 +245,15 @@ contains
         open(1, file='FileCreateDir.scr')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd egnaumann'
+        write(1,*) 'cd egnaumann/2DEngInlSim/', newdir, '/Input'
         
-        ! Put in Solver Input File
+        ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster
         strOut = len(trim(currentDir)) + 33
         allocate(character(len=strOut) :: Output)
         Output = 'put "'//trim(currentDir)//'/Input_Data/SolverInput'//istr//'.txt"'
         write(1, '(A)') Output       
         deallocate(Output)
-        
-        write(1,*) 'cd 2DEngInlSim/', newdir, '/Input'
-        
-        ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster        
+                      
         strOut = len(trim(currentDir)) + 22
         allocate(character(len=strOut) :: Output)
         Output = 'put "'//trim(currentDir)//'/Output_Data/'//filename//istr//'.sol"'
@@ -280,6 +279,7 @@ contains
     
         ! Variables
         character(len=255) :: currentDir
+        character(len=255) :: Output
         character(len=*) :: filename, istr, newdir 
         
         ! Body of createDirectories
@@ -288,12 +288,20 @@ contains
         open(1, file='FileCreateDir.scr')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd egnaumann'
-        write(1,*) 'mv ', currentDir, '/Input_Data/SolverInput.txt SolverInput', istr, '.txt'
-        write(1,*) 'cd 2DEngInlSim/', newdir, '/Input'    
-        write(1,*) 'mv ', currentDir, '/Output_Data/', filename, istr, '.sol ', filename, istr, '.sol'
-        write(1,*) 'mv ', currentDir, '/Input_Data/', filename, istr, '.inp ', filename, istr, '.inp'
-        write(1,*) 'mv ', currentDir, '/Input_Data/batchfile', istr, ' batchfile', istr
+        write(1,*) 'cd egnaumann/2DEngInlSim/', newdir, '/Input'
+
+        Output = 'mv '//trim(currentDir)//'/Input_Data/SolverInput'//istr//'.txt SolverInput'//istr//'.txt'
+        write(1, '(A)') trim(Output)
+        
+        Output = 'mv '//trim(currentDir)//'/Output_Data/'//filename//istr//'.sol '//filename//istr//'.sol'
+        write(1, '(A)') trim(Output)
+        
+        Output = 'mv '//trim(currentDir)//'/Input_Data/'//filename//istr//'.inp '//filename//istr//'.inp'
+        write(1, '(A)') trim(Output)
+        
+        Output = 'mv '//trim(currentDir)//'/Input_Data/batchfile'//istr//'.sh batchfile'//istr//'.sh'
+        write(1, '(A)') trim(Output)
+        
         close(1)
     
     end subroutine transferFilesLin
@@ -332,31 +340,40 @@ contains
     end subroutine TriggerFile2
     
     subroutine CheckSimStatus(newdir, filename, NoNests)
+    ! Objectives: Regularly checks for the last error file and stores response in check.txt file
     
         ! Variables
         character(len=*) :: newdir, filename
+        character(len=255) :: Output
     
         ! Body of CheckSimStatus
         open(1, file='CheckStatus.scr')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd egnaumann/2DEngInlSim/', newdir, '/Output'      
-        write(1,*) '[ -e ', filename, NoNests, '.rsd ] && echo 1 > check.txt || echo 0 > check.txt'
+        write(1,*) '[ -e ', filename, NoNests, '.e* ] && echo 1 > check.txt || echo 0 > check.txt'
+        if (IsLin == 'Y')   then
+            write(1,*) 'cd ..'
+            write(1,*) 'cd ..'
+            Output = 'mv egnaumann/2DEngInlSim/'//newdir//'/Output/check.txt check.txt'
+            write(1, '(A)') trim(Output)
+        end if
         close(1)
     
     end subroutine CheckSimStatus
     
-    subroutine CheckSimStatus2(newdir, filename, NoNests)
+    subroutine CheckSimStatus2(newdir)
+    ! Objectives: Transfers Check file to correct folder
     
         ! Variables
-        character(len=*) :: newdir, filename
+        character(len=*) :: newdir
     
         ! Body of CheckSimStatus
         open(1, file='CheckStatus.scr')
         write(1,*) 'cd '
-        write(1,*) 'cd ..'
-        write(1,*) 'cd egnaumann/2DEngInlSim/', newdir, '/Output' 
-        write(1,*) 'get check.txt'
+        write(1,*) 'cd ..'       
+        write(1,*) 'cd egnaumann/2DEngInlSim/', newdir, '/Output'
+        write(1,*) 'get check.txt'       
         close(1)
     
     end subroutine CheckSimStatus2
