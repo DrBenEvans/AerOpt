@@ -203,7 +203,7 @@ contains
     
         ! Body of writeBatchFile
         open(1, file= InFolder//'/batchfile'//istr//'.sh')  
-        if (SystemType == 'Q') then
+        if (SystemType /= 'B') then
             write(1,*) '#PBS -N ' ,fileName, istr
             write(1,*) '#PBS -q oh'
             write(1,*) '#PBS -l nodes=1:ppn=1'
@@ -338,11 +338,11 @@ contains
     
     end subroutine transferFilesLin
     
-    subroutine TriggerFile(filename, istr, newdir, defPath, InFolder)
+    subroutine TriggerFile(filename, istr, newdir, defPath, InFolder, SystemType)
     ! Objectives: Triggerfile for Cluster Simulation & Parallelisation
     
         ! Variables
-        character(len=*) :: filename, istr, newdir, defPath, InFolder
+        character(len=*) :: filename, istr, newdir, defPath, InFolder, SystemType
     
         ! Body of TriggerFile
         open(1, file='Trigger.sh')
@@ -350,7 +350,7 @@ contains
         write(1,*) 'cd ..'
         write(1,*) 'cd ', defPath, '/', newdir, '/', InFolder
         
-        if (SystemType == 'Q') then
+        if (SystemType /= 'B') then
             write(1,*) 'qsub batchfile', istr, '.sh'
         else
             write(1,*) 'bsub < batchfile', istr, '.sh'

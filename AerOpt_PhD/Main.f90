@@ -12,95 +12,130 @@ program AerOpt
     
     !type(InputVariablesData) :: IV       ! contains the input variables 
 
-    ! ****User Input****** ! 
-    !real, parameter :: Mach = 0.5
-    real, parameter :: hMa = 0.5                    ! Mach number
-    real, parameter :: xmax = 0.00                  ! Maximum horizontal displacement of Control Nodes
-    real, parameter :: ymax = 0.02                  ! Maximum vertical displacement of Control Nodes
-    real, parameter :: zmax = 0.00                  ! Maximum lateral displacement of Control Nodes
-    real, parameter :: engFMF = 1.0                 ! Solver variable - engines Front Mass Flow
-    real, parameter :: p = 0.75                     ! Fraction of Top to Low Nests
-    integer, parameter :: NoNests = 30              ! Number of Nests (Cuckoo Search)
-    integer, parameter :: NoCP = 7                  ! Number of Control Points
-    integer, parameter :: NoDim = 2                 ! Number of Dimensions
-    integer, parameter :: NoG = 5                   ! Number of Generations
-    integer, parameter :: NoPOMod = -1              ! No of POD Modes considered
-    integer, parameter :: NoLeviSteps = 100         ! Number of Levy walks per movement
-    integer, parameter :: NoIter = -3               ! Batch File variable - Number of Iterations    
-    logical, parameter :: constrain = 1             ! Constrain: Include boundaries of design space for Levy Walk - 1:Yes 0:no
-    integer, parameter :: delay = 300               ! Delay per check in seconds
-    integer, parameter :: waitMax = 48              ! maximum waiting time in hours
-    real :: Aconst = 0.01                           ! Levy Flight parameter (determined emperically) 
-    integer :: IntSystem                            ! Length of System command string; used for character variable allocation
-    real :: waitTime                                ! waiting time for Cluster Results
-    integer :: jobcheck
+    ! ****User Input****** !
+    type InputVariablesData
+        
+        real :: Ma                      ! Mach number
+        real :: xmax                    ! Maximum horizontal displacement of Control Nodes
+        real :: ymax                    ! Maximum vertical displacement of Control Nodes
+        real :: zmax                    ! Maximum lateral displacement of Control Nodes
+        ! 1D: only x considered, 2D: x & y considered, 3D: x, y & z considered
+        real :: engFMF                  ! Solver variable - engines Front Mass Flow
+        real :: Top2Low                 ! Fraction of Top to Low Nests
+        integer :: NoNests              ! Number of Nests (Cuckoo Search)
+        integer :: NoCP                 ! Number of Control Points
+        integer :: NoDim                ! Number of Dimensions
+        integer :: NoG                  ! Number of Generations
+        integer :: NoPOMod              ! No of POD Modes considered
+        integer :: NoLeviSteps          ! Number of Levy walks per movement
+        integer :: NoIter               ! Batch File variable - Number of Iterations    
+        logical :: constrain            ! Constrain: Include boundaries of design space for Levy Walk - 1:Yes 0:no
+        integer :: delay                ! Delay per check in seconds
+        integer :: waitMax              ! maximum waiting time in hours
+        real :: Aconst                  ! Levy Flight parameter (determined emperically) 
 
-    ! 1D: only x considered, 2D: x & y considered, 3D: x, y & z considered
+        character(len=20) :: filename    ! I/O file of initial Meshes for FLITE solver
+        character :: runOnCluster       ! Run On Cluster or Run on Engine?
+        character :: SystemType         ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)    
+        character(len=20) :: UserName    ! Putty Username
+        character(len=20) :: Password    ! Putty Password
+        character(len=100) :: defPath    ! defines defaultpath - Clusterpath: 'egnaumann/2DEngInlSim/'
+        character(len=3) :: version
+        
+    end type InputVariablesData
 
-    character(len=8), parameter :: filename = 'Snapshot'        ! I/O file of initial Meshes for FLITE solver
+    character(len=10) :: InFolder = 'Input_Data'               ! Input Folder Name
+    character(len=11) :: OutFolder = 'Output_Data'             ! Output Folder Name
+    integer :: IntSystem                                        ! Length of System command string; used for character variable allocation
+    real :: waitTime                                            ! waiting time for Simulation Results
+    integer :: jobcheck                                         ! Check Variable for Simulation 
     character(len=:), allocatable :: istr                       ! Number of I/O file
-    character, parameter :: runOnCluster = 'Y'                  ! Run On Cluster or Run on Engine?
-    character(len=:), allocatable :: strSystem                  ! System Command string for communication with FLITE Solver
-    character, parameter :: SystemType = 'B'                    ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)    
+    character(len=21) :: pathWin                                ! Path to Windows preprocessor file
     character(len=:), allocatable :: pathLin_Prepro             ! Path to Linux preprocessor file
     character(len=:), allocatable :: pathLin_Solver             ! Path to Linux Solver file
-    character(len=21) :: pathWin                                ! Path to Windows preprocessor file
-    character(len=9), parameter :: UserName = 'egnaumann'       ! Putty Username
-    character(len=8), parameter :: Password = 'Fleur666'        ! Putty Password
+    character(len=:), allocatable :: strSystem                  ! System Command string for communication with FLITE Solver
     character(len=8) :: date                                    ! Container for current date
     character(len=10) :: time                                   ! Container for current time
     character(len=35) :: newdir                                 ! Name of new folder for a new Solution generated by 2D solver
-    character(len=25) :: defPath = 'david.naumann/2DEngInlSim'  ! Clusterpath: 'egnaumann/2DEngInlSim/'
-    character(len=10) :: InFolder = 'Input_Data'               ! Input Folder Name
-    character(len=11) :: OutFolder = 'Output_Data'             ! Output Folder Name
-    character(len=3), parameter :: version = '1.2'
+ 
+    type(InputVariablesData) :: IV
+    
+    namelist /InputVariables/ IV
+    
+    IV%Ma = 0.5  		            ! Mach number
+    IV%xmax = 0.00			        ! Maximum horizontal displacement of Control Nodes    
+    IV%ymax = 0.02			        ! Maximum vertical displacement of Control Nodes    
+    IV%zmax = 0.00			        ! Maximum lateral displacement of Control Nodes    
+    IV%engFMF = 1.0			        ! engines Front Mass Flow(Solver variable)
+    IV%Top2Low = 0.75		        ! Fraction of Top to Low Cuckoo Nests
+    IV%NoNests = 30              	! Number of Nests (Cuckoo Search) 
+    IV%NoCP = 7			            ! Number of Control Points 
+    IV%NoDim = 2			        ! Number of Dimensions in Space 
+    IV%NoG = 5			            ! Number of Generations 
+    IV%NoPOMod = -1			        ! No of POD Modes considered 
+    IV%NoLeviSteps = 100         	! Number of Levy walks per movement 
+    IV%NoIter = -3               	! Batch File variable - Number of Iterations 
+    IV%constrain = .TRUE.         	! Constrain: Include boundaries of design space for Levy Walk - 1:Yes 0:no
+    IV%delay = 300               	! Sleep Time between check for Simulation Results in seconds
+    IV%waitMax = 48			        ! maximum waiting time in hours
+    IV%Aconst = 0.01		        ! Levy Flight parameter (determined emperically)
+    IV%filename = 'Snapshot'        ! I/O file of initial Meshes for FLITE solver
+    IV%runOnCluster = 'Y'           ! Run On Cluster or Run on Engine?
+    IV%SystemType = 'Q'             ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)
+    IV%UserName = 'egnaumann'       ! Putty Username
+    IV%Password = 'Fleur666'        ! Putty Password
+    IV%defPath = 'egnaumann/2DEngInlSim'  ! defines defaultpath - Clusterpath: 'egnaumann/2DEngInlSim/'
+    IV%version = '1.2'
+    
+    open(1,file = InFolder//'/AerOpt_InputParameters.txt')
+    read(1,InputVariables)
+    close(1)
     
     ! Check xmax, ymax, zmax & NoDim Input
-    select case (NoDim)
-    case (1)
-        if (ymax /= 0 .or. zmax /= 0) then
+    if (IV%NoDim == 1) then
+        if (IV%ymax /= 0 .or. IV%zmax /= 0) then
             print *, 'ymax and/or zmax remain unconsidered in 1 Dimension'
             print *, 'Input any and click enter to continue'
             read(*, *)
-        endif
-    case (2)
-        if (zmax /= 0) then
+        end if
+    elseif (IV%NoDim == 2) then
+        if (IV%zmax /= 0) then
             print *, 'zmax remains unconsidered in 2 Dimensions'
             print *, 'Input any and click enter to continue'
             read(*, *)
-        endif
-    end select
+        end if
+    end if
     
     ! Automatically generates a random initial number based on time and date
     call RANDOM_SEED
     
     ! Get Time and Date for File and Folder Name creation
     call DATE_AND_TIME(date, time)
-    newdir = '2DEngInletSnapshots_'//version//'_'//date(3:8)//'_'//time(1:4)
+    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4)
     
 
     ! ****Sub-Section: Create Initial Nests for the CFD Solver****** ! 
     ! ***********included in CreateInitialNests module************** !
     print *, 'Start LHS Sampling - Create Initial Nests'
-    call SubCreateInitialNests(NoNests, NoDim, NoCP, xmax, ymax, zmax)                !Sampling of initial points/nests via LHC    
+    call SubCreateInitialNests(IV%NoNests, IV%NoDim, IV%NoCP, IV%xmax, IV%ymax, IV%zmax)                !Sampling of initial points/nests via LHC    
     ! Output: InitialNests - Sampling Points for initial Nests
     
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
     print *, 'Start Read Data'
-    call SubReadData(NoCP, NoDim, InFolder)
+    call SubReadData(IV%NoCP, IV%NoDim, InFolder)
     ! Output: Boundf, Coord, Connecf, Coord_CP
     
 !!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
     
     ! ****Generate initial Meshes/Snapshots**** !
-    allocate(coord_temp(np,NoDim))
-    allocate(boundff(nbf,(NoDim+1)))
+    allocate(coord_temp(np,IV%NoDim))
+    allocate(boundff(nbf,(IV%NoDim+1)))
     boundff(:,1:2) = boundf
-    do i = 1, NoNests
-        print *, "Generating Mesh", i, "/", NoNests
+    do i = 1, IV%NoNests
+        print *, "Generating Mesh", i, "/", IV%NoNests
         coord_temp = coord
-        call SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP,Rect, InitialNests(i,:))
+        call SubGenerateInitialMeshes(IV%NoDim, IV%NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP,Rect, InitialNests(i,:))
         ! Output: New Coordinates - 30 Snapshots with moved boundaries based on initial nests
         
         call IdentifyBoundaryFlags()
@@ -111,17 +146,17 @@ program AerOpt
         ! Determine correct String      
         call DetermineStrLen(istr, i) 
         ! Write Snapshot to File
-        call InitSnapshots(filename, istr, coord_temp, boundff, NoDim, OutFolder)
+        call InitSnapshots(trim(IV%filename), istr, coord_temp, boundff, IV%NoDim, OutFolder)
         deallocate (istr)
     end do
     
 
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     print *, 'Create Directories'
-    call createDirectoriesInit(newdir, defPath, InFolder, OutFolder)
-    if (SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
+    call createDirectoriesInit(newdir, trim(IV%defPath), InFolder, OutFolder)
+    if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
                              
-        call communicateWin2Lin(Username, Password, 'FileCreateDir.scr', 'psftp')   ! Submits create directory file
+        call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits create directory file
             
     else                        ! AerOpt is executed from a Linux machine
                             
@@ -133,7 +168,7 @@ program AerOpt
 
     ! ****Call 2D Preprocessor and pass on input parameters**** !
     print *, 'Start Preprocessing'
-    if (SystemType == 'Q') then
+    if (IV%SystemType == 'Q') then
         allocate(character(len=61) :: pathLin_Prepro)
         pathLin_Prepro = '/eng/cvcluster/egnaumann/2DEngInlSim/PrePro/2DPreProcessorLin'
     else
@@ -141,14 +176,14 @@ program AerOpt
         pathLin_Prepro = '/home/david.naumann/2DEngInlSim/PrePro/2DPreProcessorLin'
     end if
     pathWin = 'Flite2D\PreProcessing'   
-    do i = 1, NoNests
+    do i = 1, IV%NoNests
     
         ! Determine correct String      
         call DetermineStrLen(istr, i)
         ! write Inputfile
-        call PreProInpFile(filename, istr, InFolder, OutFolder)
+        call PreProInpFile(trim(IV%filename), istr, InFolder, OutFolder)
         
-        if (SystemType == 'W') then
+        if (IV%SystemType == 'W') then
              
             allocate(character(len=29) :: strSystem)
             strSystem = pathWin
@@ -156,9 +191,9 @@ program AerOpt
         else
             
             ! write command (for Linux)
-            IntSystem = 10 + len(filename) + len(istr) + len(pathLin_Prepro)
+            IntSystem = 10 + len(trim(IV%filename)) + len(istr) + len(pathLin_Prepro)
             allocate(character(len=IntSystem) :: strSystem)
-            strSystem = pathLin_Prepro//' > '//filename//istr//'.outpre'
+            strSystem = pathLin_Prepro//' > '//trim(IV%filename)//istr//'.outpre'
             
         end if
         print *, 'Preprocessing Snapshot', i
@@ -173,7 +208,7 @@ program AerOpt
     
     ! ****Call 2D FLITE Solver and pass on input parameters**** !
     print *, 'Call FLITE 2D Solver'
-    if (SystemType == 'Q') then
+    if (IV%SystemType /= 'B') then
         allocate(character(len=55) :: pathLin_Solver)
         pathLin_Solver = '/eng/cvcluster/egnaumann/2DEngInlSim/Solver/2DSolverLin'
     else
@@ -181,42 +216,42 @@ program AerOpt
         pathLin_Solver = '/home/david.naumann/2DEngInlSim/Solver/2DSolverLin'
     end if
     
-    do i = 1, NoNests
+    do i = 1, IV%NoNests
             
         ! Determine correct String      
         call DetermineStrLen(istr, i)                      
         ! Creates the input file including Solver Parameters and a second file including I/O filenames
-        call WriteSolverInpFile(filename, istr, engFMF, hMa, NoIter, newdir, NoNests, defPath, InFolder, OutFolder, SystemType)
+        call WriteSolverInpFile(trim(IV%filename), istr, IV%engFMF, IV%Ma, IV%NoIter, newdir, IV%NoNests, trim(IV%defPath), InFolder, OutFolder, IV%SystemType)
         ! writes the batchfile to execute Solver on Cluster
-        call writeBatchFile(filename, istr, pathLin_Solver, newdir, SystemType, InFolder, OutFolder)
+        call writeBatchFile(trim(IV%filename), istr, pathLin_Solver, newdir, IV%SystemType, InFolder, OutFolder)
     
         ! Is AerOpt executed from Linux or Windows?                
-        if (SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
+        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
             
             ! Transfer Files from Windows Machine onto Cluster
-            call transferFilesWin(filename, istr, newdir, defPath, InFolder, OutFolder)            
-            call communicateWin2Lin(Username, Password, 'FileCreateDir.scr', 'psftp')
+            call transferFilesWin(trim(IV%filename), istr, newdir, trim(IV%defPath), InFolder, OutFolder)            
+            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
             
-            if (runOnCluster == 'Y') then
-                call Triggerfile(filename, istr, newdir, defPath, InFolder)           ! Triggerfile for submission
+            if (IV%runOnCluster == 'Y') then
+                call Triggerfile(trim(IV%filename), istr, newdir, trim(IV%defPath), InFolder, IV%SystemType)           ! Triggerfile for submission
             else
-                call TriggerFile2(filename, istr, pathLin_Solver)  ! Triggerfile for submission
+                call TriggerFile2(trim(IV%filename), istr, pathLin_Solver)  ! Triggerfile for submission
             end if
                     
             ! Submits Batchfile via Putty
-            call communicateWin2Lin(Username, Password, 'Trigger.sh', 'putty')
+            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Trigger.sh', 'putty')
                 
         else    ! AerOpt is executed from a Linux machine
             
             ! Transfer Files in correct folder on Cluster
-            call transferFilesLin(filename, istr, newdir, defPath, InFolder, OutFolder)
+            call transferFilesLin(trim(IV%filename), istr, newdir, trim(IV%defPath), InFolder, OutFolder)
             call system('chmod a+x ./FileCreateDir.scr')
             call system('./FileCreateDir.scr')
             
-            if (runOnCluster == 'Y') then
-                call Triggerfile(filename, istr, newdir, defPath, InFolder)     ! Triggerfile for submission
+            if (IV%runOnCluster == 'Y') then
+                call Triggerfile(trim(IV%filename), istr, newdir, trim(IV%defPath), InFolder, IV%SystemType)     ! Triggerfile for submission
             else
-                call TriggerFile2(filename, istr, pathLin_Solver)               ! Triggerfile for submission
+                call TriggerFile2(trim(IV%filename), istr, pathLin_Solver)               ! Triggerfile for submission
             end if
             
             ! Submits Batchfile
@@ -237,27 +272,27 @@ program AerOpt
     do while (jobcheck==0)
         
         ! Wait Function
-        call SleepQQ(delay*1000)
+        call SleepQQ(IV%delay*1000)
         print*, 'Sleep Wake Up Check'
         
         ! Check Status of Simulation by checking the existence of all error files
-        do i = NoNests, 1, -1
+        do i = IV%NoNests, 1, -1
             
             ! Determine correct String      
             call DetermineStrLen(istr, i)
             ! Creates File containing Linux commands to check for last file
-            call CheckSimStatus(newdir, filename, istr, SystemType, defPath, InFolder)
+            call CheckSimStatus(newdir, trim(IV%filename), istr, IV%SystemType, trim(IV%defPath), InFolder)
             ! Submit File
-            if (SystemType == 'W')   then
-                call communicateWin2Lin(Username, Password, 'CheckStatus.scr', 'plink')
+            if (IV%SystemType == 'W')   then
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'plink')
             else
                 call system('chmod a+x ./CheckStatus.scr')
                 call system('./CheckStatus.scr')
             end if
             ! Creates File to transfer response from Windows to Linux
-            if (SystemType == 'W')   then
-                call CheckSimStatus2(newdir, defPath, InFolder)
-                call communicateWin2Lin(Username, Password, 'CheckStatus.scr', 'psftp')
+            if (IV%SystemType == 'W')   then
+                call CheckSimStatus2(newdir, trim(IV%defPath), InFolder)
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'psftp')
             end if
             
             open(1, file='check.txt')
@@ -268,8 +303,8 @@ program AerOpt
             
         end do
         
-        waitTime = (delay/3600.0) + waitTime
-        if (waitTime > waitMax) then
+        waitTime = (IV%delay/3600.0) + waitTime
+        if (waitTime > IV%waitMax) then
             STOP 'Cluster Simulation Time exceeded maximum waiting Time'
         end if
         
@@ -280,13 +315,13 @@ program AerOpt
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
     print *, 'Start Optmization'
-    call SubOptimization(NoNests, NoCP, NoDim, cond, InitialNests, MxDisp_Move, np, xmax, hMa, p, Aconst, NoPOMod, NoLeviSteps, NoG, constrain)
+    call SubOptimization(IV%NoNests, IV%NoCP, IV%NoDim, cond, InitialNests, MxDisp_Move, np, IV%xmax, IV%Ma, IV%Top2Low, IV%Aconst, IV%NoPOMod, IV%NoLeviSteps, IV%NoG, IV%constrain)
     ! Output: Optimized mesh via Cuckoo Search and POD
     
     
     ! ****Generate Optimum Mesh and Safe in file**** !
     coord_temp = coord
-    call SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP, Rect, NestOpt)
+    call SubGenerateInitialMeshes(IV%NoDim, IV%NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP, Rect, NestOpt)
     ! Output: Optimum Coordinates - 1 Mesh with moved boundaries based on optimum Control Point Coordinates
     
     ! Safe Optimum Geometry in Text File
@@ -297,4 +332,4 @@ program AerOpt
 11  format(3I8)
     close(99)
     
-end program AerOpt
+    end program AerOpt

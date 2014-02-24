@@ -28,7 +28,7 @@ contains
         
         ! Find Real Control Nodes based on Coordinates - !! on long terms redundant only required to run once           
         ! Also Identify boundary nodes within the influence box of each Control Point
-        ! NOTE: Hardwired for a 2D problem!
+!!!! NOTE: Hardwired for a 2D problem!
         do i = 1, NoCP
             k = 0
             do j = 1, nbf
