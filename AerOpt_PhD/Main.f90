@@ -85,7 +85,7 @@ program AerOpt
     IV%UserName = 'egnaumann'       ! Putty Username
     IV%Password = 'Fleur666'        ! Putty Password
     IV%defPath = 'egnaumann/2DEngInlSim'  ! defines defaultpath - Clusterpath: 'egnaumann/2DEngInlSim/'
-    IV%version = '1.2'
+    IV%version = '1.3'
     
     open(1,file = InFolder//'/AerOpt_InputParameters.txt')
     read(1,InputVariables)
@@ -269,11 +269,14 @@ program AerOpt
     print*, 'Start Sleep'
     jobcheck = 0
     waitTime = 0
+    j = 1
     do while (jobcheck==0)
         
         ! Wait Function
+        print*, 'Sleep'
         call SleepQQ(IV%delay*1000)
-        print*, 'Sleep Wake Up Check'
+        print*, 'Wake Up - Check ', j
+        j = j + 1
         
         ! Check Status of Simulation by checking the existence of all error files
         do i = IV%NoNests, 1, -1

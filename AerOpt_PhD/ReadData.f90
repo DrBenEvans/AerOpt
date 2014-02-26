@@ -87,7 +87,7 @@ contains
         end do
         write(99,*) 'Coordinates'
         do j = 1, np
-            write(99,*) j, coord_temp(j,:)
+            write(99,*) j, coord_temp(j,:)*15.0
         end do
         write(99,*) 'Boundary Faces'
         do j = 1, nbf
@@ -292,6 +292,12 @@ contains
         write(1, '(A)') Output
         deallocate(Output)
         
+        strOut = len(trim(currentDir)) + 22
+        allocate(character(len=strOut) :: Output)
+        Output = 'put "'//trim(currentDir)//'/'//OutFolder//'/'//filename//istr//'.dat"'
+        write(1, '(A)') Output
+        deallocate(Output)
+
         strOut = len(trim(currentDir)) + 23
         allocate(character(len=strOut) :: Output)
         Output = 'put "'//trim(currentDir)//'/'//InFolder//'/'//filename//istr//'.inp"'
@@ -326,6 +332,9 @@ contains
         write(1, '(A)') trim(Output)
         
         Output = 'mv '//trim(currentDir)//'/'//OutFolder//'/'//filename//istr//'.sol '//filename//istr//'.sol'
+        write(1, '(A)') trim(Output)
+        
+        Output = 'mv '//trim(currentDir)//'/'//OutFolder//'/'//filename//istr//'.dat '//filename//istr//'.dat'
         write(1, '(A)') trim(Output)
         
         Output = 'mv '//trim(currentDir)//'/'//InFolder//'/'//filename//istr//'.inp '//filename//istr//'.inp'

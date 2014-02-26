@@ -38,7 +38,7 @@ contains
                     k = k + 1
                     if (i /= 6) then
                         IB(k,i) = j
-                    elseif (k > 15) then
+                    elseif (k > 15) then ! Bloodhound engine inlet specific. Dependant on the definition of the rectangles!
                         IB((k-15),i) = j
                     end if                           
                 end if 
@@ -54,10 +54,11 @@ contains
         
         ! Relocating boundary nodes based on their distance to Control node and the Control Nodes Displacements (NestDisp)
         ! Method: Gaussian RBF function
-        c = 1.9
+        ! c = 1.9
         do i = 1, NoCp
+            c = abs((Rect(i,3) - Rect(i,1)))/2.0
             do j = 1, size_ib(i)
-                dis = coord_temp(CP_ind(i),1) - coord_temp(IB(j,i),1)   ! Distance of Control Node to a Node in the Influence Box         
+                dis = (coord_temp(CP_ind(i),1) - coord_temp(IB(j,i),1))   ! Distance of Control Node to a Node in the Influence Box         
                 w = exp(-(dis**2)/(c**2))   ! Gaussian
                 coord_temp(IB(j,i),:) = (/(coord_temp(IB(j,i),1) + w*NestDisp(i)),(coord_temp(IB(j,i),2) + w*NestDisp(NoCP+i))/)   ! New coordinates
             end do
