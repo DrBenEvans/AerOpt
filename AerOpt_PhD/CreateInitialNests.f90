@@ -1,6 +1,7 @@
 module CreateInitialNests
     
-        use Toolbox   
+        use Toolbox
+        use InputData
         real :: rn                                            ! Counts random numbers
         real, dimension(:,:), allocatable :: MxDisp           ! Matrix with min/max Displacements
         real, dimension(:,:), allocatable :: MxDisp_Move      ! Matrix with only moving min/max Displacements
@@ -11,41 +12,39 @@ module CreateInitialNests
         
     contains
     
-    subroutine SubCreateInitialNests(NoNests, NoDim, NoCP, xmax, ymax, zmax)
+    subroutine SubCreateInitialNests()
     
         ! Variables
         implicit none
-        integer :: NoDim, NoNests, NoCP, i, j, k
-        real :: xmax, ymax, zmax
-        integer, dimension(NoCP) :: ones                      ! Vector with Ones                                    
-        allocate(MxDisp((NoCP*NoDim),2))
-        allocate(cond(NoCP*NoDim))
-        allocate(InitialNests(NoNests,NoDim*NoCP))
+        integer, dimension(IV%NoCP) :: ones                      ! Vector with Ones                                    
+        allocate(MxDisp((IV%NoCP*IV%NoDim),2))
+        allocate(cond(IV%NoCP*IV%NoDim))
+        allocate(InitialNests(IV%NoNests,IV%NoDim*IV%NoCP))
 
         
         !!****Body of SubCreateInitialNests****!!      
-        ones = (/ (1, i=1,NoCP) /)
+        ones = (/ (1, i=1,IV%NoCP) /)
         
         ! Initialize min/max Displacement Matrix
         ! NoDim automatically defines the size of the Matrix
-        MxDisp(:,1) = (/xmax*ones, ymax*ones, zmax*ones/)
-        MxDisp(:,2) = (/xmax*(-1)*ones, ymax*(-1)*ones, zmax*(-1)*ones/)
+        MxDisp(:,1) = (/IV%xmax*ones, IV%ymax*ones, IV%zmax*ones/)
+        MxDisp(:,2) = (/IV%xmax*(-1)*ones, IV%ymax*(-1)*ones, IV%zmax*(-1)*ones/)
         
         !**Reduction of MxDisp to Nonzero Values - (only for LHS-routine to reduce processing time)**!
         cond = MxDisp(:,1) /= MxDisp(:,2)
         
         ! Derive size for reduced Matrix
         av = 0
-        if (xmax /= 0.00) then
+        if (IV%xmax /= 0.00) then
             av = av + 1
         end if
-        if (ymax /= 0.00 .and. NoDim > 1) then
+        if (IV%ymax /= 0.00 .and. IV%NoDim > 1) then
             av = av + 1
         end if
-        if (zmax /= 0.00 .and. NoDim == 3) then
+        if (IV%zmax /= 0.00 .and. IV%NoDim == 3) then
             av = av + 1
         end if
-        allocate(MxDisp_Move(av*NoCP,2))
+        allocate(MxDisp_Move(av*IV%NoCP,2))
         
         ! Reduce Matrix     
         j = 1
@@ -59,30 +58,31 @@ module CreateInitialNests
                
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
-        call LHS(av, MxDisp_Move, NoNests, NoCP, NoDim, xmax, ymax, zmax)     
+        call LHS(av, MxDisp_Move)     
         !Output: InitialNests - an initial Sampling via LHS
-        InitialNests(1,:) = (/ (0, i=1,(NoCP*NoDim)) /)
+        InitialNests(1,:) = (/ (0, i=1,(IV%NoCP*IV%NoDim)) /)
 
     end subroutine SubCreateInitialNests
     
-    subroutine LHS(av, MxDisp_Move, NoNests, NoCP, NoDim, xmax, ymax, zmax)
+    subroutine LHS(av, MxDisp_Move)
     
-        ! Variables      
+        ! Variables
+        implicit none
         integer :: ms, av
-        real, dimension(NoCP*av,2) :: MxDisp_Move
-        real, dimension(NoNests,NoCP) :: InitialNests_1D
-        integer, dimension(NoNests) :: zeros
+        real, dimension(IV%NoCP*av,2) :: MxDisp_Move
+        real, dimension(IV%NoNests,IV%NoCP) :: InitialNests_1D
+        integer, dimension(IV%NoNests) :: zeros
         
         ! Body of LHS
         !!*** Based on the degrees of freedom(xmax, ymax & zmax definition ****!!
         !!*** & Dimension restriction) the LHS is performed 1,2 or 3 times. ***!!
         !!**** The size of MxDisp_Move indicates the degrees of freedom ****!!
-        zeros = (/ (0, i=1,NoNests) /)
+        zeros = (/ (0, i=1,IV%NoNests) /)
         ms = size(MxDisp_Move,1)
-        if ( ms == NoCP) then
+        if ( ms == IV%NoCP) then
             
             print *, 'Case 1'
-            call LHS_1D(MxDisp_Move, NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            call LHS_1D(MxDisp_Move, InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
                        
             ! Based on the Number of Dimensions, NonMoving Columns need to be filled with zeros
             j = 1
@@ -95,50 +95,50 @@ module CreateInitialNests
                 end if
             end do            
             
-        elseif (ms == NoCP*2) then
+        elseif (ms == IV%NoCP*2) then
             
             ! All possible combinations of Number of Dimensions and Moving/Non-Moving restrictions are considered.
             print *, 'Case 2, Part 1'
-            call LHS_1D(MxDisp_Move(1:NoCP,:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-            if (xmax == 0) then
-                InitialNests(:,(NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
-                do i = 1, NoCp
+            call LHS_1D(MxDisp_Move(1:IV%NoCP,:), InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            if (IV%xmax == 0) then
+                InitialNests(:,(IV%NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
+                do i = 1, IV%NoCp
                 InitialNests(:,i) = zeros ! Non Moving
                 end do
             else
-                InitialNests(:,1:NoCP) = InitialNests_1D ! Write Data in x-Matrix section
+                InitialNests(:,1:IV%NoCP) = InitialNests_1D ! Write Data in x-Matrix section
             end if
             
             print *, 'Case 2,Part 2'
-            call LHS_1D(MxDisp_Move((NoCP+1):ms,:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-            if (xmax == 0) then     ! x: 0, y & z full
-                InitialNests(:,(2*NoCP+1):3*NoCP) = InitialNests_1D ! Write Data in z-Matrix section                         
-            elseif (ymax == 0) then ! y: 0, x & z full
-                do i = 1, NoCp
-                    InitialNests(:,(NoCP+i)) = zeros ! Non Moving
+            call LHS_1D(MxDisp_Move((IV%NoCP+1):ms,:), InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            if (IV%xmax == 0) then     ! x: 0, y & z full
+                InitialNests(:,(2*IV%NoCP+1):3*IV%NoCP) = InitialNests_1D ! Write Data in z-Matrix section                         
+            elseif (IV%ymax == 0) then ! y: 0, x & z full
+                do i = 1, IV%NoCp
+                    InitialNests(:,(IV%NoCP+i)) = zeros ! Non Moving
                 end do
-                InitialNests(:,(2*NoCP+1):3*NoCP) = InitialNests_1D ! Write Data in z-Matrix section
-            elseif (NoDim == 2) then ! just 2D - x & y full
-                InitialNests(:,(NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
+                InitialNests(:,(2*IV%NoCP+1):3*IV%NoCP) = InitialNests_1D ! Write Data in z-Matrix section
+            elseif (IV%NoDim == 2) then ! just 2D - x & y full
+                InitialNests(:,(IV%NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
             else                     ! z: 0, x & y full  
-                InitialNests(:,(NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
-                do i = 1, NoCp
-                    InitialNests(:,(2*NoCP+i)) = zeros ! Non Moving
+                InitialNests(:,(IV%NoCP+1):ms) = InitialNests_1D ! Write Data in y-Matrix section
+                do i = 1, IV%NoCp
+                    InitialNests(:,(2*IV%NoCP+i)) = zeros ! Non Moving
                 end do
             end if    
                     
-        elseif (ms == NoCP*3) then
+        elseif (ms == IV%NoCP*3) then
         
             ! Only one combination possible --> Fixed
             print *, 'Case 3, Part 1'
-            call LHS_1D(MxDisp_Move(1:NoCP,:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-            InitialNests(:,1:NoCP) = InitialNests_1D
+            call LHS_1D(MxDisp_Move(1:IV%NoCP,:), InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            InitialNests(:,1:IV%NoCP) = InitialNests_1D
             print *, 'Case 3, Part 2'
-            call LHS_1D(MxDisp_Move((NoCP+1):(2*NoCP),:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-            InitialNests(:,(NoCP+1):(NoCP*2)) = InitialNests_1D
+            call LHS_1D(MxDisp_Move((IV%NoCP+1):(2*IV%NoCP),:), InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            InitialNests(:,(IV%NoCP+1):(IV%NoCP*2)) = InitialNests_1D
             print *, 'Case 3, Part 3'
-            call LHS_1D(MxDisp_Move((2*NoCP+1):ms,:), NoNests, NoCP,InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-            InitialNests(:,(NoCP*2+1):ms) = InitialNests_1D
+            call LHS_1D(MxDisp_Move((2*IV%NoCP+1):ms,:), InitialNests_1D) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
+            InitialNests(:,(IV%NoCP*2+1):ms) = InitialNests_1D
             
         else
             print *, 'Impossible Number of Dimensions.'
@@ -148,13 +148,14 @@ module CreateInitialNests
         
     end subroutine LHS
     
-    subroutine LHS_1D(MD_Move, NoNests, NoCP,InitialNests_1D)
+    subroutine LHS_1D(MD_Move, InitialNests_1D)
     
         ! Variables
-        real, dimension(NoNests,NoCP), intent(out) :: InitialNests_1D
-        integer, dimension(NoNests) :: rp
-        real, dimension(NoCP,2) :: MD_Move 
-        double precision, dimension(NoNests) :: linSamp, linSamp2
+        implicit none
+        real, dimension(IV%NoNests,IV%NoCP), intent(out) :: InitialNests_1D
+        integer, dimension(IV%NoNests) :: rp
+        real, dimension(IV%NoCP,2) :: MD_Move 
+        double precision, dimension(IV%NoNests) :: linSamp, linSamp2
         double precision :: max, min, first, last, dlS, ds, dlL1, dlL2, dL, dbound
     
         ! Body of LHS_1D
@@ -164,7 +165,7 @@ module CreateInitialNests
         !! Here, a uniform distribution (linSpacing) by picking the Midpoints is selected. !!        
         max = MD_Move(1,1)
         min = MD_Move(1,2)
-        linSamp = linSpacing(max, min, NoNests) ! linear splitting of Design Space/Movement Domain
+        linSamp = linSpacing(max, min, IV%NoNests) ! linear splitting of Design Space/Movement Domain
         
         !! Find maximum minimum distance between Points/Nests to redefine limits
         dlS = linSamp(1) - linSamp(2)
@@ -173,7 +174,7 @@ module CreateInitialNests
                 
             first = max - ds*i
             last = min + ds*i
-            linSamp = linSpacing(first, last, NoNests)
+            linSamp = linSpacing(first, last, IV%NoNests)
                 
             dlL1 = max - linSamp(1)
             dlL2 = (linSamp(2) - linSamp(1))/2
@@ -187,23 +188,23 @@ module CreateInitialNests
         ! Calculate Spacing with new limits
         first = max - dL
         last = min + dL
-        linSamp = linSpacing(first, last, NoNests)
+        linSamp = linSpacing(first, last, IV%NoNests)
         
         ! Simplified version: Redefine Limits(max/min) via Midpoint Calculation        
-        linSamp2 = linSpacing(max, min, (NoNests + 1))
+        linSamp2 = linSpacing(max, min, (IV%NoNests + 1))
         dbound = abs((linSamp2(1) - linSamp2(2))/2)
         max = max - dbound
         min = min + dbound
-        linSamp2 = linSpacing(max, min, NoNests) ! Calculate Spacing with new limits
+        linSamp2 = linSpacing(max, min, IV%NoNests) ! Calculate Spacing with new limits
         
         ! Test simplified version vs complicated version
         k = 0
-        do i = 1, NoNests
-            if (abs(linSamp(i) - linSamp2(i))/xmax < 1D-6) then
+        do i = 1, IV%NoNests
+            if (abs(linSamp(i) - linSamp2(i))/IV%xmax < 1D-6) then
                     k = k + 1                
             end if
         end do
-        if (k == NoNests) then
+        if (k == IV%NoNests) then
             print *, 'Simplified Version WORKS'
         else
             print *, 'Simplified Version FAILED'
@@ -211,9 +212,9 @@ module CreateInitialNests
         end if
         
         ! Execute Random Permutation of distributed Nests for each Control Point
-        do i = 1, NoCP               
-            call randperm(NoNests, rp) ! see Subroutine, Output are integers
-            do j = 1, NoNests               
+        do i = 1, IV%NoCP               
+            call randperm(IV%NoNests, rp) ! see Subroutine, Output are integers
+            do j = 1, IV%NoNests               
                 InitialNests_1D(j,i) = linSamp(rp(j)) ! Randomly permuted integers applied as indices (rp)                               
             end do                
         end do        

@@ -2,6 +2,8 @@ module Optimization
     
     use CreateInitialNests
     use Toolbox
+    use InputData
+    use ReadData
     real, dimension(:,:), allocatable :: Mesh_opt                       ! The final optimum Mesh
     double precision, dimension(:,:), allocatable :: modes, coeff       ! Modes and Coefficient derived by the POD method
     real, dimension(:), allocatable :: engInNodes                       ! Engine inlet Nodes
@@ -11,32 +13,32 @@ module Optimization
         
 contains
     
-    subroutine SubOptimization(NoNests, NoCP, NoDim, cond, InitialNests, MxDisp_Move, np, xmax, hMa, p, Aconst, NoPOMod, NoLeviSteps, NoG, constrain)
+    subroutine SubOptimization(cond, MxDisp_Move, np)
     
         ! Variables
         implicit none
-        real :: p, Aconst, hMa, Ac, xmax
-        integer :: NoLeviSteps, NoPOMod, NoNests, NoSteps, NoCP, NoDim, i, j, k, np, NoG
-        real, dimension(av*NoCP,2) :: MxDisp_Move
-        real, dimension(av*NoCP) :: NormFact
-        real, dimension(NoNests,NoDim*NoCP) :: InitialNests, newNests
-        integer, dimension(NoCP*NoDim) :: cond
+        real :: Ac
+        integer :: NoSteps, i, j, k, np
+        real, dimension(av*IV%NoCP,2) :: MxDisp_Move
+        real, dimension(av*IV%NoCP) :: NormFact
+        real, dimension(IV%NoNests,IV%NoDim*IV%NoCP) :: InitialNests, newNests
+        integer, dimension(IV%NoCP*IV%NoDim) :: cond
         real, dimension(:,:), allocatable :: Mesh_new 
-        real, dimension(NoNests,av*NoCP) :: InitialNests_Move, newNests_Move
+        real, dimension(IV%NoNests,av*IV%NoCP) :: InitialNests_Move, newNests_Move
         integer :: NoCPdim, NoTop, NoDiscard, l, randomNest
-        integer, dimension(NoNests) :: ind_Fi
-        real, dimension(av*NoCP) :: tempNests_Move, dist
-        real, dimension(NoDim*NoCP) :: tempNests
-        logical :: constrain, oob
+        integer, dimension(IV%NoNests) :: ind_Fi
+        real, dimension(av*IV%NoCP) :: tempNests_Move, dist
+        real, dimension(IV%NoDim*IV%NoCP) :: tempNests
+        logical :: oob
         real :: Ftemp, Fopt
-        allocate(NestOpt(NoDim*NoCP))
+        allocate(NestOpt(IV%NoDim*IV%NoCP))
         
         ! Body of SubOptimization            
-        NoCPdim = av*NoCP
-        NoDiscard = nint(p*NoNests)
-        NoTop = NoNests - NoDiscard
-        Aconst = (sqrt(real(NoCPDim))/NoLeviSteps)*Aconst
-        tempNests = (/ (0, i=1,(NoDim*NoCP)) /)
+        NoCPdim = av*IV%NoCP
+        NoDiscard = nint(IV%Top2Low*IV%NoNests)
+        NoTop = IV%NoNests - NoDiscard
+        IV%Aconst = (sqrt(real(NoCPDim))/IV%NoLeviSteps)*IV%Aconst
+        tempNests = (/ (0, i=1,(IV%NoDim*IV%NoCP)) /)
         
         ! Extract moving initial Nests
         j = 1
@@ -57,29 +59,29 @@ contains
         end do
             
         ! Allocate modes and coeff size based on the user input of Number of POD Modes desired. If < 0, all Modes are considered.
-        if (NoPOMod < 0) then
-            allocate(modes(np, NoNests))
-            allocate(coeff(NoNests, NoNests))
+        if (IV%NoPOMod < 0) then
+            allocate(modes(np, IV%NoNests))
+            allocate(coeff(IV%NoNests, IV%NoNests))
         else
-            allocate(modes(np, NoPOMod))
-            allocate(coeff(NoNests, NoPOMod))
+            allocate(modes(np, IV%NoPOMod))
+            allocate(coeff(IV%NoNests, IV%NoPOMod))
         end if
             
-        call POD(NoNests, hMa, np)
+        call POD(np)
         ! Output: Modes and Coefficients of POD
         
-        allocate(Fi(NoNests))    
-        call getengineInlet(NoDim) ! Get boundary nodes, that define the Engine Inlet Plane
+        allocate(Fi(IV%NoNests))    
+        call getengineInlet(IV%NoDim) ! Get boundary nodes, that define the Engine Inlet Plane
         ! Output: Engine Inlet Nodes(engInNodes)
         
-        call getDistortion(NoDim, NoNests, Fi) ! Determine Distortion
+        call getDistortion(IV%NoDim, IV%NoNests, Fi) ! Determine Distortion
         ! Output: Distortion as the Fitness (Fi)
         
         ! Loop over all Cuckoo Generations - each Generation creates new Nests
-        do i = 2, NoG
+        do i = 2, IV%NoG
             print *, 'Generation ', i
                 
-            ind_Fi = (/ (i, i=1,NoNests) /)
+            ind_Fi = (/ (i, i=1,IV%NoNests) /)
             call QSort(Fi,size(Fi), 'y', ind_Fi) ! Result in Ascending order
             
             !! Change to Descending Order in Case of Maximization Problem
@@ -101,11 +103,11 @@ contains
             do j = 1, NoDiscard
                 
                 ! Perform Random Walk using Levy Flight with a Cauchy Distribution
-                Ac = Aconst/(i**(1.0/2.0))
+                Ac = IV%Aconst/(i**(1.0/2.0))
                 call random_number(rn)
-                NoSteps = nint(log(rn)*(-NoLeviSteps))
-                NoSteps = minval((/ NoSteps, NoLeviSteps /))
-                tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + newNests_Move(NoNests-j+1,:)
+                NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
+                NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
+                tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + newNests_Move(IV%NoNests-j+1,:)
                 
                 ! Re-evaluate Fitness of moved Nests and check if out of bounds
                 oob = 0
@@ -117,7 +119,7 @@ contains
                 end do
                 
                 
-                if (oob == 1 .and. constrain == 1) then                  
+                if (oob == 1 .and. IV%constrain == 1) then                  
                     ! Do nothing if out of bounds
                 else
                     
@@ -131,10 +133,10 @@ contains
                     end do
                     
                     ! Update Values (Fitness, Nest Locations)
-                    call ReEvaluateDistortion(NoDim, NoNests, NoCP, NoCPDim, np, tempNests, Fi(NoNests-j+1))
+                    call ReEvaluateDistortion(NoCPDim, tempNests, Fi(IV%NoNests-j+1))
                     ! Output: ONE Fitnessvalue(Fi)
-                    newNests_Move(NoNests-j+1,:) = tempNests_Move
-                    newNests(NoNests-j+1,:) = tempNests
+                    newNests_Move(IV%NoNests-j+1,:) = tempNests_Move
+                    newNests(IV%NoNests-j+1,:) = tempNests
                     
                 end if
                          
@@ -150,11 +152,11 @@ contains
                 if (randomNest == j) then  ! Same Nest
                 
                     ! Perform Random Walk instead                   
-                    Ac = Aconst/(i**2.0)
+                    Ac = IV%Aconst/(i**2.0)
                     call random_number(rn)
-                    NoSteps = nint(log(rn)*(-NoLeviSteps))
-                    NoSteps = minval((/ NoSteps, NoLeviSteps /))
-                    tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + newNests_Move(NoNests-j+1,:)
+                    NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
+                    NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
+                    tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + newNests_Move(IV%NoNests-j+1,:)
                     
                 else    ! Different Nest
                     
@@ -193,7 +195,7 @@ contains
                 end do
                 
                 
-                if (oob == 1 .and. constrain == 1) then                    
+                if (oob == 1 .and. IV%constrain == 1) then                    
                     ! Do nothing if out of bounds
                 else
                     
@@ -207,15 +209,15 @@ contains
                     end do
                     
                     ! Update Values (Fitness, Nest Locations)
-                    call ReEvaluateDistortion(NoDim, NoNests, NoCP, NoCPDim, np, tempNests, Ftemp)
+                    call ReEvaluateDistortion(NoCPDim, tempNests, Ftemp)
                     ! Output: ONE Fitnessvalue(Fi)
                     
                     ! Check if new Fitness is better than a Random Top Nest, If yes replace values
                     call random_number(rn)
                     randomNest = nint((1 + (NoTop - 1)*rn))
                     if (Ftemp < Fi(randomNest)) then
-                        newNests_Move(NoNests-j+1,:) = tempNests_Move
-                        newNests(NoNests-j+1,:) = tempNests
+                        newNests_Move(IV%NoNests-j+1,:) = tempNests_Move
+                        newNests(IV%NoNests-j+1,:) = tempNests
                         Fi(randomNest) = Ftemp
                     end if
             
@@ -242,37 +244,38 @@ contains
         
     end subroutine SubOptimization
         
-    subroutine POD(NoNests, hMa, np)
+    subroutine POD(np)
         
         ! Variables
         real, dimension(:,:), allocatable :: Output
         double precision, dimension(:,:), allocatable :: pressure2, var1, var2, modestemp
-        character(len=1) :: istr1
-        character(len=2) :: istr2
-        double precision, dimension(NoNests,NoNests) :: V
+        character(len=:), allocatable :: istr
+        double precision, dimension(IV%NoNests,IV%NoNests) :: V
         double precision, dimension(np,1) :: ones
-        double precision, dimension(1, NoNests) :: var3
-            
+        double precision, dimension(1, IV%NoNests) :: var3            
         
         ! Body of POD
         allocate(Output(np, 5))
-        allocate(pressure(np, NoNests))
-        allocate(pressure2(np, NoNests))
-        allocate(var1(np, NoNests))
-        allocate(modestemp(np, NoNests))
-        allocate(var2(np, NoNests))
+        allocate(pressure(np, IV%NoNests))
+        allocate(pressure2(np, IV%NoNests))
+        allocate(var1(np, IV%NoNests))
+        allocate(modestemp(np, IV%NoNests))
+        allocate(var2(np, IV%NoNests))
             
         !Extract pressure of Snapshot Output file
         do i = 1, NoNests
             
-            if (i < 10) then
-                write( istr1, '(I1)' )  i
-                open(8, file='Cases/case'//istr1//'.txt')
-            else
-                write( istr2, '(I2)' )  i
-                open(8, file='Cases/case'//istr2//'.txt')
+            ! Determine correct String number
+            call DetermineStrLen(istr, i)
+            
+            if (SystemType == 'W') then
+                 call TransferSolutionOutput()
+                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
+                 call system('move '//IV%filename//istr//'.resp '//OutFolder//IV%filename//istr//'.resp')
             end if
-                
+            
+            open(8, file='Cases/case'//istr//'.txt')
+
             do k = 1, 5
                 do j = 1, np
                     read(8, *) Output(j,k)  ! rho, Vx, Vy, Vz, e
@@ -282,6 +285,7 @@ contains
             pressure(:,i) = Output(:,5) + (1.0/2.0)*(hMa**2)*Output(:,1)*(Output(:,2)*Output(:,2)+Output(:,3)*Output(:,3)) !! Bernoulli Equation to calculate non-dimensional pressure            
 !!!!! Implement new pressure Calculation
             close(8)
+            deallocate(istr)
             print *,'Pressure Snapshot', i 
                 
         end do         
@@ -509,7 +513,7 @@ contains
     
     end function LevyWalk
     
-    subroutine ReEvaluateDistortion(NoDim, NoNests, NoCP, NoCPDim, np, tempNests, Distortion)
+    subroutine ReEvaluateDistortion(NoCPDim, tempNests, Distortion)
     ! Objective: Determine the Distortion of each Snapshot by using the Area Weighted Average Pressure and Trapezoidal Numerical Integration
         
         ! Variables
@@ -518,7 +522,7 @@ contains
         real, dimension(size(engInNodes)) :: PlaneX, PlaneY, dPress
         real, dimension(size(engInNodes)-1) :: h, Area_trap, Pmid_x, Pmid_y
         real, dimension(size(engInNodes)-2) :: Area, Press_mid
-        real, dimension(NoDim*NoCP) :: tempNests
+        real, dimension(IV%NoDim*IV%NoCP) :: tempNests
         real :: Distortion
         real :: Press_ave, L
         real, dimension(np) :: newpressure

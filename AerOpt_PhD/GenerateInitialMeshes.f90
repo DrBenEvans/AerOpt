@@ -2,26 +2,27 @@ module GenerateInitialMeshes
     
         use Toolbox
         use ReadData
+        use InputData
         real, dimension(:,:), allocatable :: coord_temp  ! Coordinates Matrix of Fine Mesh
             
 contains
         
-    subroutine SubGenerateInitialMeshes(NoDim, NoCP, coord_temp, connecf, boundf, coarse, connecc, Coord_CP, Rect, NestDisp)
+    subroutine SubGenerateInitialMeshes(coord_temp, connecf, boundf, coarse, connecc, Coord_CP, Rect, NestDisp)
         
         ! Variables
         implicit none
-        integer :: lb, i, j ,k, NoDim, NoCP
-        real, dimension(np,NoDim) :: coord_temp
-        real, dimension(NoCP, NoDim) :: Coord_CP
-        real, dimension(NoCP,NoDim*4) :: Rect
-        real, dimension((np-nbf), NoDim+2) :: coarse
+        integer :: lb
+        real, dimension(np,IV%NoDim) :: coord_temp
+        real, dimension(IV%NoCP, IV%NoDim) :: Coord_CP
+        real, dimension(IV%NoCP,IV%NoDim*4) :: Rect
+        real, dimension((np-nbf), IV%NoDim+2) :: coarse
         real, dimension(nbf) :: dCP2N
-        real, dimension(NoCP*NoDim) :: NestDisp
-        integer, dimension(nbf, NoCP) :: IB
-        integer, dimension(ne,NoDim+1) :: connecf
-        integer, dimension(nbc,NoDim+1) :: connecc
-        integer, dimension(nbf,NoDim) :: boundf
-        integer, dimension(NoCP) :: CP_ind, size_ib
+        real, dimension(IV%NoCP*IV%NoDim) :: NestDisp
+        integer, dimension(nbf, IV%NoCP) :: IB
+        integer, dimension(ne,IV%NoDim+1) :: connecf
+        integer, dimension(nbc,IV%NoDim+1) :: connecc
+        integer, dimension(nbf,IV%NoDim) :: boundf
+        integer, dimension(IV%NoCP) :: CP_ind, size_ib
         real :: c, w, dis, x1, y1, x2, y2, x3, y3, xp, yp
 
         ! Body of GenerateInitialMeshes
@@ -29,10 +30,10 @@ contains
         ! Find Real Control Nodes based on Coordinates - !! on long terms redundant only required to run once           
         ! Also Identify boundary nodes within the influence box of each Control Point
 !!!! NOTE: Hardwired for a 2D problem!
-        do i = 1, NoCP
+        do i = 1, IV%NoCP
             k = 0
             do j = 1, nbf
-                dCP2N(j) = DistP2P(NoDim, Coord_CP(i,1), coord_temp(j,1), Coord_CP(i, 2), coord_temp(j,2))  ! Calculate Distances
+                dCP2N(j) = DistP2P(IV%NoDim, Coord_CP(i,1), coord_temp(j,1), Coord_CP(i, 2), coord_temp(j,2))  ! Calculate Distances
                 
                 if (Rectcheck(Rect(i,:), coord_temp(j,:)) == 1) then ! Check if boundary node is in influence box - Note: first values in coordinates matrix are per default the boundary nodes
                     k = k + 1
@@ -55,12 +56,12 @@ contains
         ! Relocating boundary nodes based on their distance to Control node and the Control Nodes Displacements (NestDisp)
         ! Method: Gaussian RBF function
         ! c = 1.9
-        do i = 1, NoCp
+        do i = 1, IV%NoCp
             c = abs((Rect(i,3) - Rect(i,1)))/2.0
             do j = 1, size_ib(i)
                 dis = (coord_temp(CP_ind(i),1) - coord_temp(IB(j,i),1))   ! Distance of Control Node to a Node in the Influence Box         
                 w = exp(-(dis**2)/(c**2))   ! Gaussian
-                coord_temp(IB(j,i),:) = (/(coord_temp(IB(j,i),1) + w*NestDisp(i)),(coord_temp(IB(j,i),2) + w*NestDisp(NoCP+i))/)   ! New coordinates
+                coord_temp(IB(j,i),:) = (/(coord_temp(IB(j,i),1) + w*NestDisp(i)),(coord_temp(IB(j,i),2) + w*NestDisp(IV%NoCP+i))/)   ! New coordinates
             end do
         end do
         
