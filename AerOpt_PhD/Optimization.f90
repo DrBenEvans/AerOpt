@@ -4,6 +4,7 @@ module Optimization
     use Toolbox
     use InputData
     use ReadData
+    use GenerateInitialMeshes
     real, dimension(:,:), allocatable :: Mesh_opt                       ! The final optimum Mesh
     double precision, dimension(:,:), allocatable :: modes, coeff       ! Modes and Coefficient derived by the POD method
     real, dimension(:), allocatable :: engInNodes                       ! Engine inlet Nodes
@@ -18,14 +19,13 @@ contains
         ! Variables
         implicit none
         real :: Ac
-        integer :: NoSteps, i, j, k, np
+        integer :: NoSteps, i, j, k, np, NoCPdim, NoTop, NoDiscard, l, randomNest
         real, dimension(av*IV%NoCP,2) :: MxDisp_Move
         real, dimension(av*IV%NoCP) :: NormFact
-        real, dimension(IV%NoNests,IV%NoDim*IV%NoCP) :: InitialNests, newNests
+        real, dimension(IV%NoNests,IV%NoDim*IV%NoCP) :: newNests
         integer, dimension(IV%NoCP*IV%NoDim) :: cond
         real, dimension(:,:), allocatable :: Mesh_new 
         real, dimension(IV%NoNests,av*IV%NoCP) :: InitialNests_Move, newNests_Move
-        integer :: NoCPdim, NoTop, NoDiscard, l, randomNest
         integer, dimension(IV%NoNests) :: ind_Fi
         real, dimension(av*IV%NoCP) :: tempNests_Move, dist
         real, dimension(IV%NoDim*IV%NoCP) :: tempNests
@@ -71,10 +71,10 @@ contains
         ! Output: Modes and Coefficients of POD
         
         allocate(Fi(IV%NoNests))    
-        call getengineInlet(IV%NoDim) ! Get boundary nodes, that define the Engine Inlet Plane
+        call getengineInlet() ! Get boundary nodes, that define the Engine Inlet Plane
         ! Output: Engine Inlet Nodes(engInNodes)
         
-        call getDistortion(IV%NoDim, IV%NoNests, Fi) ! Determine Distortion
+        call getDistortion(Fi) ! Determine Distortion
         ! Output: Distortion as the Fitness (Fi)
         
         ! Loop over all Cuckoo Generations - each Generation creates new Nests
@@ -247,7 +247,10 @@ contains
     subroutine POD(np)
         
         ! Variables
-        real, dimension(:,:), allocatable :: Output
+        implicit none
+        integer :: np
+        real, dimension(:), allocatable :: Output
+        real, dimension(:), allocatable :: Vx, Vy, Vz, rho, e
         double precision, dimension(:,:), allocatable :: pressure2, var1, var2, modestemp
         character(len=:), allocatable :: istr
         double precision, dimension(IV%NoNests,IV%NoNests) :: V
@@ -255,7 +258,12 @@ contains
         double precision, dimension(1, IV%NoNests) :: var3            
         
         ! Body of POD
-        allocate(Output(np, 5))
+        allocate(rho(np))
+        allocate(e(np))
+        allocate(Vx(np))
+        allocate(Vy(np))
+        allocate(Vz(np))
+        allocate(Output(6*np))
         allocate(pressure(np, IV%NoNests))
         allocate(pressure2(np, IV%NoNests))
         allocate(var1(np, IV%NoNests))
@@ -263,28 +271,38 @@ contains
         allocate(var2(np, IV%NoNests))
             
         !Extract pressure of Snapshot Output file
-        do i = 1, NoNests
+        do i = 1, IV%NoNests
             
             ! Determine correct String number
             call DetermineStrLen(istr, i)
             
-            if (SystemType == 'W') then
-                 call TransferSolutionOutput()
-                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-                 call system('move '//IV%filename//istr//'.resp '//OutFolder//IV%filename//istr//'.resp')
+            !if (IV%SystemType == 'W') then
+            !     call TransferSolutionOutput()
+            !     call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
+            !     call system('move '//trim(IV%filename)//istr//'.resp '//OutFolder//trim(IV%filename)//istr//'.resp')
+            !end if
+            !
+            if (IV%SystemType == 'W') then
+                open(11, file=OutFolder//'/Snapshot'//istr//'.resp')
+            else
+                open(11, file=newdir//'/'//OutFolder//'/Snapshot'//istr//'.resp')
             end if
             
-            open(8, file='Cases/case'//istr//'.txt')
-
-            do k = 1, 5
-                do j = 1, np
-                    read(8, *) Output(j,k)  ! rho, Vx, Vy, Vz, e
-                end do
+            read(11, *) Output  ! index, rho, Vx, Vy, Vz, e
+            
+            k = 0
+            do j = 1, (6*np), 6
+                k = k + 1
+                rho(k) = Output(j+1)
+                Vx(k) = Output(j+2)
+                Vy(k) = Output(j+3)
+                Vz(k) = Output(j+4)
+                e(k) = Output(j+5)
             end do
                 
-            pressure(:,i) = Output(:,5) + (1.0/2.0)*(hMa**2)*Output(:,1)*(Output(:,2)*Output(:,2)+Output(:,3)*Output(:,3)) !! Bernoulli Equation to calculate non-dimensional pressure            
+            pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) !! Bernoulli Equation to calculate non-dimensional pressure            
 !!!!! Implement new pressure Calculation
-            close(8)
+            close(11)
             deallocate(istr)
             print *,'Pressure Snapshot', i 
                 
@@ -299,14 +317,13 @@ contains
         var1 = matmul(pressure,V)
         ones(:,1) = (/ (1, i=1,np) /)
         var2 = var1*var1
-        do j = 1, NoNests
+        do j = 1, IV%NoNests
             var3(1,j) = sqrt(sum(var2(:,j), dim = 1))
         end do
         var2 = matmul(ones,var3)
         modestemp = var1 / var2
         modes = modestemp
-        coeff = matmul(transpose(modes),pressure)
-           
+        coeff = matmul(transpose(modes),pressure)   
             
         ! Output: Modes and Coefficients of POD       
         !open(23,file='Output_Data/Coefficients.txt')
@@ -316,16 +333,16 @@ contains
                       
     end subroutine POD
         
-    subroutine getDistortion(NoDim, NoNests, Distortion)
+    subroutine getDistortion(Distortion)
     ! Objective: Determine the Distortion of each Snapshot by using the Area Weighted Average Pressure and Trapezoidal Numerical Integration
         
         ! Variables
-        use ReadData
+        implicit none
         integer :: NoEngIN
         real, dimension(size(engInNodes)) :: PlaneX, PlaneY, dPress
         real, dimension(size(engInNodes)-1) :: h, Area_trap, Pmid_x, Pmid_y
         real, dimension(size(engInNodes)-2) :: Area, Press_mid
-        real, dimension(NoNests) :: Distortion
+        real, dimension(IV%NoNests) :: Distortion
         real :: Press_ave, L
  
         
@@ -337,7 +354,7 @@ contains
         PlaneY = coord(engInNodes,2)
         
         ! Calculate coordinates of midpoints and afterwards the Area between them
-        do i = 1, NoNests
+        do i = 1, IV%NoNests
                  
             ! Assign Right boundary nodes as First Midpoint to act as boundaries
             Pmid_x(1) = PlaneX(1)
@@ -355,7 +372,7 @@ contains
             do j = 1, (NoEngIN - 2)
                 Area(j) = sqrt((Pmid_x(j) - Pmid_x(j+1))**2 + (Pmid_y(j) - Pmid_y(j+1))**2)
             end do
-            !
+            
             !print *, 'Area:'
             !print *, Area
             
@@ -385,13 +402,11 @@ contains
   
     end subroutine getDistortion
         
-    subroutine getengineInlet(NoDim)
+    subroutine getengineInlet()
     ! Output: Identify all nodes positioned at the engine Inlet (engInNodes)
         
         ! Variables
-        use Toolbox
-        use GenerateInitialMeshes
-
+        implicit none
         integer, dimension(size(boundf, dim = 1),2) :: nodesall
         real, dimension(:), allocatable :: nodesvec
         real, dimension(2) :: point
@@ -419,7 +434,9 @@ contains
     subroutine SVD(A, M, N, V2)
 
         ! Parameters
-        integer          LDA, LDU, LDVT
+        implicit none
+        integer :: M, N
+        integer :: LDA, LDU, LDVT
         integer          LWMAX
         parameter        ( LWMAX = 10000)
 
@@ -489,7 +506,8 @@ contains
     function LevyWalk(NoSteps, NoCPdim)
     
         ! Variables
-        integer :: median, scale
+        implicit none
+        integer :: median, scale, l, m, NoSteps, NoCPdim
         real, parameter :: pi = 3.14159265359
         real, dimension(NoCPdim) :: LevyWalk
         real, dimension(NoSteps) :: y
@@ -517,8 +535,8 @@ contains
     ! Objective: Determine the Distortion of each Snapshot by using the Area Weighted Average Pressure and Trapezoidal Numerical Integration
         
         ! Variables
-        use GenerateInitialMeshes
-        integer :: NoEngIN
+        implicit none
+        integer :: NoEngIN, NoCPDim
         real, dimension(size(engInNodes)) :: PlaneX, PlaneY, dPress
         real, dimension(size(engInNodes)-1) :: h, Area_trap, Pmid_x, Pmid_y
         real, dimension(size(engInNodes)-2) :: Area, Press_mid
@@ -553,7 +571,7 @@ contains
         Pmid_y(NoEngIN-1) = PlaneY(NoEngIN)
                 
         ! Area Weighted Average Pressure (calculated based on the Areas)
-        call PressInterp(NoNests, NoCP, NoDim, NoCPDim, np, newpressure, InitialNests, tempNests)
+        call PressInterp(NoCPDim, np, newpressure, InitialNests, tempNests)
         Press_mid = newpressure(engInNodes(2:(NoEngIN-1))) ! Extract Pressure of middle engine Inlet Nodes
         Press_ave = sum(Press_mid*Area, dim = 1)/sum(Area, dim = 1)
             
@@ -577,25 +595,27 @@ contains
   
     end subroutine ReEvaluateDistortion
     
-    subroutine PressInterp(NoNests, NoCP, NoDim, NoCPDim, np, newpressure, InitNests, tempNests)
+    subroutine PressInterp(NoCPDim, np, newpressure, InitNests, tempNests)
     ! Objective: Interpolation of Coefficients with Radial Basis Functions, based on normalized Gaussian RBF (see Hardy theory)
     
         ! Variables
-        real, dimension(NoNests,NoDim*NoCP) :: InitNests ! = InitialNests, but will be manipulated in this function --> New Name, so it will not effect the InitialNests Array
-        real, dimension(NoNests) :: Init_Nests_temp, Lambda, newCoeff
-        integer, dimension(NoNests) :: ind_IN, avec
+        implicit none
+        real, dimension(IV%NoNests,IV%NoDim*IV%NoCP) :: InitNests ! = InitialNests, but will be manipulated in this function --> New Name, so it will not effect the InitialNests Array
+        real, dimension(IV%NoNests) :: Init_Nests_temp, Lambda, newCoeff
+        integer, dimension(IV%NoNests) :: ind_IN, avec
         real, dimension(size(coeff, dim=1), size(coeff,dim=2)) :: coeff_temp
-        real, dimension(NoDim*NoCP) :: tempNests
+        real, dimension(IV%NoDim*IV%NoCP) :: tempNests
         real :: a, b, d, a2
-        double precision, dimension(NoNests, NoNests) :: B_ar
+        double precision, dimension(IV%NoNests, IV%NoNests) :: B_ar
         real, dimension(np) :: newpressure
+        integer :: NoCPDim, l, m, n, np
     
         ! Body of PressInterp
         
         ! Sort InitNests Matrix
         coeff_temp = coeff
-        ind_IN = (/ (i, i=1,NoNests) /)
-        Init_Nests_temp = InitNests(:, (1+NoDim*NoCP-NoCPDim))
+        ind_IN = (/ (i, i=1,IV%NoNests) /)
+        Init_Nests_temp = InitNests(:, (1+IV%NoDim*IV%NoCP-NoCPDim))
         call QSort(Init_Nests_temp, size(InitNests, dim = 1), 'y', ind_IN)
         InitNests = InitNests(ind_IN,:)
         coeff_temp = coeff_temp(:,ind_IN)
@@ -603,8 +623,8 @@ contains
         ! Compute Shape Parameter
         a = 0
         b = 0
-        do l = 1, (NoNests - 1)
-            do m = (l+1), NoNests
+        do l = 1, (IV%NoNests - 1)
+            do m = (l+1), IV%NoNests
                 a = a + sqrt(sum(((InitNests(l,:)-InitNests(m,:))**2), dim = 1))    ! Sum of all distances between points
                 b = b + 1                                                           ! Amount of points considered  
             end do    
@@ -613,26 +633,27 @@ contains
         d = 0.25*(d**2)
         
         ! For each 'pressure field' f(:,k) ie vector of coefficients corresponding to mode k
-        newCoeff = (/ (0, i=1,NoNests) /)
+        newCoeff = (/ (0, i=1,IV%NoNests) /)
         do l = 1, size(coeff_temp, dim = 1)
             
             ! Compute Coefficients for Interpolation
-            do m = 1, NoNests
-                do n = 1, NoNests       
+            do m = 1, IV%NoNests
+                do n = 1, IV%NoNests       
                     a = sqrt(sum(((InitNests(m,:)-InitNests(n,:))**2), dim = 1)) ! Distance
                     B_ar(m,n) = 1.0/d*exp(-(a**2)/d)           
                 end do     
             end do
             
-            call Inverse(B_ar, B_ar, NoNests)
+            call Inverse(B_ar, B_ar, IV%NoNests)
             Lambda = matmul(B_ar,coeff_temp(l,:))
             
-            do m = 1, NoNests
+            do m = 1, IV%NoNests
                 a = sqrt(sum(((tempNests-InitNests(m,:))**2), dim = 1)) ! Distance
                 newCoeff(l) = newCoeff(l) + Lambda(m)*(1.0/d*exp(-(a**2)/d))
             end do 
         end do
         newpressure = matmul(modes,newCoeff)
+        
     end subroutine PressInterp
-
+    
 end module Optimization

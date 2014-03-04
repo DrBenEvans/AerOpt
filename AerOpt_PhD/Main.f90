@@ -53,8 +53,8 @@ program AerOpt
 !!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
     
     ! ****Generate initial Meshes/Snapshots**** !
-    allocate(coord_temp(np,IV%NoDim))
-    allocate(boundff(nbf,(IV%NoDim+1)))
+    allocate(coord_temp(np,iv%nodim))
+    allocate(boundff(nbf,(iv%nodim+1)))
     boundff(:,1:2) = boundf
     do ii = 1, IV%NoNests
         print *, "Generating Mesh", ii, "/", IV%NoNests
