@@ -291,9 +291,12 @@ contains
         if (i < 10) then
             allocate(character(len=1) :: istr)
             write( istr, '(I1)' )  i
-        else
+        elseif (i < 100) then
             allocate(character(len=2) :: istr)
             write( istr, '(I2)' )  i
+        else
+            allocate(character(len=3) :: istr)
+            write( istr, '(I3)' )  i
         end if
         
     end subroutine DetermineStrLen
