@@ -122,7 +122,7 @@ contains
                 NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
                 tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + newNests_Move(IV%NoNests-j+1,:)
                 
-                ! Re-evaluate Fitness of moved Nests and check if out of bounds
+                ! Check if out of bounds
                 oob = 0
                 do k = 1, NoCPdim
                     if (tempNests_Move(k) <= 1 .and. tempNests_Move(k) >= 0) then
@@ -131,8 +131,8 @@ contains
                     end if               
                 end do
                 
-                
-                if (oob == 1 .and. IV%constrain == 1) then                  
+                ! Re-evaluate Fitness of moved Nests
+                if (oob == 1 .and. IV%constrain == .true.) then                  
                     ! Do nothing if out of bounds
                 else
                     
@@ -198,7 +198,7 @@ contains
                    
                 end if
                     
-                ! Re-evaluate Fitness of moved Nests and check if out of bounds
+                ! Check if out of bounds
                 oob = 0
                 do k = 1, NoCPdim
                     if (tempNests_Move(k) <= 1 .and. tempNests_Move(k) >= 0) then
@@ -207,8 +207,8 @@ contains
                     end if               
                 end do
                 
-                
-                if (oob == 1 .and. IV%constrain == 1) then                    
+                ! Re-evaluate Fitness of moved Nests
+                if (oob == 1 .and. IV%constrain == .true.) then                    
                     ! Do nothing if out of bounds
                 else
                     
