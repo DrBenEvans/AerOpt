@@ -77,6 +77,11 @@ contains
         call getDistortion(Fi) ! Determine Distortion
         ! Output: Distortion as the Fitness (Fi)
         
+        ! Write Output File for Analysis including Initial and all moved Nests of each Generation
+        open(29,file='Output_Data/newNests.txt')
+        write(29, *) 'Initial Snapshots'
+        write(29,'(30f13.10)') InitialNests
+        
         ! Loop over all Cuckoo Generations - each Generation creates new Nests
         do i = 2, IV%NoG
             print *, 'Generation ', i
@@ -94,9 +99,17 @@ contains
             open(19,file='Output_Data/Fitness.txt')
             write(19,'(1f13.10)') Fi(1)                    
             
-            newNests_Move = InitialNests_Move(ind_Fi,:)
-            newNests = InitialNests(ind_Fi,:)
-!!!!! If necessary, record Initial Nests (newnests) --> Output Text file
+            if (i == 2) then
+                newNests_Move = InitialNests_Move(ind_Fi,:)
+                newNests = InitialNests(ind_Fi,:)
+            else
+                newNests_Move = newNests_Move(ind_Fi,:)
+                newNests = newNests(ind_Fi,:)
+            end if
+            
+            ! Store moved Nests in Output Analysis File
+            write(29, *) 'Generation', (i-1)
+            write(29,'(30f13.10)') newNests
             
             !!*** Loop over Discarded Nests ***!!
             print *, 'Modify Discarded Cuckoos'
@@ -234,6 +247,11 @@ contains
         write(19,'(1f13.10)') Fi(1)
         close(19)
         
+        !write final Nests in File
+        write(29, *) 'Generation', (i-1)
+        write(29,'(30f13.10)') newNests
+        close(29)
+        
         NestOpt = newNests(ind_Fi(1),:)
         
         print *, 'Optimum Fitness found:', Fopt
@@ -309,7 +327,6 @@ contains
         end do         
             
         ! Perform Single Value Decomposition
-        ! call SVDCMP(pressure,np,NoNests,np,NoNests, V)
         pressure2 = pressure
         call SVD(pressure2, size(pressure, Dim = 1), size(pressure, Dim = 2),V)
             
@@ -571,7 +588,7 @@ contains
         Pmid_y(NoEngIN-1) = PlaneY(NoEngIN)
                 
         ! Area Weighted Average Pressure (calculated based on the Areas)
-        call PressInterp(NoCPDim, np, newpressure, InitialNests, tempNests)
+        call PressInterp(NoCPDim, np, newpressure, tempNests)
         Press_mid = newpressure(engInNodes(2:(NoEngIN-1))) ! Extract Pressure of middle engine Inlet Nodes
         Press_ave = sum(Press_mid*Area, dim = 1)/sum(Area, dim = 1)
             
@@ -595,7 +612,7 @@ contains
   
     end subroutine ReEvaluateDistortion
     
-    subroutine PressInterp(NoCPDim, np, newpressure, InitNests, tempNests)
+    subroutine PressInterp(NoCPDim, np, newpressure, tempNests)
     ! Objective: Interpolation of Coefficients with Radial Basis Functions, based on normalized Gaussian RBF (see Hardy theory)
     
         ! Variables
@@ -613,6 +630,7 @@ contains
         ! Body of PressInterp
         
         ! Sort InitNests Matrix
+        InitNests = InitialNests
         coeff_temp = coeff
         ind_IN = (/ (i, i=1,IV%NoNests) /)
         Init_Nests_temp = InitNests(:, (1+IV%NoDim*IV%NoCP-NoCPDim))
