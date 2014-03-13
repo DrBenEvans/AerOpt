@@ -267,8 +267,9 @@ contains
         ! Variables
         implicit none
         integer :: np
+        real :: Vamb, rho_amb, Rspec, gamma
         real, dimension(:), allocatable :: Output
-        real, dimension(:), allocatable :: Vx, Vy, Vz, rho, e
+        real, dimension(:), allocatable :: Vx, Vy, rho, e
         double precision, dimension(:,:), allocatable :: pressure2, var1, var2, modestemp
         character(len=:), allocatable :: istr
         double precision, dimension(IV%NoNests,IV%NoNests) :: V
@@ -280,13 +281,16 @@ contains
         allocate(e(np))
         allocate(Vx(np))
         allocate(Vy(np))
-        allocate(Vz(np))
         allocate(Output(6*np))
         allocate(pressure(np, IV%NoNests))
         allocate(pressure2(np, IV%NoNests))
         allocate(var1(np, IV%NoNests))
         allocate(modestemp(np, IV%NoNests))
         allocate(var2(np, IV%NoNests))
+        
+        ! Precalculat ambient Parameters
+        Vamb = IV%Ma*sqrt(IV%gamma*IV%R*IV%Tamb)          ! ambient velocity
+        rho_amb = (IV%Pamb)/(IV%Tamb*IV%R)             ! ambient Density
             
         !Extract pressure of Snapshot Output file
         do i = 1, IV%NoNests
@@ -314,18 +318,20 @@ contains
                 rho(k) = Output(j+1)
                 Vx(k) = Output(j+2)
                 Vy(k) = Output(j+3)
-                Vz(k) = Output(j+4)
-                e(k) = Output(j+5)
+                e(k) = Output(j+4)
+                !turbulence(k) = Output(j+5)
             end do
                 
-            pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) !! Bernoulli Equation to calculate non-dimensional pressure            
-!!!!! Implement new pressure Calculation
+            ! Calculate Pressure
+            pressure(:,i) = rho_amb*(IV%gamma - 1)*rho*(Vamb**2)*(e - 0.5*(Vx**2 + Vy**2))
+            ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) 
+            
             close(11)
             deallocate(istr)
             print *,'Pressure Snapshot', i 
                 
         end do         
-            
+
         ! Perform Single Value Decomposition
         pressure2 = pressure
         call SVD(pressure2, size(pressure, Dim = 1), size(pressure, Dim = 2),V)
@@ -340,7 +346,7 @@ contains
         var2 = matmul(ones,var3)
         modestemp = var1 / var2
         modes = modestemp
-        coeff = matmul(transpose(modes),pressure)   
+        coeff = matmul(transpose(modes),pressure)
             
         ! Output: Modes and Coefficients of POD       
         !open(23,file='Output_Data/Coefficients.txt')

@@ -7,7 +7,10 @@ module InputData
         real :: xmax                    ! Maximum horizontal displacement of Control Nodes
         real :: ymax                    ! Maximum vertical displacement of Control Nodes
         real :: zmax                    ! Maximum lateral displacement of Control Nodes
-        ! 1D: only x considered, 2D: x & y considered, 3D: x, y & z considered
+        real :: gamma                   ! Ratio of specific heats
+        real :: R                       ! specific gas constant
+        real :: Tamb					! ambient Temperature [K]
+        real :: Pamb    				! ambient Pressure [Pa]
         real :: engFMF                  ! Solver variable - engines Front Mass Flow
         real :: Top2Low                 ! Fraction of Top to Low Nests
         integer :: NoNests              ! Number of Nests (Cuckoo Search)
@@ -59,6 +62,10 @@ contains
         namelist /InputVariables/ IV
     
         IV%Ma = 0.5  		            ! Mach number
+        IV%Tamb = 30					! ambient Temperature [deg]
+        IV%Pamb = 101325				! ambient Pressure [Pa]
+        IV%R = 287                  	! specific gas constant
+        IV%gamma = 1.4                  ! Ratio of specific heats
         IV%xmax = 0.00			        ! Maximum horizontal displacement of Control Nodes    
         IV%ymax = 0.02			        ! Maximum vertical displacement of Control Nodes    
         IV%zmax = 0.00			        ! Maximum lateral displacement of Control Nodes    
