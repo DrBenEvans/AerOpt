@@ -3,6 +3,7 @@ module GenerateInitialMeshes
         use Toolbox
         use ReadData
         use InputData
+        use CreateInitialNests
         real, dimension(:,:), allocatable :: coord_temp  ! Coordinates Matrix of Fine Mesh
             
 contains
@@ -59,7 +60,7 @@ contains
         do i = 1, IV%NoCp
             c = abs((Rect(i,3) - Rect(i,1)))/2.0
             do j = 1, size_ib(i)
-                dis = (coord_temp(CP_ind(i),1) - coord_temp(IB(j,i),1))   ! Distance of Control Node to a Node in the Influence Box         
+                dis = ((coord_temp(CP_ind(i),1) - coord_temp(IB(j,i),1)))*1.5   ! Distance of Control Node to a Node in the Influence Box         
                 w = exp(-(dis**2)/(c**2))   ! Gaussian
                 coord_temp(IB(j,i),:) = (/(coord_temp(IB(j,i),1) + w*NestDisp(i)),(coord_temp(IB(j,i),2) + w*NestDisp(IV%NoCP+i))/)   ! New coordinates
             end do
@@ -83,5 +84,26 @@ contains
         end do
         
     end subroutine SubGenerateInitialMeshes
+    
+    subroutine IdentifyBoundaryFlags()
+    
+        ! Variables
+        use ReadData
+        real, dimension(2) :: point
+    
+        ! Body of IdentifyBoundaryFlags
+        do k = 1, nbf
+            point(1) = (coord(boundf(k,1),1)*15 + coord(boundf(k,2),1)*15)/2.0
+            point(2) = (coord(boundf(k,1),2)*15 + coord(boundf(k,2),2)*15)/2.0
+            if (point(1) < 20 .and. point(1) > 0 .and. point(2) < 3 .and. point(2) > (-2)) then
+                boundff(k,3) = 6    ! Adiabatic Viscous Wall
+            elseif (point(1) == 0 .and. point(2) < 1 .and. point(2) > 0) then
+                boundff(k,3) = 8    ! Engine Inlet
+            else    
+                boundff(k,3) = 3    ! Far Field
+            end if       
+        end do
+    
+    end subroutine IdentifyBoundaryFlags
     
 end module GenerateInitialMeshes

@@ -7,6 +7,7 @@ program AerOpt
     use Optimization
     use ReadData
     use InputData
+    use CFD
     
     implicit none
     integer :: ii
@@ -15,6 +16,7 @@ program AerOpt
     call SubInputData(IV)
     
     ! Check xmax, ymax, zmax & NoDim Input
+    ! 1D: only x considered, 2D: x & y considered, 3D: x, y & z considered
     if (IV%NoDim == 1) then
         if (IV%ymax /= 0 .or. IV%zmax /= 0) then
             print *, 'ymax and/or zmax remain unconsidered in 1 Dimension'
@@ -49,6 +51,10 @@ program AerOpt
     call SubCreateInitialNests()                !Sampling of initial points/nests via LHC    
     ! Output: InitialNests - Sampling Points for initial Nests
     
+    !open(29,file='Output_Data/InitialNests.txt')
+    !read(29, *) strSystem
+    !read(29,'(100f13.10)') InitialNests
+    !close(29)
     
 !!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
     
@@ -89,7 +95,7 @@ program AerOpt
             
     end if
     
-
+    
     ! ****Call 2D Preprocessor and pass on input parameters**** !
     print *, 'Start Preprocessing'
     if (IV%SystemType == 'Q') then
@@ -102,29 +108,7 @@ program AerOpt
     pathWin = 'Flite2D\PreProcessing'   
     do ii = 1, IV%NoNests
     
-        ! Determine correct String      
-        call DetermineStrLen(istr, ii)
-        ! write Inputfile
-        call PreProInpFile()
-        
-        if (IV%SystemType == 'W') then
-             
-            allocate(character(len=29) :: strSystem)
-            strSystem = pathWin
-            
-        else
-            
-            ! write command (for Linux)
-            IntSystem = 10 + len(trim(IV%filename)) + len(istr) + len(pathLin_Prepro)
-            allocate(character(len=IntSystem) :: strSystem)
-            strSystem = pathLin_Prepro//' > '//trim(IV%filename)//istr//'.outpre'
-            
-        end if
-        print *, 'Preprocessing Snapshot', ii
-        print *, ' '
-        call system(strSystem)   ! System operating command called to activate fortran       
-        deallocate (istr)
-        deallocate (strSystem)
+        call PreProcessing(ii)
     
     end do
     print *, 'Finished Preprocessing'
@@ -142,103 +126,28 @@ program AerOpt
     
     do ii = 1, IV%NoNests
             
-        ! Determine correct String      
-        call DetermineStrLen(istr, ii)                      
-        ! Creates the input file including Solver Parameters and a second file including I/O filenames
-        call WriteSolverInpFile()
-        ! writes the batchfile to execute Solver on Cluster
-        call writeBatchFile()
-    
-        ! Is AerOpt executed from Linux or Windows?                
-        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
-            
-            ! Transfer Files from Windows Machine onto Cluster
-            call transferFilesWin()            
-            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-            
-            if (IV%runOnCluster == 'Y') then
-                call Triggerfile()           ! Triggerfile for submission
-            else
-                call TriggerFile2()  ! Triggerfile for submission
-            end if
-                    
-            ! Submits Batchfile via Putty
-            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Trigger.sh', 'putty')
-                
-        else    ! AerOpt is executed from a Linux machine
-            
-            ! Transfer Files in correct folder on Cluster
-            call transferFilesLin()
-            call system('chmod a+x ./FileCreateDir.scr')
-            call system('./FileCreateDir.scr')
-            
-            if (IV%runOnCluster == 'Y') then
-                call Triggerfile()     ! Triggerfile for submission
-            else
-                call TriggerFile2()               ! Triggerfile for submission
-            end if
-            
-            ! Submits Batchfile
-            call system('chmod a+x ./Trigger.sh')
-            call system('./Trigger.sh')
-                    
-        end if
-                
-        deallocate(istr) 
+       call Solver(ii) 
                 
     end do
     print *, 'Finished Submitting Jobs to FLITE 2D Solver'
     
+    
     ! ****Wait & Check for FLITE Solver Output**** !
     print*, 'Start Sleep'
-    jobcheck = 0
-    waitTime = 0
-    j = 1
-    do while (jobcheck==0)
-        
-        ! Wait Function
-        print*, 'Sleep'
-        call SleepQQ(IV%delay*1000)
-        print*, 'Wake Up - Check ', j
-        j = j + 1
-        
-        ! Check Status of Simulation by checking the existence of all error files
-        do ii = IV%NoNests, 1, -1
-            
-            ! Determine correct String      
-            call DetermineStrLen(istr, ii)
-            ! Creates File containing Linux commands to check for last file
-            call CheckSimStatus()
-            ! Submit File
-            if (IV%SystemType == 'W')   then
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'plink')
-            else
-                call system('chmod a+x ./CheckStatus.scr')
-                call system('./CheckStatus.scr')
-            end if
-            ! Creates File to transfer response from Windows to Linux
-            if (IV%SystemType == 'W')   then
-                call CheckSimStatus2()
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'psftp')
-            end if
-            
-            open(1, file='check.txt')
-            read(1,*) jobcheck
-            close(1)
-            deallocate(istr)
-            if (jobcheck == 0) EXIT           
-            
-        end do
-        
-        waitTime = (IV%delay/3600.0) + waitTime
-        if (waitTime > IV%waitMax) then
-            STOP 'Cluster Simulation Time exceeded maximum waiting Time'
-        end if
-        
-    end do
+    call Sleep()
     print*, 'End Sleep - Jobs are finished'
     
-!!!! Check amount of .rsd files & conversion!
+    !if (IV%SystemType == 'W') then
+    !    call TransferSolutionOutput()
+    !end if
+    
+    
+    ! ****Check Simulation Results**** !
+    print*, 'Start Check for Convergence'
+    ii = 0
+    call CheckforConvergence(ii)
+     print*, 'All Solutions converged'
+     
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
     print *, 'Start Optmization'

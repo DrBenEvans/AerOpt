@@ -11,10 +11,14 @@ contains
         double precision, dimension(NoInt) :: linSpacing
     
         ! Body of linSpacing
-        do a = 0, (NoInt - 1)
-            c = a/ real(NoInt - 1)  
-            linSpacing(a+1) = max - (max - min)*c
-        end do
+        if (NoInt == 1) then
+            linSpacing(1) = (max - min)/2
+        else
+            do a = 0, (NoInt - 1)
+                c = a/ real(NoInt - 1)  
+                linSpacing(a+1) = max - (max - min)*c
+            end do
+        end if
     
     end function linSpacing
         
@@ -294,9 +298,12 @@ contains
         elseif (i < 100) then
             allocate(character(len=2) :: istr)
             write( istr, '(I2)' )  i
-        else
+        elseif (i < 1000) then
             allocate(character(len=3) :: istr)
             write( istr, '(I3)' )  i
+        else
+            allocate(character(len=4) :: istr)
+            write( istr, '(I4)' )  i
         end if
         
     end subroutine DetermineStrLen

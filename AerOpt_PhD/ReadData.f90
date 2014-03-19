@@ -443,7 +443,30 @@ contains
         Output = 'get '//trim(IV%filename)//istr//'.resp'
         write(1, '(A)') Output       
         deallocate(Output)
+        
+        strOut = len(trim(IV%filename)) + len(istr) + 8
+        allocate(character(len=strOut) :: Output)
+        Output = 'get '//trim(IV%filename)//istr//'.rsd'
+        write(1, '(A)') Output       
+        deallocate(Output)
     
     end subroutine TransferSolutionOutput
+    
+    subroutine DeleteErrorFiles(i)
+    
+        ! Variables
+        implicit none
+        integer :: i
+    
+        ! Body of DeleteErrorFiles
+        open(1, file='FileCreateDir.scr')
+        write(1,*) 'cd '
+        write(1,*) 'cd ..'
+        write(1,*) 'cd ', trim(IV%defPath) , '/', newdir, '/', InFolder
+        write(1,*) ' chmod 777 ', trim(IV%filename), i, '.e*'
+        write(1,*) ' rm ', trim(IV%filename), i, '.e*'
+        close(1)
+    
+    end subroutine DeleteErrorFiles
     
 end module ReadData

@@ -88,7 +88,7 @@ contains
         IV%UserName = 'egnaumann'       ! Putty Username
         IV%Password = 'Fleur666'        ! Putty Password
         IV%defPath = 'egnaumann/2DEngInlSim'  ! defines defaultpath - Clusterpath: 'egnaumann/2DEngInlSim/'
-        IV%version = '1.4'
+        IV%version = '1.5'
     
         open(1,file = InFolder//'/AerOpt_InputParameters.txt')
         read(1,InputVariables)

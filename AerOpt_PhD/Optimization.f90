@@ -5,6 +5,7 @@ module Optimization
     use InputData
     use ReadData
     use GenerateInitialMeshes
+    use CFD
     real, dimension(:,:), allocatable :: Mesh_opt                       ! The final optimum Mesh
     double precision, dimension(:,:), allocatable :: modes, coeff       ! Modes and Coefficient derived by the POD method
     real, dimension(:), allocatable :: engInNodes                       ! Engine inlet Nodes
@@ -80,7 +81,7 @@ contains
         ! Write Output File for Analysis including Initial and all moved Nests of each Generation
         open(29,file='Output_Data/newNests.txt')
         write(29, *) 'Initial Snapshots'
-        write(29,'(30f13.10)') InitialNests
+        write(29,'(100f13.10)') InitialNests
         
         ! Loop over all Cuckoo Generations - each Generation creates new Nests
         do i = 2, IV%NoG
@@ -109,7 +110,7 @@ contains
             
             ! Store moved Nests in Output Analysis File
             write(29, *) 'Generation', (i-1)
-            write(29,'(30f13.10)') newNests
+            write(29,'(100f13.10)') newNests
             
             !!*** Loop over Discarded Nests ***!!
             print *, 'Modify Discarded Cuckoos'
@@ -249,7 +250,7 @@ contains
         
         !write final Nests in File
         write(29, *) 'Generation', (i-1)
-        write(29,'(30f13.10)') newNests
+        write(29,'(100f13.10)') newNests
         close(29)
         
         NestOpt = newNests(ind_Fi(1),:)
@@ -461,7 +462,7 @@ contains
         integer :: M, N
         integer :: LDA, LDU, LDVT
         integer          LWMAX
-        parameter        ( LWMAX = 10000)
+        parameter        ( LWMAX = 1000000)
 
         ! Local Scalars
         integer          INFO, LWORK
@@ -679,5 +680,115 @@ contains
         newpressure = matmul(modes,newCoeff)
         
     end subroutine PressInterp
+    
+    recursive subroutine CheckforConvergence(Iter)
+    
+        ! Variables
+        integer :: FileSize, LastLine
+        integer, save :: NoConv
+        integer,intent(inout) :: Iter
+        logical :: Converge
+        real, dimension(8) :: Input
+        character(len=200) :: strCommand
+        integer, dimension(IV%NoNests) :: DivNestPos
+        real, dimension(IV%NoCP*IV%NoDim) :: MidPoints
+    
+        ! Body of CheckforConvergence
+        print *, 'Iteration', (Iter + 1)
+        Converge = .true.
+        NoConv = 0
+        do i = 1, IV%NoNests
+            
+            ! Determine correct String number
+            call DetermineStrLen(istr, i)
+            
+            ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
+            if (IV%SystemType == 'W') then
+                open(1, file=OutFolder//'/Snapshot'//istr//'.rsd', STATUS="OLD")
+            else
+                open(1, file=newdir//'/'//OutFolder//'/Snapshot'//istr//'.rsd', STATUS="OLD")
+            end if       
+            inquire(1, size = FileSize)           
+            LastLine = FileSize/106
+            
+            ! Read until last line
+            do j = 1, (LastLine - 1)
+                read(1, *) Input
+            end do
+            read(1, *) Input
+            close(1)
+            
+            ! Convergence = false if last line contains 'NaN'
+            do j = 1, 8
+                if (isnan(Input(j))) then
+                    Converge = .false.
+                    exit   
+                end if       
+            end do
+            
+            ! All diverged nests are pulled halfway to midpoint(no movement center)
+            if (Converge == .false.) then
+                
+                    print *, 'File', i, 'failed to converge and will be resimulated'
+                    NoConv = NoConv + 1
+                    DivNestPos(NoConv) = i
+                    MidPoints = MxDisp(1,:) - MxDisp(2,:)  ! Midpoint calculation
+                    InitialNests(i,:) = InitialNests(i,:) - ((InitialNests(i,:) - MidPoints)/2.0)   ! Half way between current Nest and Midpoint
+                    
+            end if
+            Converge = .true.
+            deallocate(istr)
+            
+        end do
+        
+        if (NoConv /= 0) then
+            
+            !!! Re-Do Mesh of diverged Nest
+            do i = 1, NoConv
+            
+            print *, "Regenerating Mesh", DivNestPos(i), "/", NoConv
+            coord_temp = coord
+            call subgenerateinitialmeshes(coord_temp, connecf, boundf, coarse, connecc, coord_cp,rect, InitialNests(DivNestPos(i),:))
+            ! output: new coordinates - 30 snapshots with moved boundaries based on initial nests
+            
+            call identifyboundaryflags()
+            ! output: boundary matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundff)
+            
+            !!!!! implement mesh quality test
+            
+            ! determine correct string      
+            call determinestrlen(istr, DivNestPos(i))
+            
+            ! write snapshot to file
+            call initsnapshots(coord_temp, boundff)
+            deallocate (istr)
+            end do
+            
+            !! PreProcessing
+            do i = 1, NoConv
+                call PreProcessing(DivNestPos(i))
+            end do
+            
+            !! Solver
+            do i = 1, NoConv        
+                call Solver(DivNestPos(i))
+                call DeleteErrorFiles(DivNestPos(i))
+            end do
+            
+            call Sleep()
+            
+            Iter = Iter + 1
+            
+            if (Iter < 4) then
+                call CheckforConvergence(Iter)
+            end if
+            
+            if (NoConv /= 0) then
+                STOP 'Convergence of CFD Simulations could not be achieved. Check initial Mesh and/or Movement constraints!'
+            end if
+        end if
+        
+    end subroutine CheckforConvergence
+    
     
 end module Optimization
