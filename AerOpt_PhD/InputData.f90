@@ -36,9 +36,10 @@ module InputData
     end type InputVariablesData
     
     type(InputVariablesData) :: IV
-    integer :: i, j, k                ! Simple Loop Variables
-    character(len=10) :: InFolder = 'Input_Data'               ! Input Folder Name
-    character(len=11) :: OutFolder = 'Output_Data'             ! Output Folder Name
+    integer :: i, j, k                                          ! Simple Loop Variables
+    integer :: allocatestatus                                   ! Check Allocation Status for Large Arrays
+    character(len=10) :: InFolder = 'Input_Data'                ! Input Folder Name
+    character(len=11) :: OutFolder = 'Output_Data'              ! Output Folder Name
     integer :: IntSystem                                        ! Length of System command string; used for character variable allocation
     real :: waitTime                                            ! waiting time for Simulation Results
     integer :: jobcheck                                         ! Check Variable for Simulation 
@@ -56,6 +57,7 @@ contains
     subroutine SubInputData(IV)
     
         ! Variables
+        implicit none
         type(InputVariablesData) :: IV
     
         ! Body of SubInputData
@@ -88,7 +90,7 @@ contains
         IV%UserName = 'egnaumann'       ! Putty Username
         IV%Password = 'Fleur666'        ! Putty Password
         IV%defPath = 'egnaumann/2DEngInlSim'  ! defines defaultpath - Clusterpath: 'egnaumann/2DEngInlSim/'
-        IV%version = '1.5'
+        IV%version = '1.6'
     
         open(1,file = InFolder//'/AerOpt_InputParameters.txt')
         read(1,InputVariables)

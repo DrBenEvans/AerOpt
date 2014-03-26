@@ -1,13 +1,20 @@
 module ReadData
     
     use InputData
-    integer :: ne, np, nbf, nbc                             ! Number of elements, Nodes/Points & boundary faces
-    integer, dimension(:,:), allocatable :: connecc         ! Connectivity Matrix of Coarse Mesh    
-    integer, dimension(:,:), allocatable :: connecf, boundf ! Connectivity & Boundary Matrix of Fine Mesh    
-    real, dimension(:,:), allocatable :: coord              ! Coordinates Matrix of Fine Mesh (includes coordinates of coarse mesh)
-    real, dimension(:,:), allocatable :: coarse             ! includes element allocation of nodes to coarse triangles and Area Coefficients of each node
-    real, dimension(:,:), allocatable :: Coord_CP           ! desired Coordinates of the Control Points
-    real, dimension(:,:), allocatable :: Rect               ! Rectangle definition of 'Influence Box'
+    type ReadVariablesData
+    
+        integer :: ne, np, nbf, nbc                             ! Number of elements, Nodes/Points & boundary faces
+        integer, dimension(:,:), allocatable :: connecc         ! Connectivity Matrix of Coarse Mesh    
+        integer, dimension(:,:), allocatable :: connecf, boundf ! Connectivity & Boundary Matrix of Fine Mesh    
+        real, dimension(:,:), allocatable :: coord              ! Coordinates Matrix of Fine Mesh (includes coordinates of coarse mesh)
+        real, dimension(:,:), allocatable :: coarse             ! includes element allocation of nodes to coarse triangles and Area Coefficients of each node
+        real, dimension(:,:), allocatable :: Coord_CP           ! desired Coordinates of the Control Points
+        real, dimension(:,:), allocatable :: Rect               ! Rectangle definition of 'Influence Box'
+        real, dimension(:,:), allocatable :: coord_temp         ! Coordinates Matrix of Fine Mesh
+    
+    end type ReadVariablesData
+    
+    type(ReadVariablesData) :: RD
     
 contains
       
@@ -19,77 +26,82 @@ contains
     
         ! Body of ReadData
         open(1, file= InFolder//'/Mesh_fine.txt')
-        read(1, 11) ne
-        allocate(connecf(ne,IV%NoDim+1))
-        read(1, 11) np
-        allocate(coord(np,IV%NoDim))
-        read(1, 11) nbf
-        allocate(boundf(nbf,IV%NoDim))
-        do i = 1, ne
-            read(1, *) connecf(i,:)
+        read(1, 11) RD%ne
+        allocate(RD%connecf(RD%ne,IV%NoDim+1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        read(1, 11) RD%np
+        allocate(RD%coord(RD%np,IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        read(1, 11) RD%nbf
+        allocate(RD%boundf(RD%nbf,IV%NoDim + 1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        do i = 1, RD%ne
+            read(1, *) RD%connecf(i,:)
         end do
-        do i = 1, np
-            read(1, *) coord(i,:)
+        do i = 1, RD%np
+            read(1, *) RD%coord(i,:)
         end do
-        do i = 1, nbf
-            read(1, *) boundf(i,:)
+        do i = 1, RD%nbf
+            read(1, *) RD%boundf(i,1:2)
         end do 
     11  format(1I8)        
         close(1)
     
-        allocate(Coord_CP(IV%NoCP,IV%NoDim))
+        allocate(RD%Coord_CP(IV%NoCP,IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         open(2, file= InFolder//'/Control_Nodes.txt')
         do i = 1, IV%NoCP
-            read(2, *) Coord_CP(i,:)
+            read(2, *) RD%Coord_CP(i,:)
         end do
         close(2)
     
-        allocate(Rect(IV%NoCP,IV%NoDim*4))
+        allocate(RD%Rect(IV%NoCP,IV%NoDim*4),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         open(3, file= InFolder//'/Rectangles.txt')
         do i = 1, IV%NoCP
-            read(3, *) Rect(i,:)
+            read(3, *) RD%Rect(i,:)
         end do
         close(3)
     
         open(4, file= InFolder//'/Mesh_coarse.txt')
-        read(4, *) nbc
-        allocate(connecc(nbc,IV%NoDim+1))
-        allocate(coarse(np-nbf, IV%NoDim+2))
-        do i = 1, (np - nbf)
-            read(4, *) coarse(i,:)
+        read(4, *) RD%nbc
+        allocate(RD%connecc(RD%nbc,IV%NoDim+1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        allocate(RD%coarse(RD%np-RD%nbf, IV%NoDim+2),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        do i = 1, (RD%np - RD%nbf)
+            read(4, *) RD%coarse(i,:)
         end do
-        do i = 1, nbc
-            read(4, *) connecc(i,:)
+        do i = 1, RD%nbc
+            read(4, *) RD%connecc(i,:)
         end do
         close(4)
     
     end subroutine SubReadData
     
-    subroutine InitSnapshots(coord_temp, boundff)
+    subroutine InitSnapshots()
     !Objective: Create Outputfile of each Snapshot as Input for the Pre Processor
     
         ! Variables
         implicit none
-        real, dimension(np,IV%NoDim) :: coord_temp
-        integer, dimension(nbf,(IV%NoDim+1)) :: boundff
     
         ! Body of InitSnapshots
         open(99, file= OutFolder//'/'//trim(IV%filename)//istr//'.dat')
         write(99,*) 1
         write(99,*) 'David Naumann'
         write(99,*) 'NoTrgElem NoNodes NoBound'        
-        write(99,*) ne, np, nbf
+        write(99,*) RD%ne, RD%np, RD%nbf
         write(99,*) 'Connectivities'
-        do j = 1, ne
-            write(99,*) j, connecf(j,:)
+        do j = 1, RD%ne
+            write(99,*) j, RD%connecf(j,:)
         end do
         write(99,*) 'Coordinates'
-        do j = 1, np
-            write(99,*) j, coord_temp(j,:)*15.0
+        do j = 1, RD%np
+            write(99,*) j, RD%coord_temp(j,:)*15.0
         end do
         write(99,*) 'Boundary Faces'
-        do j = 1, nbf
-            write(99,*) boundff(j,:)
+        do j = 1, RD%nbf
+            write(99,*) RD%boundf(j,:)
         end do
 10      format(2f12.7)        
         close(99)
@@ -386,6 +398,7 @@ contains
     ! Objectives: writes file that checks for error files and stores response in check.txt file
     
         ! Variables
+        implicit none
         character(len=255) :: Output
     
         ! Body of CheckSimStatus
@@ -428,6 +441,7 @@ contains
     subroutine TransferSolutionOutput()
     
         ! Variables
+        implicit none
         character(len=:), allocatable :: Output
         integer :: strOut        
     
@@ -456,7 +470,7 @@ contains
     
         ! Variables
         implicit none
-        integer :: i
+        character(len=*) :: i
     
         ! Body of DeleteErrorFiles
         open(1, file='FileCreateDir.scr')

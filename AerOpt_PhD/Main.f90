@@ -36,7 +36,7 @@ program AerOpt
     
     ! Get Time and Date for File and Folder Name creation
     call DATE_AND_TIME(date, time)
-    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4)
+    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4) !'2DEngInletSnapshots_1.6_140320_1150' !
     
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
@@ -51,35 +51,33 @@ program AerOpt
     call SubCreateInitialNests()                !Sampling of initial points/nests via LHC    
     ! Output: InitialNests - Sampling Points for initial Nests
     
-    !open(29,file='Output_Data/InitialNests.txt')
-    !read(29, *) strSystem
-    !read(29,'(100f13.10)') InitialNests
-    !close(29)
+    open(29,file='Output_Data/InitialNests.txt')
+    write(29, *) 'Initial Snapshots' !strSystem
+    write(29,'(1000f13.10)') InitialNests
+    close(29)
     
 !!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
     
     ! ****Generate initial Meshes/Snapshots**** !
-    allocate(coord_temp(np,iv%nodim))
-    allocate(boundff(nbf,(iv%nodim+1)))
-    boundff(:,1:2) = boundf
+    call IdentifyBoundaryFlags()
+    ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
+    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
     do ii = 1, IV%NoNests
         print *, "Generating Mesh", ii, "/", IV%NoNests
-        coord_temp = coord
-        call SubGenerateInitialMeshes(coord_temp, connecf, boundf, coarse, connecc, Coord_CP,Rect, InitialNests(ii,:))
-        ! Output: New Coordinates - 30 Snapshots with moved boundaries based on initial nests
-        
-        call IdentifyBoundaryFlags()
-        ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundff)
+        RD%coord_temp = RD%coord
+        call SubGenerateInitialMeshes(InitialNests(ii,:))
+        ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
         
 !!!!! IMPLEMENT Mesh Quality Test
 
         ! Determine correct String      
         call DetermineStrLen(istr, ii) 
         ! Write Snapshot to File
-        call InitSnapshots(coord_temp, boundff)
+        call InitSnapshots()
         deallocate (istr)
     end do
-    
+    deallocate(RD%coord_temp)
 
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     print *, 'Create Directories'
@@ -137,34 +135,36 @@ program AerOpt
     call Sleep()
     print*, 'End Sleep - Jobs are finished'
     
-    !if (IV%SystemType == 'W') then
-    !    call TransferSolutionOutput()
-    !end if
+    if (IV%SystemType == 'W') then
+        call TransferSolutionOutput()
+    end if
     
     
     ! ****Check Simulation Results**** !
-    print*, 'Start Check for Convergence'
-    ii = 0
-    call CheckforConvergence(ii)
-     print*, 'All Solutions converged'
+    !print*, 'Start Check for Convergence'
+    !ii = 0
+    !call CheckforConvergence(ii)
+    ! print*, 'All Solutions converged'
      
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
     print *, 'Start Optmization'
-    call SubOptimization(cond, MxDisp_Move, np)
+    call SubOptimization()
     ! Output: Optimized mesh via Cuckoo Search and POD
     
     
     ! ****Generate Optimum Mesh and Safe in file**** !
-    coord_temp = coord
-    call SubGenerateInitialMeshes(coord_temp, connecf, boundf, coarse, connecc, Coord_CP, Rect, NestOpt)
+    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
+    if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main " 
+    RD%coord_temp = RD%coord
+    call SubGenerateInitialMeshes(NestOpt)
     ! Output: Optimum Coordinates - 1 Mesh with moved boundaries based on optimum Control Point Coordinates
     
     ! Safe Optimum Geometry in Text File
     open(99, file= OutFolder//'/OptimumMesh.txt')         
-    write(99,'(1I8)') np
-    write(99,'(1I8)') ne
-    write(99,'(2f12.7)') transpose(coord_temp)
+    write(99,'(1I8)') RD%np
+    write(99,'(1I8)') RD%ne
+    write(99,'(2f12.7)') transpose(RD%coord_temp)
 11  format(3I8)
     close(99)
     

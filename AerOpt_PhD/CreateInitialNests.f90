@@ -8,7 +8,6 @@ module CreateInitialNests
         integer, dimension(:), allocatable :: cond            ! Identifies zero/non-zero values
         real, dimension(:,:), allocatable :: InitialNests     ! Matrix containing the initial Nests
         integer :: av                                         ! Allocater Variable
-        integer, dimension(:,:), allocatable :: boundff       ! Boundary faces including boundary flags
         
     contains
     
@@ -70,14 +69,20 @@ module CreateInitialNests
         implicit none
         integer :: NoSampPoints, NoPerm
         integer :: ms
-        real, dimension(NoSampPoints, IV%NoDim*NoPerm) :: Sampling
-        real, dimension(NoSampPoints, NoPerm) :: Sampling_1D
-        integer, dimension(NoSampPoints) :: zeros
+        real, dimension(:,:), allocatable :: Sampling
+        real, dimension(:,:), allocatable :: Sampling_1D
+        integer, dimension(:), allocatable :: zeros
         
         ! Body of LHS
         !!*** Based on the degrees of freedom(xmax, ymax & zmax definition ****!!
         !!*** & Dimension restriction) the LHS is performed 1,2 or 3 times. ***!!
         !!**** The size of MxDisp_Move indicates the degrees of freedom ****!!
+        allocate(Sampling(NoSampPoints, IV%NoDim*NoPerm),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in LHS "
+        allocate(Sampling_1D(NoSampPoints, NoPerm),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in LHS "
+        allocate(zeros(NoSampPoints),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in LHS "
         zeros = (/ (0, i=1,NoSampPoints) /)
         ms = size(MxDisp_Move,1)
         if ( ms == NoPerm) then
