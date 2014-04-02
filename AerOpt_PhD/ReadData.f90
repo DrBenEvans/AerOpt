@@ -15,6 +15,7 @@ module ReadData
     end type ReadVariablesData
     
     type(ReadVariablesData) :: RD
+    real, dimension(:,:), allocatable :: ArrayTemp
     
 contains
       

@@ -69,7 +69,7 @@ module CreateInitialNests
         implicit none
         integer :: NoSampPoints, NoPerm
         integer :: ms
-        real, dimension(:,:), allocatable :: Sampling
+        real, dimension(NoSampPoints, IV%NoDim*NoPerm) :: Sampling
         real, dimension(:,:), allocatable :: Sampling_1D
         integer, dimension(:), allocatable :: zeros
         
@@ -77,8 +77,6 @@ module CreateInitialNests
         !!*** Based on the degrees of freedom(xmax, ymax & zmax definition ****!!
         !!*** & Dimension restriction) the LHS is performed 1,2 or 3 times. ***!!
         !!**** The size of MxDisp_Move indicates the degrees of freedom ****!!
-        allocate(Sampling(NoSampPoints, IV%NoDim*NoPerm),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in LHS "
         allocate(Sampling_1D(NoSampPoints, NoPerm),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in LHS "
         allocate(zeros(NoSampPoints),stat=allocateStatus)

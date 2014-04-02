@@ -73,7 +73,7 @@ contains
         IV%zmax = 0.00			        ! Maximum lateral displacement of Control Nodes    
         IV%engFMF = 1.0			        ! engines Front Mass Flow(Solver variable)
         IV%Top2Low = 0.75		        ! Fraction of Top to Low Cuckoo Nests
-        IV%NoNests = 30              	! Number of Nests (Cuckoo Search) 
+        IV%NoNests = 100              	! Number of Nests (Cuckoo Search) 
         IV%NoCP = 7			            ! Number of Control Points 
         IV%NoDim = 2			        ! Number of Dimensions in Space 
         IV%NoG = 100			            ! Number of Generations 

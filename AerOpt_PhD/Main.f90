@@ -36,7 +36,7 @@ program AerOpt
     
     ! Get Time and Date for File and Folder Name creation
     call DATE_AND_TIME(date, time)
-    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4) !'2DEngInletSnapshots_1.6_140320_1150' !
+    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4) !'2DEngInletSnapshots_1.6_140320_1150'
     
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
@@ -51,10 +51,13 @@ program AerOpt
     call SubCreateInitialNests()                !Sampling of initial points/nests via LHC    
     ! Output: InitialNests - Sampling Points for initial Nests
     
-    open(29,file='Output_Data/InitialNests.txt')
-    write(29, *) 'Initial Snapshots' !strSystem
+    !allocate(ArrayTemp(1000,(IV%NoDim*IV%NoCP)))
+    open(29,file='Output_Data/InitialNests1000.txt')
+    write(29, *) 'Initial Nests'
     write(29,'(1000f13.10)') InitialNests
-    close(29)
+    close(29) 
+    !InitialNests = ArrayTemp(1:999,:)
+    !deallocate(ArrayTemp)
     
 !!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
     
@@ -141,10 +144,10 @@ program AerOpt
     
     
     ! ****Check Simulation Results**** !
-    !print*, 'Start Check for Convergence'
-    !ii = 0
-    !call CheckforConvergence(ii)
-    ! print*, 'All Solutions converged'
+    print*, 'Start Check for Convergence'
+    ii = 0
+    call CheckforConvergence(ii)
+     print*, 'All Solutions converged'
      
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
@@ -161,7 +164,7 @@ program AerOpt
     ! Output: Optimum Coordinates - 1 Mesh with moved boundaries based on optimum Control Point Coordinates
     
     ! Safe Optimum Geometry in Text File
-    open(99, file= OutFolder//'/OptimumMesh.txt')         
+    open(99, file= OutFolder//'/OptimumMesh300.txt')         
     write(99,'(1I8)') RD%np
     write(99,'(1I8)') RD%ne
     write(99,'(2f12.7)') transpose(RD%coord_temp)

@@ -90,8 +90,6 @@
     double precision, dimension(3,3) :: A
     real :: D
 
-
-
     ! Body of LocateNode
     !A1 = /coord(
 

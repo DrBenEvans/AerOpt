@@ -19,7 +19,7 @@ contains
         ! Variables
         implicit none
         real :: Ac, Ftemp, Fopt
-        integer :: NoSteps, i, j, k, np, NoCPdim, NoTop, NoDiscard, l, randomNest
+        integer :: NoSteps, i, j, k, NoCPdim, NoTop, NoDiscard, l, randomNest
         real, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests
         real, dimension(:,:), allocatable :: InitialNests_Move, newNests_Move, newNests
         integer, dimension(:), allocatable :: ind_Fi
@@ -71,19 +71,22 @@ contains
             
         ! Allocate modes and coeff size based on the user input of Number of POD Modes desired. If < 0, all Modes are considered.
         if (IV%NoPOMod < 0) then
-            allocate(modes(np, IV%NoNests),stat=allocateStatus)
+            allocate(modes(RD%np, IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
             allocate(coeff(IV%NoNests, IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        IV%NoPoMod = IV%NoNests
         else
-            allocate(modes(np, IV%NoPOMod),stat=allocateStatus)
+            allocate(modes(RD%np, IV%NoPOMod),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
             allocate(coeff(IV%NoNests, IV%NoPOMod),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         end if
-            
+        
+        call timestamp()
         call POD()
         ! Output: Modes and Coefficients of POD
+        call timestamp()
         
         allocate(Fi(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "    
@@ -95,13 +98,14 @@ contains
         ! Output: Distortion as the Fitness (Fi)
         
         ! Write Output File for Analysis including Initial and all moved Nests of each Generation
-        open(29,file='Output_Data/newNests.txt')
+        open(29,file='Output_Data/newNests1000.txt')
         write(29, *) 'Initial Snapshots'
         write(29,'(1000f13.10)') InitialNests
         
         ! Loop over all Cuckoo Generations - each Generation creates new Nests
         do i = 2, IV%NoG
             print *, 'Generation ', i
+            call timestamp()
                 
             ind_Fi = (/ (i, i=1,IV%NoNests) /)
             call QSort(Fi,size(Fi), 'y', ind_Fi) ! Result in Ascending order
@@ -113,7 +117,7 @@ contains
             !end do
             
             print *, 'Current best solution:' , Fi(1)
-            open(19,file='Output_Data/Fitness.txt')
+            open(19,file='Output_Data/Fitness1000.txt')
             write(19,'(1f13.10)') Fi(1)                    
             
             if (i == 2) then
@@ -186,7 +190,7 @@ contains
                     call random_number(rn)
                     NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                     NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
-                    tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + newNests_Move(IV%NoNests-j+1,:)
+                    tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + newNests_Move(j,:)
                     
                 else    ! Different Nest
                     
@@ -288,11 +292,13 @@ contains
         real, dimension(:), allocatable :: Vx, Vy, rho, e
         double precision, dimension(:,:), allocatable :: pressure2, var1, var2, modestemp
         character(len=:), allocatable :: istr
-        double precision, dimension(:,:), allocatable :: V
-        double precision, dimension(RD%np,1) :: ones
-        double precision, dimension(1, IV%NoNests) :: var3            
+        double precision, dimension(:,:), allocatable :: V, var3, ones      
         
         ! Body of POD
+        allocate(var3(1, IV%NoNests),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        allocate(ones(RD%np,1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         allocate(rho(RD%np),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         allocate(e(RD%np),stat=allocateStatus)
@@ -323,9 +329,9 @@ contains
             !end if
             !
             if (IV%SystemType == 'W') then
-                open(11, file=OutFolder//'/Snapshot'//istr//'.resp')
+                open(11, file=OutFolder//'/'//trim(IV%filename)//istr//'.resp')
             else
-                open(11, file=newdir//'/'//OutFolder//'/Snapshot'//istr//'.resp')
+                open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp')
             end if
             
             read(11, *) Output  ! index, rho, Vx, Vy, Vz, e
@@ -379,6 +385,7 @@ contains
         var2 = matmul(ones,var3)
         modestemp = var1 / var2
         modes = modestemp
+!!!!! modes = modestemp(:,1:IV%NoPOMod)
         coeff = matmul(transpose(modes),pressure)
         
         deallocate(var1)
@@ -386,9 +393,9 @@ contains
         deallocate(modestemp)
             
         ! Output: Modes and Coefficients of POD       
-        open(23,file='Output_Data/Coefficients.txt')
-        write(23,'(30f12.7)') coeff            
-        close(23)
+        !open(23,file='Output_Data/Coefficients.txt')
+        !write(23,'(30f12.7)') coeff            
+        !close(23)
         print *, 'All Modes and Coefficients Calculated'
                       
     end subroutine POD
@@ -514,7 +521,7 @@ contains
         integer :: M, N
         integer :: LDA, LDU, LDVT
         integer          LWMAX
-        parameter        ( LWMAX = 1000000)
+        parameter        ( LWMAX = 10000)
 
         ! Local Scalars
         integer          INFO, LWORK
@@ -704,20 +711,26 @@ contains
         implicit none
         double precision, dimension(:,:), allocatable :: B_ar
         real, dimension(:,:), allocatable :: InitNests, coeff_temp ! = InitialNests, but will be manipulated in this function --> New Name, so it will not effect the InitialNests Array
-        real, dimension(:), allocatable :: Init_Nests_temp, Lambda, newCoeff
+        real, dimension(:), allocatable :: Init_Nests_temp, Lambda, newCoeff, Ipiv
         integer, dimension(:), allocatable :: ind_IN, avec
         real, dimension(IV%NoDim*IV%NoCP) :: tempNests
         real, dimension(RD%np) :: newpressure
         real :: a, b, d, a2
-        integer :: NoCPDim, l, m, n
+        integer :: NoCPDim, l, m, n, LWMAX, LWORK, Info
+        parameter        ( LWMAX = 10000)
+        double precision, dimension(:), allocatable ::  WORK
     
+        allocate(Ipiv(IV%NoNests),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
+        allocate(Work(LWMAX),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(InitNests(IV%NoNests,IV%NoDim*IV%NoCP),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(Init_Nests_temp(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-        allocate(Lambda(IV%NoNests),stat=allocateStatus)
+        allocate(Lambda(size(coeff, dim=2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-        allocate(newCoeff(IV%NoNests),stat=allocateStatus)
+        allocate(newCoeff(size(coeff, dim=2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(ind_IN(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
@@ -727,7 +740,12 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(B_ar(IV%NoNests, IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
+        
         ! Body of PressInterp
+        ! Initial parameters for LAPACK
+        LWORK = -1
+        Ipiv = 0.0
+        Info = 0
         
         ! Sort InitNests Matrix
         InitNests = InitialNests
@@ -750,20 +768,25 @@ contains
         d = a/b             ! Mean Distance between Points
         d = 0.25*(d**2)
         
-        ! For each 'pressure field' f(:,k) ie vector of coefficients corresponding to mode k
+        
+        ! Compute Coefficients for Interpolation
+        do m = 1, IV%NoNests
+            do n = 1, IV%NoNests       
+                a = sqrt(sum(((InitNests(m,:)-InitNests(n,:))**2), dim = 1)) ! Distance
+                B_ar(m,n) = 1.0/d*exp(-(a**2)/d)           
+            end do     
+        end do
+            
+        !Get Inverse of Matrix via LAPACK Library         
+        call dgetrf(IV%NoNests, IV%NoNests, B_ar, IV%NoNests, Ipiv, info)
+        call dgetri(IV%NoNests, B_ar, IV%NoNests, Ipiv, WORK, LWORK, Info)
+        LWORK = min( LWMAX, int( WORK( 1 ) ) )
+        call dgetri(IV%NoNests, B_ar, IV%NoNests, Ipiv, WORK, LWORK, Info)
+            
+        ! For each 'pressure field' f(:,k) ie vector of coefficients corresponding to mode k    
         newCoeff = (/ (0, i=1,IV%NoNests) /)
-        do l = 1, size(coeff_temp, dim = 1)
+        do l = 1, size(coeff_temp, dim = 2)
             
-            ! Compute Coefficients for Interpolation
-            do m = 1, IV%NoNests
-                do n = 1, IV%NoNests       
-                    a = sqrt(sum(((InitNests(m,:)-InitNests(n,:))**2), dim = 1)) ! Distance
-                    B_ar(m,n) = 1.0/d*exp(-(a**2)/d)           
-                end do     
-            end do
-            
-            call Inverse(B_ar, B_ar, IV%NoNests)
-!!!! Replace with DGETRI of LAPACK Library
             Lambda = matmul(B_ar,coeff_temp(l,:))
             
             do m = 1, IV%NoNests
@@ -804,9 +827,9 @@ contains
             
             ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
             if (IV%SystemType == 'W') then
-                open(1, file=OutFolder//'/Snapshot'//istr//'.rsd', STATUS="OLD")
+                open(1, file=OutFolder//'/'//trim(IV%filename)//istr//'.rsd', STATUS="OLD")
             else
-                open(1, file=newdir//'/'//OutFolder//'/Snapshot'//istr//'.rsd', STATUS="OLD")
+                open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', STATUS="OLD")
             end if       
             inquire(1, size = FileSize)           
             LastLine = FileSize/106
