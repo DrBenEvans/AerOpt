@@ -18,7 +18,7 @@ module CreateInitialNests
         integer, dimension(IV%NoCP) :: ones                      ! Vector with Ones                                    
         allocate(MxDisp((IV%NoCP*IV%NoDim),2))
         allocate(cond(IV%NoCP*IV%NoDim))
-        allocate(InitialNests(IV%NoNests,IV%NoDim*IV%NoCP))
+        allocate(InitialNests(IV%NoSnap,IV%NoDim*IV%NoCP))
 
         
         !!****Body of SubCreateInitialNests****!!      
@@ -57,7 +57,7 @@ module CreateInitialNests
                
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
-        call LHS(InitialNests, IV%NoNests, IV%NoCP)     
+        call LHS(InitialNests, IV%NoSnap, IV%NoCP)     
         !Output: InitialNests - an initial Sampling via LHS
         InitialNests(1,:) = (/ (0, i=1,(IV%NoCP*IV%NoDim)) /)
 

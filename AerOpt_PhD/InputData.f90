@@ -14,6 +14,7 @@ module InputData
         real :: engFMF                  ! Solver variable - engines Front Mass Flow
         real :: Top2Low                 ! Fraction of Top to Low Nests
         integer :: NoNests              ! Number of Nests (Cuckoo Search)
+        integer :: NoSnap               ! Number of initial Snapshots
         integer :: NoCP                 ! Number of Control Points
         integer :: NoDim                ! Number of Dimensions
         integer :: NoG                  ! Number of Generations
@@ -73,10 +74,11 @@ contains
         IV%zmax = 0.00			        ! Maximum lateral displacement of Control Nodes    
         IV%engFMF = 1.0			        ! engines Front Mass Flow(Solver variable)
         IV%Top2Low = 0.75		        ! Fraction of Top to Low Cuckoo Nests
-        IV%NoNests = 100              	! Number of Nests (Cuckoo Search) 
+        IV%NoSnap = 1000                ! Number of initial Snapshots
         IV%NoCP = 7			            ! Number of Control Points 
         IV%NoDim = 2			        ! Number of Dimensions in Space 
-        IV%NoG = 100			            ! Number of Generations 
+        IV%NoG = 100		            ! Number of Generations
+        IV%NoNests = 10*IV%NoDim*IV%NoCP! Number of Nests (Cuckoo Search)
         IV%NoPOMod = -1			        ! No of POD Modes considered 
         IV%NoLeviSteps = 100         	! Number of Levy walks per movement 
         IV%NoIter = -3               	! Batch File variable - Number of Iterations 

@@ -20,10 +20,11 @@ contains
         implicit none
         real :: Ac, Ftemp, Fopt
         integer :: NoSteps, i, j, k, NoCPdim, NoTop, NoDiscard, l, randomNest
-        real, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests
+        real, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial
         real, dimension(:,:), allocatable :: InitialNests_Move, newNests_Move, newNests
-        integer, dimension(:), allocatable :: ind_Fi
+        integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial
         logical :: oob
+        character(len=5) :: strNoSnap
 
         allocate(NormFact(av*IV%NoCP),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
@@ -31,9 +32,7 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(dist(av*IV%NoCP),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(ind_Fi(IV%NoNests),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(InitialNests_Move(IV%NoNests,av*IV%NoCP),stat=allocateStatus)
+        allocate(InitialNests_Move(IV%NoSnap,av*IV%NoCP),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(newNests_Move(IV%NoNests,av*IV%NoCP),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
@@ -70,64 +69,80 @@ contains
         end do
             
         ! Allocate modes and coeff size based on the user input of Number of POD Modes desired. If < 0, all Modes are considered.
-        if (IV%NoPOMod < 0) then
-            allocate(modes(RD%np, IV%NoNests),stat=allocateStatus)
+        if (IV%NoPOMod < 0 .OR. IV%NoPOMod > IV%NoSnap) then
+            allocate(modes(RD%np, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-            allocate(coeff(IV%NoNests, IV%NoNests),stat=allocateStatus)
+            allocate(coeff(IV%NoSnap, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        IV%NoPoMod = IV%NoNests
+        IV%NoPoMod = IV%NoSnap
         else
             allocate(modes(RD%np, IV%NoPOMod),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-            allocate(coeff(IV%NoNests, IV%NoPOMod),stat=allocateStatus)
+            allocate(coeff(IV%NoSnap, IV%NoPOMod),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         end if
         
         call timestamp()
         call POD()
-        ! Output: Modes and Coefficients of POD
         call timestamp()
-        
-        allocate(Fi(IV%NoNests),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "    
+        ! Output: Modes and Coefficients of POD       
+                
         call getengineInlet() ! Get boundary nodes, that define the Engine Inlet Plane
         ! Output: Engine Inlet Nodes(engInNodes)
         
-        call getDistortion(Fi) ! Determine Distortion
+        allocate(ind_Fi_initial(IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        allocate(ind_Fi(IV%NoNests),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        allocate(Fi(IV%NoNests),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        allocate(Fi_initial(IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        
+        ! Determine Distortion
+        call getDistortion(Fi_initial)
         deallocate(pressure)
-        ! Output: Distortion as the Fitness (Fi)
+        ! Output: Distortion of all Snapshots as the Fitness (Fi)
+        
+        ! Pass on Top Snapshot parameters to Nests 
+        ind_Fi_initial = (/ (i, i=1,IV%NoSnap) /)
+        call QSort(Fi_initial,size(Fi), 'y', ind_Fi_initial) ! Result in Ascending order
+        Fi = Fi_initial(1:IV%NoNests)
+        newNests_Move = InitialNests_Move(ind_Fi_initial(1:IV%NoNests),:)
+        newNests = InitialNests(ind_Fi_initial(1:IV%NoNests),:)
+        deallocate(Fi_initial)
+        deallocate(ind_Fi_initial)
         
         ! Write Output File for Analysis including Initial and all moved Nests of each Generation
-        open(29,file='Output_Data/newNests1000.txt')
+        write(strNoSnap, *) IV%NoSnap
+        open(29,file='Output_Data/newNests'//trim(strNoSnap)//'.txt')
         write(29, *) 'Initial Snapshots'
-        write(29,'(1000f13.10)') InitialNests
+        write(29,'(<IV%NoSnap>f13.10)') InitialNests
         
         ! Loop over all Cuckoo Generations - each Generation creates new Nests
         do i = 2, IV%NoG
             print *, 'Generation ', i
             call timestamp()
-                
+            
+            ! Re-order Fitness in ascending order
             ind_Fi = (/ (i, i=1,IV%NoNests) /)
-            call QSort(Fi,size(Fi), 'y', ind_Fi) ! Result in Ascending order
+            call QSort(Fi,size(Fi), 'y', ind_Fi)
             
             !! Change to Descending Order in Case of Maximization Problem
-            !do j = 1, nint(NoNests/2.0)
-            !    Fi(j) = Fi(NoNests-j+1)
-            !    ind_Fi(j) = ind_Fi(NoNests-j+1)
+            !do j = 1, nint(IV%NoNests/2.0)
+            !    Fi(j) = Fi(IV%NoNests-j+1)
+            !    ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
             !end do
             
+            ! Re-order newNests for next Generation
+            newNests_Move = newNests_Move(ind_Fi,:)
+            newNests = newNests(ind_Fi,:)
+            
+            ! Store Optimum Fitness value
             print *, 'Current best solution:' , Fi(1)
             open(19,file='Output_Data/Fitness1000.txt')
             write(19,'(1f13.10)') Fi(1)                    
-            
-            if (i == 2) then
-                newNests_Move = InitialNests_Move(ind_Fi,:)
-                newNests = InitialNests(ind_Fi,:)
-            else
-                newNests_Move = newNests_Move(ind_Fi,:)
-                newNests = newNests(ind_Fi,:)
-            end if
-            
+                    
             ! Store moved Nests in Output Analysis File
             write(29, *) 'Generation', (i-1)
             write(29,'(1000f13.10)') newNests
@@ -295,7 +310,7 @@ contains
         double precision, dimension(:,:), allocatable :: V, var3, ones      
         
         ! Body of POD
-        allocate(var3(1, IV%NoNests),stat=allocateStatus)
+        allocate(var3(1, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         allocate(ones(RD%np,1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
@@ -309,7 +324,7 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         allocate(Output(6*RD%np),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
-        allocate(pressure(RD%np, IV%NoNests),stat=allocateStatus)
+        allocate(pressure(RD%np, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         
         ! Precalculat ambient Parameters
@@ -317,7 +332,7 @@ contains
         rho_amb = (IV%Pamb)/(IV%Tamb*IV%R)             ! ambient Density
             
         !Extract pressure of Snapshot Output file
-        do i = 1, IV%NoNests
+        do i = 1, IV%NoSnap
             
             ! Determine correct String number
             call DetermineStrLen(istr, i)
@@ -362,24 +377,24 @@ contains
         deallocate(rho)
 
         ! Perform Single Value Decomposition
-        allocate(pressure2(RD%np, IV%NoNests),stat=allocateStatus)
+        allocate(pressure2(RD%np, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         pressure2 = pressure
         call SVD(pressure2, size(pressure, Dim = 1), size(pressure, Dim = 2),V)
         deallocate(pressure2)
             
         ! Calculate PO modes and initial Coefficients 
-        allocate(var1(RD%np, IV%NoNests),stat=allocateStatus)
+        allocate(var1(RD%np, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
-        allocate(modestemp(RD%np, IV%NoNests),stat=allocateStatus)
+        allocate(modestemp(RD%np, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
-        allocate(var2(RD%np, IV%NoNests),stat=allocateStatus)
+        allocate(var2(RD%np, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         
         var1 = matmul(pressure,V)
         ones(:,1) = (/ (1, i=1,RD%np) /)
         var2 = var1*var1
-        do j = 1, IV%NoNests
+        do j = 1, IV%NoSnap
             var3(1,j) = sqrt(sum(var2(:,j), dim = 1))
         end do
         var2 = matmul(ones,var3)
@@ -407,7 +422,7 @@ contains
         implicit none
         integer :: NoEngIN
         real, dimension(:), allocatable :: PlaneX, PlaneY, dPress, h, Area_trap, Pmid_x, Pmid_y, Area, Press_mid
-        real, dimension(IV%NoNests) :: Distortion
+        real, dimension(IV%NoSnap) :: Distortion
         real :: Press_ave, L
  
         allocate(PlaneX(size(engInNodes)),stat=allocateStatus)
@@ -437,7 +452,7 @@ contains
         PlaneY = RD%coord(engInNodes,2)
         
         ! Calculate coordinates of midpoints and afterwards the Area between them
-        do i = 1, IV%NoNests
+        do i = 1, IV%NoSnap
                  
             ! Assign Right boundary nodes as First Midpoint to act as boundaries
             Pmid_x(1) = PlaneX(1)
@@ -712,7 +727,7 @@ contains
         double precision, dimension(:,:), allocatable :: B_ar
         real, dimension(:,:), allocatable :: InitNests, coeff_temp ! = InitialNests, but will be manipulated in this function --> New Name, so it will not effect the InitialNests Array
         real, dimension(:), allocatable :: Init_Nests_temp, Lambda, newCoeff, Ipiv
-        integer, dimension(:), allocatable :: ind_IN, avec
+        integer, dimension(:), allocatable :: ind_IN
         real, dimension(IV%NoDim*IV%NoCP) :: tempNests
         real, dimension(RD%np) :: newpressure
         real :: a, b, d, a2
@@ -720,25 +735,23 @@ contains
         parameter        ( LWMAX = 10000)
         double precision, dimension(:), allocatable ::  WORK
     
-        allocate(Ipiv(IV%NoNests),stat=allocateStatus)
+        allocate(Ipiv(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(Work(LWMAX),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-        allocate(InitNests(IV%NoNests,IV%NoDim*IV%NoCP),stat=allocateStatus)
+        allocate(InitNests(IV%NoSnap,IV%NoDim*IV%NoCP),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-        allocate(Init_Nests_temp(IV%NoNests),stat=allocateStatus)
+        allocate(Init_Nests_temp(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(Lambda(size(coeff, dim=2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(newCoeff(size(coeff, dim=2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-        allocate(ind_IN(IV%NoNests),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-        allocate(avec(IV%NoNests),stat=allocateStatus)
+        allocate(ind_IN(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(coeff_temp(size(coeff, dim=1), size(coeff,dim=2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-        allocate(B_ar(IV%NoNests, IV%NoNests),stat=allocateStatus)
+        allocate(B_ar(IV%NoSnap, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         
         ! Body of PressInterp
@@ -750,7 +763,7 @@ contains
         ! Sort InitNests Matrix
         InitNests = InitialNests
         coeff_temp = coeff
-        ind_IN = (/ (i, i=1,IV%NoNests) /)
+        ind_IN = (/ (i, i=1,IV%NoSnap) /)
         Init_Nests_temp = InitNests(:, (1+IV%NoDim*IV%NoCP-NoCPDim))
         call QSort(Init_Nests_temp, size(InitNests, dim = 1), 'y', ind_IN)
         InitNests = InitNests(ind_IN,:)
@@ -759,8 +772,8 @@ contains
         ! Compute Shape Parameter
         a = 0
         b = 0
-        do l = 1, (IV%NoNests - 1)
-            do m = (l+1), IV%NoNests
+        do l = 1, (IV%NoSnap - 1)
+            do m = (l+1), IV%NoSnap
                 a = a + sqrt(sum(((InitNests(l,:)-InitNests(m,:))**2), dim = 1))    ! Sum of all distances between points
                 b = b + 1                                                           ! Amount of points considered  
             end do    
@@ -770,26 +783,26 @@ contains
         
         
         ! Compute Coefficients for Interpolation
-        do m = 1, IV%NoNests
-            do n = 1, IV%NoNests       
+        do m = 1, IV%NoSnap
+            do n = 1, IV%NoSnap       
                 a = sqrt(sum(((InitNests(m,:)-InitNests(n,:))**2), dim = 1)) ! Distance
                 B_ar(m,n) = 1.0/d*exp(-(a**2)/d)           
             end do     
         end do
             
         !Get Inverse of Matrix via LAPACK Library         
-        call dgetrf(IV%NoNests, IV%NoNests, B_ar, IV%NoNests, Ipiv, info)
-        call dgetri(IV%NoNests, B_ar, IV%NoNests, Ipiv, WORK, LWORK, Info)
+        call dgetrf(IV%NoSnap, IV%NoSnap, B_ar, IV%NoNests, Ipiv, info)
+        call dgetri(IV%NoSnap, B_ar, IV%NoSnap, Ipiv, WORK, LWORK, Info)
         LWORK = min( LWMAX, int( WORK( 1 ) ) )
-        call dgetri(IV%NoNests, B_ar, IV%NoNests, Ipiv, WORK, LWORK, Info)
+        call dgetri(IV%NoSnap, B_ar, IV%NoSnap, Ipiv, WORK, LWORK, Info)
             
         ! For each 'pressure field' f(:,k) ie vector of coefficients corresponding to mode k    
-        newCoeff = (/ (0, i=1,IV%NoNests) /)
+        newCoeff = (/ (0, i=1,IV%NoSnap) /)
         do l = 1, size(coeff_temp, dim = 2)
             
             Lambda = matmul(B_ar,coeff_temp(l,:))
             
-            do m = 1, IV%NoNests
+            do m = 1, IV%NoSnap
                 a = sqrt(sum(((tempNests-InitNests(m,:))**2), dim = 1)) ! Distance
                 newCoeff(l) = newCoeff(l) + Lambda(m)*(1.0/d*exp(-(a**2)/d))
             end do 
@@ -811,7 +824,7 @@ contains
         integer, dimension(:), allocatable :: DivNestPos
         real, dimension(:), allocatable :: MidPoints
         
-        allocate(DivNestPos(IV%NoNests),stat=allocateStatus)
+        allocate(DivNestPos(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(MidPoints(IV%NoCP*IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
@@ -820,7 +833,7 @@ contains
         print *, 'Iteration', (Iter + 1)
         Converge = .true.
         NoConv = 0
-        do i = 1, IV%NoNests
+        do i = 1, IV%NoSnap
             
             ! Determine correct String number
             call DetermineStrLen(istr, i)

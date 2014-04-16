@@ -52,22 +52,23 @@ program AerOpt
     ! Output: InitialNests - Sampling Points for initial Nests
     
     !allocate(ArrayTemp(1000,(IV%NoDim*IV%NoCP)))
-    open(29,file='Output_Data/InitialNests1000.txt')
-    write(29, *) 'Initial Nests'
-    write(29,'(1000f13.10)') InitialNests
+    write(strNoSnap, *) IV%NoSnap
+    open(29,file='Output_Data/newNests'//trim(strSystem)//'.txt')
+    read(29, *)
+    read(29,'(<IV%NoSnap>f13.10)') InitialNests
     close(29) 
     !InitialNests = ArrayTemp(1:999,:)
     !deallocate(ArrayTemp)
     
-!!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
+!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
     
     ! ****Generate initial Meshes/Snapshots**** !
     call IdentifyBoundaryFlags()
     ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
     allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
-    do ii = 1, IV%NoNests
-        print *, "Generating Mesh", ii, "/", IV%NoNests
+    do ii = 1, IV%NoSnap
+        print *, "Generating Mesh", ii, "/", IV%NoSnap
         RD%coord_temp = RD%coord
         call SubGenerateInitialMeshes(InitialNests(ii,:))
         ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
@@ -107,7 +108,7 @@ program AerOpt
         pathLin_Prepro = '/home/david.naumann/2DEngInlSim/PrePro/2DPreProcessorLin'
     end if
     pathWin = 'Flite2D\PreProcessing'   
-    do ii = 1, IV%NoNests
+    do ii = 1, IV%NoSnap
     
         call PreProcessing(ii)
     
@@ -125,7 +126,7 @@ program AerOpt
         pathLin_Solver = '/home/david.naumann/2DEngInlSim/Solver/2DSolverLin'
     end if
     
-    do ii = 1, IV%NoNests
+    do ii = 1, IV%NoSnap
             
        call Solver(ii) 
                 

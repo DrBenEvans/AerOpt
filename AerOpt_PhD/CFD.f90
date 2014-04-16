@@ -118,7 +118,7 @@ contains
             j = j + 1
         
             ! Check Status of Simulation by checking the existence of all error files
-            do i = IV%NoNests, 1, -1
+            do i = IV%NoSnap, 1, -1
             
                 ! Determine correct String      
                 call DetermineStrLen(istr, i)
