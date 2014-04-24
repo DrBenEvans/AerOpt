@@ -1,6 +1,7 @@
 module ReadData
     
     use InputData
+    use Toolbox
     type ReadVariablesData
     
         integer :: ne, np, nbf, nbc                             ! Number of elements, Nodes/Points & boundary faces
@@ -80,13 +81,18 @@ contains
     
     end subroutine SubReadData
     
-    subroutine InitSnapshots()
+    subroutine InitSnapshots(ii)
     !Objective: Create Outputfile of each Snapshot as Input for the Pre Processor
     
         ! Variables
         implicit none
+        integer :: ii
     
         ! Body of InitSnapshots
+        
+        ! Determine correct String      
+        call DetermineStrLen(istr, ii) 
+        
         open(99, file= OutFolder//'/'//trim(IV%filename)//istr//'.dat')
         write(99,*) 1
         write(99,*) 'David Naumann'
@@ -106,6 +112,7 @@ contains
         end do
 10      format(2f12.7)        
         close(99)
+        deallocate (istr)
     
     end subroutine InitSnapshots
     

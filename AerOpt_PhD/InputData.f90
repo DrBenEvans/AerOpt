@@ -78,7 +78,7 @@ contains
         IV%NoCP = 7			            ! Number of Control Points 
         IV%NoDim = 2			        ! Number of Dimensions in Space 
         IV%NoG = 100		            ! Number of Generations
-        IV%NoNests = 10*IV%NoDim*IV%NoCP! Number of Nests (Cuckoo Search)
+        IV%NoNests = 0                  ! Number of Nests (Cuckoo Search)
         IV%NoPOMod = -1			        ! No of POD Modes considered 
         IV%NoLeviSteps = 100         	! Number of Levy walks per movement 
         IV%NoIter = -3               	! Batch File variable - Number of Iterations 
@@ -92,11 +92,17 @@ contains
         IV%UserName = 'egnaumann'       ! Putty Username
         IV%Password = 'Fleur666'        ! Putty Password
         IV%defPath = 'egnaumann/2DEngInlSim'  ! defines defaultpath - Clusterpath: 'egnaumann/2DEngInlSim/'
-        IV%version = '1.6'
+        IV%version = '1.7'
     
+        IV%NoNests = 10*IV%NoDim*IV%NoCP! Number of Nests (Cuckoo Search)6
         open(1,file = InFolder//'/AerOpt_InputParameters.txt')
         read(1,InputVariables)
         close(1)
+        
+        !IV%NoSnap = IV%NoSnap - 2*(IV%NoG - 2)
+        if (IV%NoNests > IV%NoSnap) then
+            IV%NoNests = IV%NoSnap
+        end if
         
     end subroutine SubInputData
     

@@ -1,8 +1,8 @@
 program AerOpt
    
     ! ****Initializing Parameters and Implement Modules**** !
-    use CreateInitialNests
-    use GenerateInitialMeshes
+    use CreateSnapshots
+    use GenerateMesh
     use Toolbox
     use Optimization
     use ReadData
@@ -11,6 +11,17 @@ program AerOpt
     
     implicit none
     integer :: ii
+    
+    print *, ''
+    print *, '*****************************************************************************'
+    print *, '**                                                                         **'
+    print *, '************************  WELCOME TO THE AEROPT TOOL  ***********************'     
+    print *, '**  AN AUTOMATED AERODYNAMIC OPTIMISATION SOFTWARE FOR COMPLEX GEOMETRIES  **'
+    print *, '**                                                                         **'
+    print *, '**********************   written by Dr. DAVID NAUMANN   *********************'
+    print *, '**********************   supervised by Dr. BEN EVANS    *********************'
+    print *, '*****************************************************************************'
+    print *, ''
     
     ! ****User Input****** !
     call SubInputData(IV)
@@ -36,7 +47,7 @@ program AerOpt
     
     ! Get Time and Date for File and Folder Name creation
     call DATE_AND_TIME(date, time)
-    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4) !'2DEngInletSnapshots_1.6_140320_1150'
+    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4) !'2DEngInletSnapshots_1.7_140418_1314'
     
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
@@ -44,20 +55,20 @@ program AerOpt
     call SubReadData()
     ! Output: Boundf, Coord, Connecf, Coord_CP
     
-    
     ! ****Sub-Section: Create Initial Nests for the CFD Solver****** ! 
-    ! ***********included in CreateInitialNests module************** !
+    ! ***********included in CreateSnapshots module************** !
     print *, 'Start LHS Sampling - Create Initial Nests'
-    call SubCreateInitialNests()                !Sampling of initial points/nests via LHC    
-    ! Output: InitialNests - Sampling Points for initial Nests
+    call SubCreateSnapshots()                !Sampling of initial points/nests via LHC    
+    ! Output: Snapshots - Sampling Points for initial Nests
     
     !allocate(ArrayTemp(1000,(IV%NoDim*IV%NoCP)))
-    write(strNoSnap, *) IV%NoSnap
-    open(29,file='Output_Data/newNests'//trim(strSystem)//'.txt')
-    read(29, *)
-    read(29,'(<IV%NoSnap>f13.10)') InitialNests
+    call DetermineStrLen(istr, IV%NoSnap)
+    open(29,file=Outfolder//'/Snapshots'//istr//'.txt')
+    deallocate(istr)
+    write(29, *) 
+    write(29,'(<IV%NoSnap>f13.10)') Snapshots
     close(29) 
-    !InitialNests = ArrayTemp(1:999,:)
+    !Snapshots = ArrayTemp(1:999,:)
     !deallocate(ArrayTemp)
     
 !!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
@@ -70,18 +81,17 @@ program AerOpt
     do ii = 1, IV%NoSnap
         print *, "Generating Mesh", ii, "/", IV%NoSnap
         RD%coord_temp = RD%coord
-        call SubGenerateInitialMeshes(InitialNests(ii,:))
+        call SubGenerateMesh(Snapshots(ii,:))
         ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
         
 !!!!! IMPLEMENT Mesh Quality Test
 
-        ! Determine correct String      
-        call DetermineStrLen(istr, ii) 
         ! Write Snapshot to File
-        call InitSnapshots()
-        deallocate (istr)
+        call InitSnapshots(ii)
+
     end do
     deallocate(RD%coord_temp)
+
 
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     print *, 'Create Directories'
@@ -135,9 +145,7 @@ program AerOpt
     
     
     ! ****Wait & Check for FLITE Solver Output**** !
-    print*, 'Start Sleep'
     call Sleep()
-    print*, 'End Sleep - Jobs are finished'
     
     if (IV%SystemType == 'W') then
         call TransferSolutionOutput()
@@ -152,16 +160,15 @@ program AerOpt
      
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
-    print *, 'Start Optmization'
     call SubOptimization()
-    ! Output: Optimized mesh via Cuckoo Search and POD
+    ! Output: Optimized mesh via Modified Cuckoo Search and POD
     
     
     ! ****Generate Optimum Mesh and Safe in file**** !
     allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
     if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main " 
     RD%coord_temp = RD%coord
-    call SubGenerateInitialMeshes(NestOpt)
+    call SubGenerateMesh(NestOpt)
     ! Output: Optimum Coordinates - 1 Mesh with moved boundaries based on optimum Control Point Coordinates
     
     ! Safe Optimum Geometry in Text File
