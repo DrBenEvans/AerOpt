@@ -442,8 +442,6 @@ contains
         character(len=:), allocatable :: istr
 
         ! Body of POD
-        allocate(var3(1, IV%NoSnap),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         allocate(ones(RD%np,1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         allocate(rho(RD%np),stat=allocateStatus)
@@ -477,9 +475,9 @@ contains
             !end if
             !
             if (IV%SystemType == 'W') then
-                open(11, file=OutFolder//'/'//trim(IV%filename)//istr//'.resp')
+                open(11, file=OutFolder//'/'//trim(IV%filename)//istr//'.resp', form='formatted',status='old')
             else
-                open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp')
+                open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp', form='formatted',status='old')
             end if
             
             read(11, *) Output  ! index, rho, Vx, Vy, Vz, e
@@ -514,44 +512,24 @@ contains
         allocate(pressure2(RD%np, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         pressure2 = pressure
-        call SVD(pressure2, size(pressure, Dim = 1), size(pressure, Dim = 2),V)
+        call SVD(pressure2, size(pressure, Dim = 1), size(pressure, Dim = 2),modestemp)
         deallocate(pressure2)
         print *, 'Finished SVD'
-            
-        ! Calculate PO modes and initial Coefficients 
-        allocate(var1(RD%np, IV%NoSnap),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
-        allocate(modestemp(RD%np, IV%NoSnap),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
-        allocate(var2(RD%np, IV%NoSnap),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
-        
-        ! Matmul: var1 = pressure*V   var1 = matmul(pressure,V)
-        CALL DGEMM('N','N',size( pressure, dim = 1), size( V, dim = 2), size( pressure, dim = 2),alpha,pressure,size( pressure, dim = 1),V,size( V, dim = 1),beta,var1,size( var1, dim = 1))  
-        
-        ones(:,1) = (/ (1, i=1,RD%np) /)
-        var2 = var1*var1
-        do j = 1, IV%NoSnap
-            var3(1,j) = sqrt(sum(var2(:,j), dim = 1))
-        end do  
-        
-        ! Matmul: var2 = ones*var3   var2 = matmul(ones,var3)
-        CALL DGEMM('N','N',size( ones, dim = 1), size( var3, dim = 2), size( ones, dim = 2),alpha,ones,size( ones, dim = 1),var3,size( var3, dim = 1),beta,var2,size( var2, dim = 1))
-        
-        modestemp = var1 / var2
+                
         modes = modestemp
 !!!!! modes = modestemp(:,1:IV%NoPOMod)
 
-        ! Matmul: coeff = modes'*pressure   matmul(transpose(modes),pressure
+        ! Matmul: coeff = modes'*pressure   coeff = matmul(transpose(modes),pressure)
         CALL DGEMM('T','N',size( modes, dim = 2), size( pressure, dim = 2), size( modes, dim = 1),alpha,modes,size( modes, dim = 1),pressure,size( pressure, dim = 1),beta,coeff,size( coeff, dim = 1))
         
-        deallocate(var1)
-        deallocate(var2)
         deallocate(modestemp)
             
         !Output: Modes and Coefficients of POD       
-        !open(23,file='Output_Data/Coefficients.txt')
-        !write(23,'(30f20.7)') coeff            
+        !open(23,file=newdir//'/Coefficients.txt')
+        !write(23,'(<IV%NoSnap>f20.7)') coeff            
+        !close(23)
+        !open(23,file=newdir//'/Modes.txt')
+        !write(23,'(10f13.10)') modes(:,1:10)           
         !close(23)
         !print *, 'All Modes and Coefficients Calculated'
                       
