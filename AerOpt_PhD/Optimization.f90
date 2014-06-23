@@ -643,14 +643,14 @@ contains
     
     end subroutine getengineInlet
         
-    subroutine SVD(A, M, N, V2)
+subroutine SVD(A, M, N, U)
 
         ! Parameters
         implicit none
         integer :: M, N
         integer :: LDA, LDU, LDVT
         integer          LWMAX
-        parameter        ( LWMAX = 10000)
+        parameter        ( LWMAX = 1000000)
 
         ! Local Scalars
         integer          INFO, LWORK
@@ -661,63 +661,45 @@ contains
         double precision, dimension (:), allocatable :: S
         double precision, intent(in) ::                             A( M, N )
         double precision ::                             WORK( LWMAX )
-        integer, dimension(8*min(M,N)) :: IWORK
-
-        !call PRINT_MATRIX( 'Initial Matrix A', M, N, A, LDA )      
+        integer, dimension(8*min(M,N)) :: IWORK    
  
         ! Executable Statements
         write(*,*)'DGESVD Program Results'
 
         ! Define Array Size
         allocate(V2(N,N),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in SVD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in SVD"
         LDA = M
         LDU = M
         LDVT = N
-        if (M > 1000) then
-            LDU = 1
-            allocate(U(LDU,M),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in SVD "
+        if (M > N) then
+            allocate(U(LDU,N),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in SVD"
         else
             allocate(U(LDU,M),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in SVD "
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in SVD"
         end if
         allocate(VT(LDVT,N),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in SVD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in SVD"
         allocate(S(N))            
             
         ! Query the optimal workspace.
         LWORK = -1
         !call DGESDD( 'O', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, IWORK, INFO )
-        call DGESVD( 'N', 'All', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, INFO )
+        !call DGESVD( 'N', 'All', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, INFO ) ! Right Singular Vector
+        call DGESVD( 'S', 'N', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, INFO ) ! Left Singular Vector
         LWORK = min( LWMAX, int( WORK( 1 ) ) )
 
         ! Compute SVD.
         !call DGESDD( 'O', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, IWORK, INFO )
-        call DGESVD( 'N', 'All', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, INFO )
+        !call DGESVD( 'N', 'All', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, INFO ) ! Right Singular Vector
+        call DGESVD( 'S', 'N', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, INFO ) ! Left Singular Vector
 
         ! Check for convergence.
         if( INFO.GT.0 ) then
         write(*,*)'The algorithm computing SVD failed to converge.'
         stop
         end if
-            
-        !! Print singular values.
-        !call PRINT_MATRIX( 'Singular values', 1, N, S, 1 )
-        !
-        !! Print left singular vectors.
-        !call PRINT_MATRIX( 'Left singular vectors (stored columnwise)', M, N, U, LDU )
-        !
-        !! Print right singular vectors.
-        !call PRINT_MATRIX( 'Right singular vectors (stored rowwise)', N, N, VT, LDVT )
-        !
-        ! Print right singular vectors transposed.
-        !call PRINT_MATRIX( 'Right singular vectors (stored rowwise), Transposed', N, N, transpose(VT), LDVT )
-            
-        !Output: V Matrix
-        !open(23,file='Output_Data/VMatrix.txt')
-        !write(23,'(30f12.7)') transpose(VT)            
-        !close(23)
 
         V2 = transpose(VT)
             
