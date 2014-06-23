@@ -27,7 +27,7 @@ contains
         implicit none
     
         ! Body of ReadData
-        open(1, file= InFolder//'/Mesh_fine.txt')
+        open(1, file= InFolder//'/Mesh_fine.txt', form='formatted',status='old')
         read(1, 11) RD%ne
         allocate(RD%connecf(RD%ne,IV%NoDim+1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
@@ -51,7 +51,7 @@ contains
     
         allocate(RD%Coord_CP(IV%NoCP,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        open(2, file= InFolder//'/Control_Nodes.txt')
+        open(2, file= InFolder//'/Control_Nodes.txt', form='formatted',status='old')
         do i = 1, IV%NoCP
             read(2, *) RD%Coord_CP(i,:)
         end do
@@ -59,13 +59,13 @@ contains
     
         allocate(RD%Rect(IV%NoCP,IV%NoDim*4),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        open(3, file= InFolder//'/Rectangles.txt')
+        open(3, file= InFolder//'/Rectangles.txt', form='formatted',status='old')
         do i = 1, IV%NoCP
             read(3, *) RD%Rect(i,:)
         end do
         close(3)
     
-        open(4, file= InFolder//'/Mesh_coarse.txt')
+        open(4, file= InFolder//'/Mesh_coarse.txt', form='formatted',status='old')
         read(4, *) RD%nbc
         allocate(RD%connecc(RD%nbc,IV%NoDim+1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
@@ -93,7 +93,7 @@ contains
         ! Determine correct String      
         call DetermineStrLen(istr, ii) 
         
-        open(99, file= OutFolder//'/'//trim(IV%filename)//istr//'.dat')
+        open(99, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
         write(99,*) 1
         write(99,*) 'David Naumann'
         write(99,*) 'NoTrgElem NoNodes NoBound'        
@@ -123,13 +123,13 @@ contains
         implicit none
     
         ! Body of PreProInpFile
-        open(11, file=InFolder//'/PreprocessingInput.txt')        
-        write(11,*) OutFolder, '/', trim(IV%filename), istr, '.dat'  ! Name of Input file
+        open(11, file=newdir//'/PreprocessingInput.txt', form='formatted',status='unknown')        
+        write(11,*) newdir//'/'//InFolder, '/', trim(IV%filename), istr, '.dat'  ! Name of Input file
         write(11,*) 'f'                                     ! Hybrid Mesh?
         write(11,*) 1                                       ! Number of Grids
         write(11,*) 0                                       ! Directionality Parameters
         write(11,*) 0                                       ! Visualization Modes
-        write(11,*) OutFolder, '/', trim(IV%filename), istr, '.sol'  ! Output File name
+        write(11,*) newdir//'/'//InFolder, '/', trim(IV%filename), istr, '.sol'  ! Output File name
         close(11)
     
     end subroutine PreProInpFile
@@ -147,13 +147,13 @@ contains
         ! Body of WriteSolverInpFile
         fileLength = len(IV%filename) + len(istr) + 15
         allocate(character(len=fileLength) :: fname)
-        fname = InFolder//'/'//trim(IV%filename)//istr//'.inp'
+        fname = newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp'
         write( strEFMF, '(F7.3)' )  IV%engFMF
         write( strMa, '(F7.3)' )  IV%Ma
         write( strNI, '(I2)' )  IV%NoIter
         
         ! Create Input File for Solver
-        open(5, file=fname)
+        open(5, file=fname, form='formatted',status='unknown')
         write(5,*) '&inputVariables'
         write(5,*) 'ivd%numberOfMGIterations = ' ,strNI , ','
         write(5,*) 'ivd%numberOfGridsToUse = 1,'
@@ -194,7 +194,7 @@ contains
         close(5)
         
         ! Create Read File for Solver
-        open(1, file=InFolder//'/SolverInput'//istr//'.txt')
+        open(1, file=newdir//'/'//InFolder//'/SolverInput'//istr//'.txt', form='formatted',status='unknown')
         if (IV%SystemType == 'B') then
             write(1,*) trim(IV%filename), istr, '.inp'    ! Control Filename
             write(1,*) trim(IV%filename), istr, '.sol'    ! Computation Filename
@@ -219,7 +219,7 @@ contains
         character(len=255) :: Output
     
         ! Body of writeBatchFile
-        open(1, file= InFolder//'/batchfile'//istr//'.sh')  
+        open(1, file= newdir//'/'//InFolder//'/batchfile'//istr//'.sh', form='formatted',status='unknown')  
         if (IV%SystemType /= 'B') then
             write(1,*) '#PBS -N ' ,trim(IV%filename), istr
             write(1,*) '#PBS -q oh'
@@ -237,7 +237,6 @@ contains
             !write(1,*) '#BSUB -q <enter a queue>'
             write(1,*) '#BSUB -n 1'
             write(1,*) '#BSUB -W 24:00'
-            write(1,*) 'ssh cf-log-001'
             Output = pathLin_Solver//' < /home/david.naumann/2DEngInlSim/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.txt'
             write(1,'(A)') trim(Output)
             write(1,*) 'cd ..'
@@ -262,7 +261,7 @@ contains
         
         ! Body of createDirectories
         call getcwd(currentDir)
-        open(1, file='FileCreateDir.scr')
+        open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%defPath)
@@ -291,7 +290,7 @@ contains
         
         ! Body of createDirectories
         call getcwd(currentDir)
-        open(1, file='FileCreateDir.scr')
+        open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%defPath) , '/', newdir, '/', InFolder
@@ -329,40 +328,6 @@ contains
     
     end subroutine transferFilesWin
     
-    subroutine transferFilesLin()
-    ! Objective: Move files from Linux in Linux
-    
-        ! Variables
-        implicit none
-        character(len=255) :: currentDir
-        character(len=255) :: Output
-        
-        ! Body of createDirectories
-        call getcwd(currentDir)
-        write(*,*) trim(currentDir)
-        open(1, file='FileCreateDir.scr')
-        write(1,*) 'cd '
-        write(1,*) 'cd ..'
-        write(1,*) 'cd ', trim(IV%defPath), '/', newdir, '/', InFolder
-
-        Output = 'mv '//trim(currentDir)//'/'//InFolder//'/SolverInput'//istr//'.txt SolverInput'//istr//'.txt'
-        write(1, '(A)') trim(Output)
-        
-        Output = 'mv '//trim(currentDir)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.sol '//trim(IV%filename)//istr//'.sol'
-        write(1, '(A)') trim(Output)
-        
-        Output = 'mv '//trim(currentDir)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.dat '//trim(IV%filename)//istr//'.dat'
-        write(1, '(A)') trim(Output)
-        
-        Output = 'mv '//trim(currentDir)//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp '//trim(IV%filename)//istr//'.inp'
-        write(1, '(A)') trim(Output)
-        
-        Output = 'mv '//trim(currentDir)//'/'//InFolder//'/batchfile'//istr//'.sh batchfile'//istr//'.sh'
-        write(1, '(A)') trim(Output)
-        
-        close(1)
-    
-    end subroutine transferFilesLin
     
     subroutine TriggerFile()
     ! Objectives: Triggerfile for Cluster Simulation & Parallelisation
@@ -371,7 +336,7 @@ contains
         implicit none
     
         ! Body of TriggerFile
-        open(1, file='Trigger.sh')
+        open(1, file='Trigger.sh', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%defPath), '/', newdir, '/', InFolder
@@ -392,7 +357,7 @@ contains
         implicit none
     
         ! Body of TriggerFile
-        open(1, file='Trigger.sh')
+        open(1, file='Trigger.sh', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ..'
@@ -410,7 +375,7 @@ contains
         character(len=255) :: Output
     
         ! Body of CheckSimStatus
-        open(1, file='CheckStatus.scr')
+        open(1, file='CheckStatus.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%defPath), '/', newdir, '/', InFolder      
@@ -437,7 +402,7 @@ contains
         implicit none
     
         ! Body of CheckSimStatus
-        open(1, file='CheckStatus.scr')
+        open(1, file='CheckStatus.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'       
         write(1,*) 'cd ', trim(IV%defPath), '/', newdir, '/', InFolder
@@ -454,7 +419,7 @@ contains
         integer :: strOut        
     
         ! Body of TransferSolutionOutput
-        open(1, file='FileCreateDir.scr')
+        open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%defPath), '/', newdir, '/', OutFolder
@@ -481,7 +446,7 @@ contains
         character(len=*) :: i
     
         ! Body of DeleteErrorFiles
-        open(1, file='FileCreateDir.scr')
+        open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%defPath) , '/', newdir, '/', InFolder

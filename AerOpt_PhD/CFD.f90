@@ -30,14 +30,13 @@ contains
         else
             
             ! write command (for Linux)
-            IntSystem = 10 + len(trim(IV%filename)) + len(istr) + len(pathLin_Prepro)
-            allocate(character(len=IntSystem) :: strSystem)
-            strSystem = pathLin_Prepro//' > '//trim(IV%filename)//istr//'.outpre'
+            allocate(character(len=100) :: strSystem)
+            strSystem = pathLin_Prepro//' < '//newdir//'/PreprocessingInput.txt'//' > /dev/null'
             
         end if
         print *, 'Preprocessing Snapshot', i
         print *, ' '
-        call system(strSystem)   ! System operating command called to activate fortran       
+        call system(trim(strSystem))   ! System operating command called to activate fortran       
         deallocate (istr)
         deallocate (strSystem)
     
@@ -77,11 +76,6 @@ contains
             call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Trigger.sh', 'putty')
                 
         else    ! AerOpt is executed from a Linux machine
-            
-            ! Transfer Files in correct folder on Cluster
-            call transferFilesLin()
-            call system('chmod a+x ./FileCreateDir.scr')
-            call system('./FileCreateDir.scr')
             
             if (IV%runOnCluster == 'Y') then
                 call Triggerfile()     ! Triggerfile for submission
@@ -139,7 +133,7 @@ contains
                     call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'psftp')
                 end if
             
-                open(1, file='check.txt')
+                open(1, file='check.txt',form='formatted',status='old')
                 read(1,*) jobcheck
                 close(1)
                 deallocate(istr)

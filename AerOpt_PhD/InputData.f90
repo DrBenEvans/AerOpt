@@ -22,6 +22,7 @@ module InputData
         integer :: NoLeviSteps          ! Number of Levy walks per movement
         integer :: NoIter               ! Batch File variable - Number of Iterations    
         logical :: constrain            ! Constrain: Include boundaries of design space for Levy Walk - 1:Yes 0:no
+        logical :: AdaptSamp            ! Adaptive Sampling - T: Active
         integer :: delay                ! Delay per check in seconds
         integer :: waitMax              ! maximum waiting time in hours
         real :: Aconst                  ! Levy Flight parameter (determined emperically) 
@@ -83,6 +84,7 @@ contains
         IV%NoLeviSteps = 100         	! Number of Levy walks per movement 
         IV%NoIter = -3               	! Batch File variable - Number of Iterations 
         IV%constrain = .TRUE.         	! Constrain: Include boundaries of design space for Levy Walk - 1:Yes 0:no
+        IV%AdaptSamp = .FALSE.          ! Adaptive Sampling - T: Active
         IV%delay = 300               	! Sleep Time between check for Simulation Results in seconds
         IV%waitMax = 48			        ! maximum waiting time in hours
         IV%Aconst = 0.01		        ! Levy Flight parameter (determined emperically)
@@ -92,14 +94,13 @@ contains
         IV%UserName = 'egnaumann'       ! Putty Username
         IV%Password = 'Fleur666'        ! Putty Password
         IV%defPath = 'egnaumann/2DEngInlSim'  ! defines defaultpath - Clusterpath: 'egnaumann/2DEngInlSim/'
-        IV%version = '1.7'
-    
-        IV%NoNests = 10*IV%NoDim*IV%NoCP! Number of Nests (Cuckoo Search)6
-        open(1,file = InFolder//'/AerOpt_InputParameters.txt')
+        IV%version = '1.8'
+            
+        open(1,file = InFolder//'/AerOpt_InputParameters.txt',form='formatted',status='old')
         read(1,InputVariables)
         close(1)
+        IV%NoNests = 10*IV%NoDim*IV%NoCP! Number of Nests (Cuckoo Search)
         
-        !IV%NoSnap = IV%NoSnap - 2*(IV%NoG - 2)
         if (IV%NoNests > IV%NoSnap) then
             IV%NoNests = IV%NoSnap
         end if

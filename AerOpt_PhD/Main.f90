@@ -8,19 +8,20 @@ program AerOpt
     use ReadData
     use InputData
     use CFD
+    use FDGD
     
     implicit none
     integer :: ii
     
     print *, ''
-    print *, '*****************************************************************************'
-    print *, '**                                                                         **'
-    print *, '************************  WELCOME TO THE AEROPT TOOL  ***********************'     
-    print *, '**  AN AUTOMATED AERODYNAMIC OPTIMISATION SOFTWARE FOR COMPLEX GEOMETRIES  **'
-    print *, '**                                                                         **'
-    print *, '**********************   written by Dr. DAVID NAUMANN   *********************'
-    print *, '**********************   supervised by Dr. BEN EVANS    *********************'
-    print *, '*****************************************************************************'
+    print *, '**************************************************************************'
+    print *, '**                                                                      **'
+    print *, '***********************  WELCOME TO THE AEROPT TOOL  *********************'     
+    print *, '***********  AN AUTOMATED AERODYNAMIC OPTIMISATION SOFTWARE  *************'
+    print *, '**                                                                      **'
+    print *, '*********************   written by Dr. DAVID NAUMANN   *******************'
+    print *, '*********************   supervised by Dr. BEN EVANS    *******************'
+    print *, '**************************************************************************'
     print *, ''
     
     ! ****User Input****** !
@@ -47,52 +48,15 @@ program AerOpt
     
     ! Get Time and Date for File and Folder Name creation
     call DATE_AND_TIME(date, time)
-    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4) !'2DEngInletSnapshots_1.7_140418_1314'
     
+    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4)
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
     print *, 'Start Read Data'
     call SubReadData()
     ! Output: Boundf, Coord, Connecf, Coord_CP
     
-    ! ****Sub-Section: Create Initial Nests for the CFD Solver****** ! 
-    ! ***********included in CreateSnapshots module************** !
-    print *, 'Start LHS Sampling - Create Initial Nests'
-    call SubCreateSnapshots()                !Sampling of initial points/nests via LHC    
-    ! Output: Snapshots - Sampling Points for initial Nests
     
-    !allocate(ArrayTemp(1000,(IV%NoDim*IV%NoCP)))
-    call DetermineStrLen(istr, IV%NoSnap)
-    open(29,file=Outfolder//'/Snapshots'//istr//'.txt')
-    deallocate(istr)
-    write(29, *) 
-    write(29,'(<IV%NoSnap>f13.10)') Snapshots
-    close(29) 
-    !Snapshots = ArrayTemp(1:999,:)
-    !deallocate(ArrayTemp)
-    
-!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
-    
-    ! ****Generate initial Meshes/Snapshots**** !
-    call IdentifyBoundaryFlags()
-    ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
-    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
-    do ii = 1, IV%NoSnap
-        print *, "Generating Mesh", ii, "/", IV%NoSnap
-        RD%coord_temp = RD%coord
-        call SubGenerateMesh(Snapshots(ii,:))
-        ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
-        
-!!!!! IMPLEMENT Mesh Quality Test
-
-        ! Write Snapshot to File
-        call InitSnapshots(ii)
-
-    end do
-    deallocate(RD%coord_temp)
-
-
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     print *, 'Create Directories'
     call createDirectoriesInit()
@@ -106,6 +70,46 @@ program AerOpt
         call system('./FileCreateDir.scr')    ! Submits create directory file
             
     end if
+
+
+    ! ****Sub-Section: Create Initial Nests for the CFD Solver****** ! 
+    ! ***********included in CreateSnapshots module************** !
+    print *, 'Start LHS Sampling - Create Initial Nests'
+    call SubCreateSnapshots()                !Sampling of initial points/nests via LHC    
+    ! Output: Snapshots - Sampling Points for initial Nests
+    
+    !allocate(ArrayTemp(1000,(IV%NoDim*IV%NoCP)))
+    allocate(character(len=3) :: istr)
+    write(istr, '(1f3.1)') IV%Ma
+    open(29, file=newdir//'/Snapshots'//istr//'.txt', form='formatted',status='new')
+    deallocate(istr)
+    write(29, *) 'Snapshots'
+    write(29,'(<IV%NoSnap>f13.10)') Snapshots
+    close(29)
+    !Snapshots = ArrayTemp(1:999,:)
+    !deallocate(ArrayTemp)
+    
+!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
+    
+    ! ****Generate initial Meshes/Snapshots**** !
+    call IdentifyBoundaryFlags()
+    ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
+    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
+    do ii = 1, IV%NoSnap
+        print *, "Generating Mesh", ii, "/", IV%NoSnap
+        RD%coord_temp = RD%coord
+        !call SubFDGD(dble(Snapshots(ii,:)))
+        call SubGenerateMesh(Snapshots(ii,:))
+        ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
+        
+!!!!! IMPLEMENT Mesh Quality Test
+
+        ! Write Snapshot to File
+        call InitSnapshots(ii)
+
+    end do
+    deallocate(RD%coord_temp)
     
     
     ! ****Call 2D Preprocessor and pass on input parameters**** !
@@ -153,7 +157,11 @@ program AerOpt
     
     
     ! ****Check Simulation Results**** !
-    print*, 'Start Check for Convergence'
+    print *, ''
+    print *, '*************************************'
+    print *, '***  Start Check for Convergence  ***'
+    print *, '*************************************'
+    print *, ''
     ii = 0
     call CheckforConvergence(ii)
     print*, 'All Solutions converged'
@@ -172,11 +180,7 @@ program AerOpt
     ! Output: Optimum Coordinates - 1 Mesh with moved boundaries based on optimum Control Point Coordinates
     
     ! Safe Optimum Geometry in Text File
-    open(99, file= OutFolder//'/OptimumMesh300.txt')         
-    write(99,'(1I8)') RD%np
-    write(99,'(1I8)') RD%ne
-    write(99,'(2f12.7)') transpose(RD%coord_temp)
-11  format(3I8)
-    close(99)
+    call InitSnapshots(005)
+    call timestamp()
     
     end program AerOpt
