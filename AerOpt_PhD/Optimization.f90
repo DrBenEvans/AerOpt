@@ -14,6 +14,7 @@ module Optimization
     double precision :: alpha, beta                                     ! Matrix Multiplicaion LAPACK variables
     double precision, dimension(:), allocatable :: PolCoeff
     double precision, dimension(:,:), allocatable :: Weights
+    logical :: oob
         
 contains
     
@@ -26,7 +27,7 @@ contains
         real, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
         real, dimension(:,:), allocatable :: Snapshots_Move, Nests_Move, Nests, tempSnapshots, newSnapshots
         integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial, ConvA
-        logical :: oob, Converge
+        logical :: Converge
         character(len=5) :: strNoSnap
 
         allocate(NormFact(av*IV%NoCP),stat=allocateStatus)
@@ -119,7 +120,7 @@ contains
          
         ! Pass on Top Snapshot parameters to Nests
         ind_Fi_initial = (/ (i, i=1,IV%NoSnap) /)
-        call QSort(Fi_initial,size(Fi), 'y', ind_Fi_initial) ! Result in Ascending order
+        call QSort(Fi_initial,size(Fi_initial), 'y', ind_Fi_initial) ! Result in Ascending order
         Fi = Fi_initial(1:IV%NoNests)
         Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
         Nests = Snapshots(ind_Fi_initial(1:IV%NoNests),:)
@@ -133,6 +134,18 @@ contains
         write(29,'(<IV%NoSnap>f13.10)') Snapshots
         open(20,file=OutFolder//'/Fitness.txt')
         open(19,file=OutFolder//'/Fitnessfull.txt')
+        deallocate(istr)
+        
+        ! Write Output File for Analysis including Initial and all moved Nests of each Generation
+        allocate(character(len=3) :: istr)
+        write(istr, '(1f3.1)') IV%Ma
+        open(29,file=newdir//'/Nests'//istr//'.txt', form='formatted',status='unknown')   
+        write(29, *) 'Snapshots'
+        write(29,'(<IV%NoSnap>f13.10)') Snapshots
+        close(29)
+        open(19,file=newdir//'/Fitness'//istr//'.txt', form='formatted',status='unknown')
+        write(19,*) 'Fitness'
+        close(19)
         deallocate(istr)
         
         !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
@@ -153,21 +166,35 @@ contains
             !    ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
             !end do
             
+            ! Error Test: If a Fitness is negative something is wrong!!!
+            do ii = 1, IV%NoNests
+                if (Fi(ii) < 0 ) then
+                    print *, 'Fitness negative:', ii, Fi(ii)
+                end if
+            end do
+            
             ! Re-order Nests for next Generation
             Nests_Move = Nests_Move(ind_Fi,:)
             Nests = Nests(ind_Fi,:)
             
             ! Store Optimum Fitness value
-            print *, 'Current best solution:' , Fi(1)         
-            write(19,'(1f13.10, 1f13.10)',advance="no") Fi(1), Fi(IV%NoNests)
-            write(20,'(1f13.10)') Fi(1) 
+            allocate(character(len=3) :: istr)
+            write(istr, '(1f3.1)') IV%Ma
+            print *, 'Current best solutions:' , Fi(1:6)
+            open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
+            write(19,'(<IV%NoNests>f13.10)') Fi
+            close(19) 
                     
             ! Store moved Nests in Output Analysis File
+            open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
             write(29, *) 'Generation', iii
             write(29,'(<IV%NoNests>f13.10)') Nests
+            close(29)
+            deallocate(istr)
             
-            ! Adaptive Sampling - Start New Jobs (first and last Fitness)
-            if (iii > 1 .and. iii < (IV%NoG - 1)) then
+            !!****** Adaptive Sampling - Start New Jobs (first and last Fitness) *******!!
+            if (iii > 1 .and. iii < (IV%NoG - 1) .and. IV%AdaptSamp == .true.) then
+                
                 print *, 'Adaptive Sampling - Start'
                 ! Extract First and Last Nest
                 newSnapshots(1,:) = Nests(1,:)
@@ -196,51 +223,55 @@ contains
             end if
             
             !!*** Loop over Discarded Nests ***!!
+            print *, ''
             print *, 'Modify Discarded Cuckoos for Generation', (iii+1)
-            do ii = 1, NoDiscard
+            print *, ''
+            do ii = IV%NoNests, (NoTop + 1), -1
                 
                 ! Perform Random Walk using Levy Flight with a Cauchy Distribution
                 Ac = IV%Aconst/((iii+1)**(1.0/2.0))
                 call random_number(rn)
                 NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                 NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
-                tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + Nests_Move(IV%NoNests-ii+1,:)
+                tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + Nests_Move(ii,:)
                 
                 ! Check if out of bounds
-                oob = 0
-                do k = 1, NoCPdim
-                    if (tempNests_Move(k) <= 1 .and. tempNests_Move(k) >= 0) then
-                    else
-                         oob = 1
-                    end if               
-                end do
-                
-                ! Re-evaluate Fitness of moved Nests
-                if (oob == 1 .and. IV%constrain == .true.) then                  
-                    ! Do nothing if out of bounds
-                else
-                    
-                    ! Refill tempNests
-                    l = 1
-                    do k = 1, size(cond)            
-                        if (cond(k) == -1) then
-                            tempNests(k) = (tempNests_Move(l) - 0.5)*NormFact(l)
-                            l = l + 1
+                if (IV%constrain == .true.) then                
+                    do k = 1, NoCPdim
+                        if (tempNests_Move(k) > 1) then
+                            tempNests_Move(k) = 1
                         end if
+                        if (tempNests_Move(k) < 0) then
+                           tempNests_Move(k) = 0 
+                        end if                   
                     end do
-                    
-                    ! Update Values (Fitness, Nest Locations)
-                    call ReEvaluateDistortion(NoCPDim, tempNests, Fi(IV%NoNests-ii+1))
-                    ! Output: ONE Fitnessvalue(Fi)
-                    Nests_Move(IV%NoNests-ii+1,:) = tempNests_Move
-                    Nests(IV%NoNests-ii+1,:) = tempNests
-                    
                 end if
-                         
+                    
+                ! Refill tempNests
+                l = 1
+                do k = 1, size(cond)            
+                    if (cond(k) == -1) then
+                        tempNests(k) = (tempNests_Move(l) - 0.5)*NormFact(l)
+                        l = l + 1
+                    end if
+                end do
+                     
+                ! Update Values (Fitness, Nest Locations)
+                call ReEvaluateDistortion(NoCPDim, tempNests, Fi(ii))
+                if (oob == .true.) then
+                    Fi(ii) = 1
+                    oob = .false.
+                end if
+                ! Output: ONE Fitnessvalue(Fi)
+                Nests_Move(ii,:) = tempNests_Move
+                Nests(ii,:) = tempNests
+                          
             end do
             
             !!*** Loop over Top Nests ***!!
+            print *, ''
             print *, 'Modify Top Cuckoos for Generation', (iii+1)
+            print *, ''
             do ii = 1, NoTop
             
                 ! Pick one of the Top Nests
@@ -283,57 +314,57 @@ contains
                 end if
                     
                 ! Check if out of bounds
-                oob = 0
-                do k = 1, NoCPdim
-                    if (tempNests_Move(k) <= 1 .and. tempNests_Move(k) >= 0) then
-                    else
-                         oob = 1
-                    end if               
-                end do
-                
-                ! Re-evaluate Fitness of moved Nests
-                if (oob == 1 .and. IV%constrain == .true.) then                    
-                    ! Do nothing if out of bounds
-                else
-                    
-                    ! Refill tempNests
-                    l = 1
-                    do k = 1, size(cond)            
-                        if (cond(k) == -1) then
-                            tempNests(k) = (tempNests_Move(l) - 0.5)*NormFact(l)
-                            l = l + 1
+                if (IV%constrain == .true.) then                
+                    do k = 1, NoCPdim
+                        if (tempNests_Move(k) > 1) then
+                            tempNests_Move(k) = 1
                         end if
+                        if (tempNests_Move(k) < 0) then
+                           tempNests_Move(k) = 0 
+                        end if                   
                     end do
-                    
-                    ! Update Values (Fitness, Nest Locations)
-                    call ReEvaluateDistortion(NoCPDim, tempNests, Ftemp)
-                    ! Output: ONE Fitnessvalue(Fi)
-                    
-                    ! Check if new Fitness is better than a Random Top Nest, If yes replace values
-                    call random_number(rn)
-                    randomNest = nint((1 + (NoTop - 1)*rn))
-                    if (Ftemp < Fi(randomNest)) then
-                        Nests_Move(IV%NoNests-ii+1,:) = tempNests_Move
-                        Nests(IV%NoNests-ii+1,:) = tempNests
-                        Fi(randomNest) = Ftemp
-                    end if
-            
                 end if
                 
-            end do
+                ! Refill tempNests
+                l = 1
+                do k = 1, size(cond)            
+                    if (cond(k) == -1) then
+                        tempNests(k) = (tempNests_Move(l) - 0.5)*NormFact(l)
+                        l = l + 1
+                    end if
+            
+                end do
+                    
+                ! Update Values (Fitness, Nest Locations)
+                call ReEvaluateDistortion(NoCPDim, tempNests, Ftemp)
+                if (oob == .true.) then
+                    Fi(ii) = 1
+                    oob = .false.
+                end if
+                ! Output: ONE Fitnessvalue(Fi)
+                    
+                ! Check if new Fitness is better than a Random Top Nest, If yes replace values
+                call random_number(rn)
+                randomNest = nint((1 + (NoTop - 1)*rn))
+                if (Ftemp < Fi(randomNest)) then
+                    Nests_Move(randomNest,:) = tempNests_Move
+                    Nests(randomNest,:) = tempNests
+                    Fi(randomNest) = Ftemp
+                 end if
+                 
+             end do
 
             !!*** Adaptive Sampling - Finish and Integrate New Jobs (first and last Fitness) ***!!
-            if (iii > 1 .and. iii < (IV%NoG - 1)) then
+            if (iii > 1 .and. iii < (IV%NoG - 1) .and. IV%AdaptSamp == .true.) then
                 print *, 'Adaptive Sampling - End'
                 
                 ! Store Snapshots in temporary Container
-                allocate(tempSnapshots((IV%NoSnap + 2*(IV%NoG - 2)),IV%NoDim*IV%NoCP),stat=allocateStatus)
+                allocate(tempSnapshots((IV%NoSnap + 2*IV%NoG),IV%NoDim*IV%NoCP),stat=allocateStatus)
                 if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
                 tempSnapshots(1:IV%NoSnap,:) = Snapshots
                 deallocate(Snapshots)
                 
                 ! Check if Jobs for new Snapshot are ready
-
                 IV%NoSnap = IV%NoSnap + 2
                 call Sleep()
                 IV%NoSnap = IV%NoSnap - 2
@@ -346,9 +377,9 @@ contains
                     call FileCheckConvergence(Converge, (IV%NoSnap + k))
                     if (Converge == .true.) then ! If Converged
                         
-                        ! Include new Snapshots
-                        tempSnapshots(IV%NoSnap,:) = newSnapshots(k,:)
+                        ! Include new Snapshots)
                         NoConv = NoConv + 1
+                        tempSnapshots((IV%NoSnap + NoConv),:) = newSnapshots(k,:)
                         ConvA(k) = 1
                         
                     else
@@ -381,7 +412,7 @@ contains
                     write(19,'(1I3, 1f13.10)',advance="no") 0, Ftemp
                     print *, 'Real Fitness best: ', Ftemp
                     if (Fcompare(1) == Fi(1)) then  ! Replace POD fitness with real fitness if still the same value                       
-                        print *, 'Comparison of POD Fitness/Real Fitness: ', Fi(1), '/', Ftemp
+                        print *, 'Comparison POD/Real Fitness best: ', Fi(1), '/', Ftemp
                         Fi(1) = Ftemp
                     end if
                 else ! Not converged set fitness to worst fitness to exclude solution
@@ -393,14 +424,16 @@ contains
                     write(19,'(1I3, 1f13.10)',advance="no") 1, Ftemp
                     print *, 'Real Fitness worst: ', Ftemp
                     if (Fcompare(2) == Fi(IV%NoNests)) then ! Replace POD fitness with real fitness if still the same value                     
-                        print *, 'Comparison of POD Fitness/Real Fitness: ', Fi(IV%NoNests), '/', Ftemp
+                        print *, 'Comparison POD/Real Fitness worst: ', Fi(IV%NoNests), '/', Ftemp
                         Fi(IV%NoNests) = Ftemp                      
                     end if
                 end if
+                
                 deallocate(pressure)
                                
                 
                 ! Resize Snapshots Array to include new Snapshots
+                IV%NoSnap = IV%NoSnap + NoConv
                 allocate(Snapshots(IV%NoSnap,IV%NoDim*IV%NoCP),stat=allocateStatus)
                 if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "              
                 Snapshots = tempSnapshots(1:IV%NoSnap,:)
@@ -416,9 +449,7 @@ contains
         call QSort(Fi,size(Fi, dim = 1), 'y', ind_Fi)
         Fopt = Fi(1)
         write(19,'(1f13.10)') Fi(1)
-        write(20,'(1f13.10)') Fi(1)
         close(19)
-        close(20)
         
         ! write final Nests in File
         write(29, *) 'Generation', (iii-1)
@@ -426,9 +457,15 @@ contains
         close(29)
         
         NestOpt = Nests(ind_Fi(1),:)
+        print *, ''
+        print *, '************************'
         print *, 'Last Generation'
+        print *, '************************'
+        print *, ''
         print *, 'Optimum Fitness found:', Fopt
+        print *, ''
         print *, 'Optimum Geometry:'
+        print *, ''
         print *, NestOpt
         
 !!! Calculate Error??
@@ -441,7 +478,7 @@ contains
         implicit none
         real :: Vamb, rho_amb, Rspec, gamma
         real, dimension(:), allocatable :: Output, Vx, Vy, rho, e
-        double precision, dimension(:,:), allocatable :: pressure2, var1, var2, modestemp, V, var3, ones
+        double precision, dimension(:,:), allocatable :: pressure2, modestemp, V, ones
         character(len=:), allocatable :: istr
 
         ! Body of POD
