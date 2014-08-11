@@ -30,10 +30,16 @@ module InputData
         character(len=20) :: filename    ! I/O file of initial Meshes for FLITE solver
         character :: runOnCluster       ! Run On Cluster or Run on Engine?
         character :: SystemType         ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)    
-        character(len=20) :: UserName    ! Putty Username
+        character(len=20) :: UserName    ! Putty Username - Cluster: egnaumann
         character(len=20) :: Password    ! Putty Password
-        character(len=100) :: defPath    ! defines defaultpath - Clusterpath: 'egnaumann/2DEngInlSim/'
         character(len=3) :: version
+        character(len=4) :: MeshGeneration
+        logical :: Meshtest
+        logical :: AllSurface
+        logical :: Pol                  ! POD using Polynomial
+        logical :: sort                 ! POD sorting the Snapshots
+        logical :: OldvsNew
+        logical :: multiquadric         ! RBF type for POD
     
     end type InputVariablesData
     
@@ -91,11 +97,17 @@ contains
         IV%filename = 'Snapshot'        ! I/O file of initial Meshes for FLITE solver
         IV%runOnCluster = 'Y'           ! Run On Cluster or Run on Engine?
         IV%SystemType = 'Q'             ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)
-        IV%UserName = 'egnaumann'       ! Putty Username
+        IV%UserName = 'egnaumann'       ! Putty Username - Cluster: egnaumann
         IV%Password = 'Fleur666'        ! Putty Password
-        IV%defPath = 'egnaumann/2DEngInlSim'  ! defines defaultpath - Clusterpath: 'egnaumann/2DEngInlSim/'
         IV%version = '1.8'
-            
+        IV%MeshGeneration = 'RBF'
+        IV%Meshtest = .true.
+        IV%AllSurface = .false.
+        IV%Pol = .true.                 ! Application of Polynomial?
+        IV%sort = .false.               ! Test sort algorithm to old algorithm
+        IV%OldvsNew = .false.           ! Test old vs new POD algorithm
+        IV%multiquadric = .true.        ! using multiquadratic RBF function for POD
+        
         open(1,file = InFolder//'/AerOpt_InputParameters.txt',form='formatted',status='old')
         read(1,InputVariables)
         close(1)

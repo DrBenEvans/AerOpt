@@ -78,7 +78,6 @@ program AerOpt
     call SubCreateSnapshots()                !Sampling of initial points/nests via LHC    
     ! Output: Snapshots - Sampling Points for initial Nests
     
-    !allocate(ArrayTemp(1000,(IV%NoDim*IV%NoCP)))
     allocate(character(len=3) :: istr)
     write(istr, '(1f3.1)') IV%Ma
     open(29, file=newdir//'/Snapshots'//istr//'.txt', form='formatted',status='new')
@@ -86,10 +85,8 @@ program AerOpt
     write(29, *) 'Snapshots'
     write(29,'(<IV%NoSnap>f13.10)') Snapshots
     close(29)
-    !Snapshots = ArrayTemp(1:999,:)
-    !deallocate(ArrayTemp)
     
-!!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
+!!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
     
     ! ****Generate initial Meshes/Snapshots**** !
     call IdentifyBoundaryFlags()
@@ -99,8 +96,12 @@ program AerOpt
     do ii = 1, IV%NoSnap
         print *, "Generating Mesh", ii, "/", IV%NoSnap
         RD%coord_temp = RD%coord
-        !call SubFDGD(dble(Snapshots(ii,:)))
-        call SubGenerateMesh(Snapshots(ii,:))
+        
+        if (IV%MeshGeneration == 'FDGD') then
+            call SubFDGD(dble(Snapshots(ii,:)))
+        else if (IV%MeshGeneration == 'RBF') then
+            call SubGenerateMesh(Snapshots(ii,:))
+        end if
         ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
         
 !!!!! IMPLEMENT Mesh Quality Test
@@ -111,15 +112,19 @@ program AerOpt
     end do
     deallocate(RD%coord_temp)
     
+    if (IV%Meshtest == .true.) then
+      pause
+    end if
+    
     
     ! ****Call 2D Preprocessor and pass on input parameters**** !
     print *, 'Start Preprocessing'
     if (IV%SystemType == 'Q') then
         allocate(character(len=61) :: pathLin_Prepro)
-        pathLin_Prepro = '/eng/cvcluster/egnaumann/2DEngInlSim/PrePro/2DPreProcessorLin'
+        pathLin_Prepro = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
     else
         allocate(character(len=56) :: pathLin_Prepro)
-        pathLin_Prepro = '/home/david.naumann/2DEngInlSim/PrePro/2DPreProcessorLin'
+        pathLin_Prepro = '/home/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
     end if
     pathWin = 'Flite2D\PreProcessing'   
     do ii = 1, IV%NoSnap
@@ -134,10 +139,10 @@ program AerOpt
     print *, 'Call FLITE 2D Solver'
     if (IV%SystemType /= 'B') then
         allocate(character(len=55) :: pathLin_Solver)
-        pathLin_Solver = '/eng/cvcluster/egnaumann/2DEngInlSim/Solver/2DSolverLin'
+        pathLin_Solver = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
     else
         allocate(character(len=50) :: pathLin_Solver)
-        pathLin_Solver = '/home/david.naumann/2DEngInlSim/Solver/2DSolverLin'
+        pathLin_Solver = '/home/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
     end if
     
     do ii = 1, IV%NoSnap
@@ -156,7 +161,7 @@ program AerOpt
     end if
     
     
-    ! ****Check Simulation Results**** !
+    !****Check Simulation Results**** !
     print *, ''
     print *, '*************************************'
     print *, '***  Start Check for Convergence  ***'

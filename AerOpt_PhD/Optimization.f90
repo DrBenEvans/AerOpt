@@ -12,6 +12,8 @@ module Optimization
     real, dimension(:), allocatable :: Fi                               ! Vector with all current Fitness values
     real, dimension(:), allocatable :: NestOpt                          ! Control Point Coordinates of Optimum Geometry
     double precision :: alpha, beta                                     ! Matrix Multiplicaion LAPACK variables
+    double precision, dimension(:), allocatable :: PolCoeff
+    double precision, dimension(:,:), allocatable :: Weights
         
 contains
     
@@ -91,6 +93,7 @@ contains
         
         call timestamp()
         call POD()
+        call ComputeRBFWeights(NoCPdim)
         call timestamp()
         ! Output: Modes and Coefficients of POD       
                
@@ -523,16 +526,25 @@ contains
         CALL DGEMM('T','N',size( modes, dim = 2), size( pressure, dim = 2), size( modes, dim = 1),alpha,modes,size( modes, dim = 1),pressure,size( pressure, dim = 1),beta,coeff,size( coeff, dim = 1))
         
         deallocate(modestemp)
-            
+        
+        !!** TESTING **!!    
         !Output: Modes and Coefficients of POD       
         !open(23,file=newdir//'/Coefficients.txt')
-        !write(23,'(<IV%NoSnap>f20.7)') coeff            
+        !write(23,'(<IV%NoSnap>f20.7)') coeff           
         !close(23)
         !open(23,file=newdir//'/Modes.txt')
         !write(23,'(10f13.10)') modes(:,1:10)           
         !close(23)
-        !print *, 'All Modes and Coefficients Calculated'
-                      
+        !pressure2(:,5) = matmul(modes,coeff(:,5))
+        !open(23,file=newdir//'/Pressure_Reconstruct.txt')
+        !write(23,'(1f25.10)') pressure2(:,5)           
+        !close(23)
+        !open(23,file=newdir//'/Pressure.txt')
+        !write(23,'(1f25.10)') pressure(:,5)           
+        !close(23)
+        
+        print *, 'All Modes and Coefficients Calculated'
+
     end subroutine POD
         
     subroutine getDistortion(Distortion, NoSnapshot)
@@ -791,7 +803,31 @@ subroutine SVD(A, M, N, U)
         Pmid_y(NoEngIN-1) = PlaneY(NoEngIN)
                 
         ! Area Weighted Average Pressure (calculated based on the Areas)
-        call PressInterp(NoCPDim, newpressure, tempNests)
+        if (IV%OldvsNew == .true.) then
+            call PressInterp(NoCPDim, newpressure, tempNests)
+            call InterpolateCoefficients(tempNests, newpressure, NoCPDim)
+            pause
+        else if (IV%sort == .true.) then
+            call PressInterp(NoCPDim, newpressure, tempNests)
+            IV%sort = .false.
+            call PressInterp(NoCPDim, newpressure, tempNests)
+            IV%sort = .true.
+            pause
+        else if (IV%multiquadric == .true.) then
+            deallocate(PolCoeff)
+            deallocate(Weights)
+            call ComputeRBFWeights(NoCPDim)
+            call InterpolateCoefficients(tempNests, newpressure, NoCPDim)
+            IV%multiquadric = .false.
+            deallocate(PolCoeff)
+            deallocate(Weights)
+            call ComputeRBFWeights(NoCPDim)
+            call InterpolateCoefficients(tempNests, newpressure, NoCPDim)
+            IV%multiquadric = .true.
+            pause
+        else
+            call InterpolateCoefficients(tempNests, newpressure, NoCPDim)
+        end if
         Press_mid = newpressure(engInNodes(2:(NoEngIN-1))) ! Extract Pressure of middle engine Inlet Nodes
         Press_ave = sum(Press_mid*Area, dim = 1)/sum(Area, dim = 1)
             
@@ -815,13 +851,230 @@ subroutine SVD(A, M, N, U)
   
     end subroutine ReEvaluateDistortion
     
+    subroutine ComputeRBFWeights(NoCPdim)
+    ! Objective: Compute Weights for the RBF interpolation scheme applied later in the POD reconstruction
+    
+        ! Variables
+        implicit none
+        double precision, dimension(:,:),allocatable :: RBFMatrix, A, b, coeff_temp
+        double precision, dimension(:), allocatable :: PolBasis, x, NormFact
+        double precision :: z, ShapeParameter
+        integer :: l, m, LWMAX, LWORK, Info, NoCPdim
+        parameter        ( LWMAX = 10000)
+        double precision, dimension(:), allocatable ::  WORK, Ipiv
+    
+        ! LAPACK Parameters
+        allocate(Ipiv(IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
+        allocate(Work(LWMAX),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
+        LWORK = -1
+        Ipiv = 0.0
+        Info = 0
+        ! Output Parameters
+        allocate(PolCoeff(IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
+        allocate(Weights(IV%NoSnap,IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "  
+        ! Matrix Parameters
+        allocate(RBFMatrix(IV%NoSnap,IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
+        allocate(PolBasis(IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
+        if (IV%Pol == .true.) then
+            allocate(b((IV%NoSnap + 1), 1),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights " 
+            allocate(A((IV%NoSnap + 1),(IV%NoSnap + 1)),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
+            allocate(x(IV%NoSnap + 1),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
+        else
+            allocate(A(IV%NoSnap,IV%NoSnap),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
+            allocate(b(IV%NoSnap, 1),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
+            allocate(x(IV%NoSnap),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "      
+        end if
+        allocate(NormFact(av*IV%NoCP),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        
+        ! Body of CoefficientInterpolation
+        ! A*x = b with A = [ RBFMatrix PolBasis, Polbasis^T 0] x = Weights of RBF and polynomial  b = [f 0] with f being the original coefficients of one Snapshot
+        ! Details, see Computation Approach Book
+        
+        ! Normalize Snapshots between 0 and 10
+        !do i = 1, NoCPdim        
+        !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
+        !    Snapshots(:,i) = (Snapshots(:,i)/NormFact(i) + 0.5)
+        !end do
+
+        allocate(coeff_temp(size(coeff, dim=1), size(coeff,dim=2)),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
+        coeff_temp = coeff
+        coeff_temp = transpose(coeff_temp) 
+    
+        ! Generate Matrix of Radial Basis Functions (multiquadratic)
+        ShapeParameter = 1.0
+        do m = 1, IV%NoSnap
+            do l = 1, IV%NoSnap
+                z = sqrt(sum(((Snapshots(m,:)-Snapshots(l,:))**2), dim = 1))
+                RBFMatrix(m,l) = Multiquadratic(z, ShapeParameter)
+            end do 
+        end do
+        
+        ! Design Polynomial Basis - for multiquadratic it is a '1' Matrix (see Computational Approach Book)
+        PolBasis = (/ (1, m=1,IV%NoSnap) /)
+
+        ! Assemble A matrix
+        A(1:IV%NoSnap,1:IV%NoSnap) = RBFMatrix        
+        if (IV%Pol == .true.) then
+            A(1:IV%NoSnap,(IV%NoSnap+1)) = PolBasis
+            A((IV%NoSnap+1),1:IV%NoSnap) = PolBasis
+            A((IV%NoSnap+1),(IV%NoSnap+1)) = 0
+        end if
+      
+        !Get Inverse of Matrix A via LAPACK Library
+        if (IV%Pol == .true.) then
+            call dgetrf((IV%NoSnap+1), (IV%NoSnap+1), A, (IV%NoSnap+1), Ipiv, info)
+            call dgetri((IV%NoSnap+1), A, (IV%NoSnap+1), Ipiv, WORK, LWORK, Info)
+            LWORK = min( LWMAX, int( WORK( 1 ) ) )
+            call dgetri((IV%NoSnap+1), A, (IV%NoSnap+1), Ipiv, WORK, LWORK, Info)
+        else
+            call dgetrf(IV%NoSnap, IV%NoSnap, A, IV%NoSnap, Ipiv, info)
+            call dgetri(IV%NoSnap, A, IV%NoSnap, Ipiv, WORK, LWORK, Info)
+            LWORK = min( LWMAX, int( WORK( 1 ) ) )
+            call dgetri(IV%NoSnap, A, IV%NoSnap, Ipiv, WORK, LWORK, Info)
+        end if
+
+        ! Loop over all Snapshots to get the Weight Vector for each Snapshot
+        do l = 1, IV%NoSnap
+        
+            ! b Solution/Residual Vector: Contains coefficents of ith Snapshot
+            b(1:IV%NoSnap,1) = coeff_temp(:,l)
+            if (IV%Pol == .true.) then
+                b(1+IV%NoSnap,1) = 0
+            end if
+        
+            ! x = A(-1)*b
+            CALL DGEMM('N','N',size( A, dim = 1), size( b, dim = 2), size( A, dim = 2),alpha,A,size( A, dim = 1),b,size( b, dim = 1),beta,x,size( x, dim = 1))
+
+        
+            ! Output: RBF Weights and Polynomial Coefficient
+            Weights(l,:) = x(1:IV%NoSnap)          
+            if (IV%Pol == .true.) then
+                PolCoeff(l) = x(1+IV%NoSnap)
+            end if
+        
+        end do
+        
+        open(23,file=newdir//'/Weights.txt')
+        write(23,'(10f55.10)') Weights(1:10,:)           
+        close(23)
+        open(23,file=newdir//'/Polynomial.txt')
+        write(23,'(1f25.10)') PolCoeff           
+        close(23)
+        
+        ! Denormalize Snapshots
+        !do i = 1, NoCPdim        
+        !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
+        !    Snapshots(:,i) = (Snapshots(:,i) - 0.5)*NormFact(i)
+        !end do
+        
+        print *, 'All Weights for POD evaluated'
+        
+    end subroutine ComputeRBFWeights
+    
+    function Multiquadratic(x, ShapeParameter)
+    ! Objective: Generate Function value of multiquadratic RBF function
+    
+        ! Variables
+        implicit none
+        double precision :: x, Multiquadratic, ShapeParameter
+    
+        ! Body of Multiquadratic
+        
+        if (IV%multiquadric == .true.) then
+            Multiquadratic = sqrt(1+(x**2)/ShapeParameter)
+        else
+            Multiquadratic = exp(-(x**2)/ShapeParameter)
+        end if
+    
+    end function Multiquadratic
+    
+    subroutine InterpolateCoefficients(newNest, newpressure, NOCPdim)
+    
+        ! Variables
+        implicit none
+        double precision, dimension(RD%np) :: newpressure
+        real, dimension(IV%NoDim*IV%NoCP) :: newNest
+        double precision, dimension (:), allocatable :: RBFVector, NormFact
+        double precision, dimension(:,:), allocatable :: newCoeff
+        double precision :: x, RBFterm, ShapeParameter
+        integer :: l, m, NoCPdim
+    
+        allocate(RBFVector(IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in InterpolateCoefficients "
+        allocate(newCoeff(IV%NoSnap,1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in InterpolateCoefficients "
+        allocate(NormFact(av*IV%NoCP),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "     
+        
+        ! Normalize Snapshots between 0 and 10
+        !do i = 1, NoCPdim        
+        !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
+        !    Snapshots(:,i) = (Snapshots(:,i)/NormFact(i) + 0.5)
+        !end do
+        !newNest = (newNest/NormFact(1) + 0.5)
+        
+        ! Body of InterpolateCoefficients
+        ShapeParameter = 1.0
+        do l = 1, IV%NoSnap
+            x = sqrt(sum(((newNest-Snapshots(l,:))**2), dim = 1))
+            RBFVector(l) = Multiquadratic(x, ShapeParameter)
+        end do
+    
+        do l = 1, IV%NoSnap
+            RBFterm = 0
+            do m = 1, IV%NoSnap
+                RBFterm = RBFterm + Weights(l,m)*RBFVector(m)
+            end do
+
+            if (IV%Pol == .true.) then
+                newCoeff(l,1) = PolCoeff(l) + RBFterm
+            else
+                newCoeff(l,1) = RBFterm
+            end if
+        end do
+        
+        ! Matmul: var1 = modes*newCoeff   newpressure = matmul(modes,newCoeff(:,1))
+        CALL DGEMM('N','N',size( modes, dim = 1), size( newCoeff, dim = 2), size( modes, dim = 2),alpha,modes,size( modes, dim = 1),newCoeff,size( newCoeff, dim = 1),beta,newpressure,size( newpressure, dim = 1))
+        
+        if (IV%multiquadric == .false.) then
+            open(23,file=newdir//'/NewPressure.txt')
+            write(23,'(1f25.10)') newpressure           
+            close(23)
+        else
+            open(23,file=newdir//'/NewPressureMQ.txt')
+            write(23,'(1f25.10)') newpressure           
+            close(23)
+        end if
+        
+        ! Denormalize Snapshots
+        !do i = 1, NoCPdim        
+        !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
+        !    Snapshots(:,i) = ((Snapshots(:,i) - 0.5)*NormFact(i))
+        !end do
+        !newNest = (newNest - 0.5)*NormFact(1)
+        
+    end subroutine InterpolateCoefficients
+    
     subroutine PressInterp(NoCPDim, newpressure, tempNests)
     ! Objective: Interpolation of Coefficients with Radial Basis Functions, based on normalized Gaussian RBF (see Hardy theory)
     
         ! Variables
         implicit none
-        double precision, dimension(:,:), allocatable :: B_ar, CoeffVec, Lambda, newCoeff
-        real, dimension(:,:), allocatable :: InitNests, coeff_temp  ! = Snapshots, but will be manipulated in this function --> New Name, so it will not effect the Snapshots Array
+        double precision, dimension(:,:), allocatable :: B_ar, CoeffVec, Lambda, newCoeff, InitNests, coeff_temp
         real, dimension(:), allocatable :: Init_Nests_temp, Ipiv
         integer, dimension(:), allocatable :: ind_IN
         real, dimension(IV%NoDim*IV%NoCP) :: tempNests
@@ -863,13 +1116,15 @@ subroutine SVD(A, M, N, U)
         InitNests = Snapshots
         coeff_temp = coeff
         
-        ind_IN = (/ (i, i=1,IV%NoSnap) /)      
-        Init_Nests_temp = InitNests(:, (1+IV%NoDim*IV%NoCP-NoCPDim)) ! only for QSort
-        call QSort(Init_Nests_temp, size(InitNests, dim = 1), 'y', ind_IN) ! Index only required
-        deallocate(Init_Nests_temp)
-        
-        InitNests = InitNests(ind_IN,:)
-        coeff_temp = coeff_temp(:,ind_IN)
+        if (IV%sort == .true.) then
+            ind_IN = (/ (i, i=1,IV%NoSnap) /)      
+            Init_Nests_temp = InitNests(:, (1+IV%NoDim*IV%NoCP-NoCPDim)) ! only for QSort
+            call QSort(Init_Nests_temp, size(InitNests, dim = 1), 'y', ind_IN) ! Index only required
+            deallocate(Init_Nests_temp)
+            
+            InitNests = InitNests(ind_IN,:)
+            coeff_temp = coeff_temp(:,ind_IN)
+        end if
         coeff_temp = transpose(coeff_temp) 
         
         ! Compute Shape Parameter
@@ -882,7 +1137,7 @@ subroutine SVD(A, M, N, U)
             end do    
         end do
         d = a/b             ! Mean Distance between Points
-        d = 0.25*(d**2)
+        d = 1 !0.25*(d**2)
         
         
         ! Compute Coefficients for Interpolation
@@ -910,12 +1165,22 @@ subroutine SVD(A, M, N, U)
             do m = 1, IV%NoSnap
                 a = sqrt(sum(((tempNests-InitNests(m,:))**2), dim = 1)) ! Distance
                 newCoeff(l,1) = newCoeff(l,1) + Lambda(m,1)*(1.0/d*exp(-(a**2)/d))
-            end do 
-            
+            end do
+
         end do        
         ! Matmul: var1 = modes*newCoeff   newpressure = matmul(modes,newCoeff(:,1))
         CALL DGEMM('N','N',size( modes, dim = 1), size( newCoeff, dim = 2), size( modes, dim = 2),alpha,modes,size( modes, dim = 1),newCoeff,size( newCoeff, dim = 1),beta,newpressure,size( newpressure, dim = 1))
-               
+        
+        if (IV%sort == .true.) then
+            open(23,file=newdir//'/NewPressureOldsort.txt')
+            write(23,'(1f25.10)') newpressure           
+            close(23)
+        else            
+            open(23,file=newdir//'/NewPressureOld.txt')
+            write(23,'(1f25.10)') newpressure           
+            close(23)
+        end if
+        
     end subroutine PressInterp
     
     recursive subroutine CheckforConvergence(Iter)
@@ -931,9 +1196,9 @@ subroutine SVD(A, M, N, U)
         real, dimension(:), allocatable :: MidPoints
         
         allocate(DivNestPos(IV%NoSnap),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckForConvergence "
         allocate(MidPoints(IV%NoCP*IV%NoDim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckforConvergence "
     
         ! Body of CheckforConvergence
         print *, 'Iteration', (Iter + 1)

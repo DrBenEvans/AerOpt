@@ -94,6 +94,7 @@ contains
         call DetermineStrLen(istr, ii) 
         
         open(99, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
+        !open(99, file = OutFolder//'/'//trim(IV%filename)//istr//'.dat')
         write(99,*) 1
         write(99,*) 'David Naumann'
         write(99,*) 'NoTrgElem NoNodes NoBound'        
@@ -142,6 +143,7 @@ contains
         character(len=:), allocatable :: fname
         character(len=7) :: strEFMF, strMa      ! String for Ma number & Engine Inlet Front Mass Flow Number
         character(len=2) :: strNI               ! String for Number of Iterations
+        character(len=255) :: Output
         integer :: fileLength
     
         ! Body of WriteSolverInpFile
@@ -194,7 +196,7 @@ contains
         close(5)
         
         ! Create Read File for Solver
-        open(1, file=newdir//'/'//InFolder//'/SolverInput'//istr//'.txt', form='formatted',status='unknown')
+        open(1, file=newdir//'/'//InFolder//'/SolverInput'//istr//'.sh', form='formatted',status='unknown')
         if (IV%SystemType == 'B') then
             write(1,*) trim(IV%filename), istr, '.inp'    ! Control Filename
             write(1,*) trim(IV%filename), istr, '.sol'    ! Computation Filename
@@ -202,11 +204,15 @@ contains
             write(1,*) trim(IV%filename), istr, '.resp'  ! Result filename
             write(1,*) trim(IV%filename), istr, '.rsd'   ! Residual Filename
         else
-            write(1,*) '2DEngInlSim/', newdir, '/', InFolder, '/', trim(IV%filename), istr, '.inp'    ! Control Filename
-            write(1,*) '2DEngInlSim/', newdir, '/', InFolder, '/', trim(IV%filename), istr, '.sol'    ! Computation Filename
+            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp'    ! Control Filename
+            write(1,'(A)') trim(Output)
+            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol'    ! Control Filename
+            write(1,'(A)') trim(Output)
             write(1,*) ''
-            write(1,*) '2DEngInlSim/', newdir, '/', OutFolder, '/', trim(IV%filename), istr, '.resp'  ! Result filename
-            write(1,*) '2DEngInlSim/', newdir, '/', OutFolder, '/', trim(IV%filename), istr, '.rsd'   ! Residual Filename
+            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp'    ! Control Filename
+            write(1,'(A)') trim(Output)
+            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd'    ! Control Filename
+            write(1,'(A)') trim(Output)
         end if
         close(1)
     
@@ -228,7 +234,7 @@ contains
             write(1,*) '#PBS -l mem=1gb'
             write(1,*) '#PBS -m bea'
             write(1,*) '#PBS -M 717761@swansea.ac.uk'
-            Output = pathLin_Solver//' < /eng/cvcluster/egnaumann/2DEngInlSim/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.txt'
+            Output = pathLin_Solver//' < /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh'
             write(1,'(A)') trim(Output)
         else
             write(1,*) '#BSUB -J ' ,trim(IV%filename), istr
@@ -237,7 +243,7 @@ contains
             !write(1,*) '#BSUB -q <enter a queue>'
             write(1,*) '#BSUB -n 1'
             write(1,*) '#BSUB -W 24:00'
-            Output = pathLin_Solver//' < /home/david.naumann/2DEngInlSim/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.txt'
+            Output = pathLin_Solver//' < /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh'
             write(1,'(A)') trim(Output)
             write(1,*) 'cd ..'
             write(1,*) 'mv ', InFolder, '/', trim(IV%filename), istr, '.rsd ', OutFolder, '/', trim(IV%filename), istr, '.rsd'
@@ -264,17 +270,16 @@ contains
         open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd ', trim(IV%defPath)
-        write(1,*) 'cd ..'
-        write(1,*) 'chmod 777 2DEngInlSim'
-        write(1,*) 'cd 2DEngInlSim'
+        write(1,*) 'cd ', trim(IV%UserName)
+        write(1,*) 'chmod 777 AerOpt'
+        write(1,*) 'cd AerOpt'
         write(1,*) 'mkdir ', newdir
         write(1,*) 'cd ', newdir
         write(1,*) 'mkdir ', InFolder
         write(1,*) 'mkdir ', OutFolder
         write(1,*) 'cd ..'
         write(1,*) 'cd ..'
-        write(1,*) 'chmod 711 2DEngInlSim'
+        write(1,*) 'chmod 711 AerOpt'
         close(1)
     
     end subroutine createDirectoriesInit
@@ -293,7 +298,7 @@ contains
         open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd ', trim(IV%defPath) , '/', newdir, '/', InFolder
+        write(1,*) 'cd ', trim(IV%UserName) , '/AerOpt/', newdir, '/', InFolder
         
         ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster
         strOut = len(trim(currentDir)) + 33
@@ -339,7 +344,7 @@ contains
         open(1, file='Trigger.sh', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd ', trim(IV%defPath), '/', newdir, '/', InFolder
+        write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder
         
         if (IV%SystemType /= 'B') then
             write(1,*) 'qsub batchfile', istr, '.sh'
@@ -378,17 +383,17 @@ contains
         open(1, file='CheckStatus.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd ', trim(IV%defPath), '/', newdir, '/', InFolder      
+        write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder      
         write(1,*) '[ -e ', trim(IV%filename), istr, '.e* ] && echo 1 > check.txt || echo 0 > check.txt'
         if (IV%SystemType == 'Q')   then
             write(1,*) 'cd ..'
             write(1,*) 'cd ..'
-            Output = 'mv /eng/cvcluster/egnaumann/2DEngInlSim/'//newdir//'/'//InFolder//'/check.txt check.txt'
+            Output = 'mv /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check.txt check.txt'
             write(1, '(A)') trim(Output)
         elseif (IV%SystemType == 'B') then
             write(1,*) 'cd ..'
             write(1,*) 'cd ..'
-            Output = 'mv /home/david.naumann/2DEngInlSim/'//newdir//'/'//InFolder//'/check.txt check.txt'
+            Output = 'mv /home/'//trim(IV%UserName)//'/AerOpt'//newdir//'/'//InFolder//'/check.txt check.txt'
             write(1, '(A)') trim(Output)
         end if
         close(1)
@@ -405,7 +410,7 @@ contains
         open(1, file='CheckStatus.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'       
-        write(1,*) 'cd ', trim(IV%defPath), '/', newdir, '/', InFolder
+        write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder
         write(1,*) 'get check.txt'       
         close(1)
     
@@ -422,7 +427,7 @@ contains
         open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd ', trim(IV%defPath), '/', newdir, '/', OutFolder
+        write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', OutFolder
         
         ! Put Commmands to Transfer Data from Output_Data Folder on Linux to Output_Folder on Windows
         strOut = len(trim(IV%filename)) + len(istr) + 9
@@ -449,7 +454,7 @@ contains
         open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd ', trim(IV%defPath) , '/', newdir, '/', InFolder
+        write(1,*) 'cd ', trim(IV%UserName) , '/AerOpt/', newdir, '/', InFolder
         write(1,*) ' chmod 777 ', trim(IV%filename), i, '.e*'
         write(1,*) ' rm ', trim(IV%filename), i, '.e*'
         close(1)
