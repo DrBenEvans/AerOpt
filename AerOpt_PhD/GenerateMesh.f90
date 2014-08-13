@@ -58,7 +58,7 @@
     do i = 1, IV%NoCp
         c = abs((RD%Rect(i,3) - RD%Rect(i,1)))/2.0
         do j = 1, size_ib(i)
-            dis = ((RD%coord_temp(CP_ind(i),1) - RD%coord_temp(IB(j,i),1)))*1.5   ! Distance of Control Node to a Node in the Influence Box         
+            dis = RD%coord_temp(CP_ind(i),1) - RD%coord_temp(IB(j,i),1)   ! Distance of Control Node to a Node in the Influence Box         
             w = exp(-(dis**2)/(c**2))   ! Gaussian
             RD%coord_temp(IB(j,i),:) = (/(RD%coord_temp(IB(j,i),1) + w*NestDisp(i)),(RD%coord_temp(IB(j,i),2) + w*NestDisp(IV%NoCP+i))/)   ! New coordinates
         end do

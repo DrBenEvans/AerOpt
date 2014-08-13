@@ -40,6 +40,7 @@ module InputData
         logical :: sort                 ! POD sorting the Snapshots
         logical :: OldvsNew
         logical :: multiquadric         ! RBF type for POD
+        logical :: POD
     
     end type InputVariablesData
     
@@ -81,6 +82,7 @@ contains
         IV%zmax = 0.00			        ! Maximum lateral displacement of Control Nodes    
         IV%engFMF = 1.0			        ! engines Front Mass Flow(Solver variable)
         IV%Top2Low = 0.75		        ! Fraction of Top to Low Cuckoo Nests
+        IV%POD = .true.                 ! Activation of POD - TRUE is ACTIVE
         IV%NoSnap = 1000                ! Number of initial Snapshots
         IV%NoCP = 7			            ! Number of Control Points 
         IV%NoDim = 2			        ! Number of Dimensions in Space 

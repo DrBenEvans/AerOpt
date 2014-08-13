@@ -49,7 +49,7 @@ program AerOpt
     ! Get Time and Date for File and Folder Name creation
     call DATE_AND_TIME(date, time)
     
-    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4)
+    newdir = '2DEngInletSnapshots_1.6_140319_1945' !'2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4)
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
     print *, 'Start Read Data'
@@ -154,14 +154,14 @@ program AerOpt
     
     
     ! ****Wait & Check for FLITE Solver Output**** !
-    call Sleep()
+    call Sleep(IV%NoSnap)
     
     if (IV%SystemType == 'W') then
         call TransferSolutionOutput()
     end if
     
     
-    !****Check Simulation Results**** !
+    ! ****Check Simulation Results**** !
     print *, ''
     print *, '*************************************'
     print *, '***  Start Check for Convergence  ***'

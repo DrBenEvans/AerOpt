@@ -93,11 +93,11 @@ contains
     
     end subroutine Solver
     
-    subroutine Sleep()
+    subroutine Sleep(m)
     
         ! Variables
         implicit none
-        integer :: i
+        integer :: i, m
     
         ! Body of Sleep
         print*, 'Start Sleep'
@@ -114,7 +114,7 @@ contains
         
             ! Check Status of Simulation by checking the existence of all error files
 
-            do i = IV%NoSnap, 1, -1
+            do i = m, 1, -1
 
                 ! Determine correct String      
                 call DetermineStrLen(istr, i)

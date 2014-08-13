@@ -14,7 +14,9 @@ module Optimization
     double precision :: alpha, beta                                     ! Matrix Multiplicaion LAPACK variables
     double precision, dimension(:), allocatable :: PolCoeff
     double precision, dimension(:,:), allocatable :: Weights
+    real, dimension(:,:), allocatable :: Nests_Move, Nests              ! Nest regenerated with each generation
     logical :: oob
+    integer :: SolutionNumber                                           ! Current Number of High Fidelity solutions
         
 contains
     
@@ -23,9 +25,9 @@ contains
         ! Variables
         implicit none
         real :: Ac, Ftemp, Fopt
-        integer :: NoSteps, ii, iii, NoCPdim, NoTop, NoDiscard, l, randomNest, NoConv
+        integer :: NoSteps, ii, iii, NoCPdim, NoTop, NoDiscard, l, randomNest, NoConv, NoTest
         real, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
-        real, dimension(:,:), allocatable :: Snapshots_Move, Nests_Move, Nests, tempSnapshots, newSnapshots
+        real, dimension(:,:), allocatable :: Snapshots_Move, tempSnapshots, newSnapshots, NestsTest, TopNest, TopNest_Move
         integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial, ConvA
         logical :: Converge
         character(len=5) :: strNoSnap
@@ -46,12 +48,22 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(NestOpt(IV%NoDim*IV%NoCP),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        
+        ! Specific for Adaptive Sampling
         allocate(newSnapshots(2,IV%NoDim*IV%NoCP),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fcompare(2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ConvA(2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+               
+        if (IV%POD == .false.) then
+            ! Specific Parameters required for Full Fidelity application
+            allocate(TopNest(NoTop,IV%NoDim*IV%NoCP),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+            allocate(TopNest_Move(NoTop,av*IV%NoCP),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
+        end if
         
         ! Body of SubOptimization
         print *, ''
@@ -80,23 +92,27 @@ contains
                 j = j + 1
             end if
         end do
-            
-        print *, 'Get POD modes and coeff for initial nests'
-        
+                   
         ! Normalize Snapshots between 0 and 1
         do i = 1, NoCPdim        
             NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
             Snapshots_Move(:,i) = Snapshots_Move(:,i)/NormFact(i) + 0.5
         end do
             
-        ! Allocate modes and coeff size based on the user input of Number of POD Modes desired. If < 0, all Modes are considered.
-        call AllocateModesCoeff()
-        
+        ! Extract Pressure of Snapshots
         call timestamp()
-        call POD()
-        call ComputeRBFWeights(NoCPdim)
+        if (IV%POD == .true.) then
+            call AllocateModesCoeff()
+            ! Output: allocated modes and coeff based on the Number of POD Modes desired. If < 0, all Modes are considered.
+            call POD()
+            ! Output: Modes and Coefficients of POD  
+            call ComputeRBFWeights(NoCPdim)
+            ! Output: Weights for RBF interpolation
+        else
+            call ExtractPressure(1, IV%NoSnap)
+        end if             
         call timestamp()
-        ! Output: Modes and Coefficients of POD       
+             
                
         call getengineInlet() ! Get boundary nodes, that define the Engine Inlet Plane
         ! Output: Engine Inlet Nodes(engInNodes)
@@ -126,15 +142,6 @@ contains
         Nests = Snapshots(ind_Fi_initial(1:IV%NoNests),:)
         deallocate(Fi_initial)
         deallocate(ind_Fi_initial)
-         
-        ! Write Output File for Analysis including Initial and all moved Nests of each Generation
-        call DetermineStrLen(istr, IV%NoSnap)
-        open(29,file=OutFolder//'/Nests'//istr//'.txt')
-        write(29, *) 'Initial Snapshots'
-        write(29,'(<IV%NoSnap>f13.10)') Snapshots
-        open(20,file=OutFolder//'/Fitness.txt')
-        open(19,file=OutFolder//'/Fitnessfull.txt')
-        deallocate(istr)
         
         ! Write Output File for Analysis including Initial and all moved Nests of each Generation
         allocate(character(len=3) :: istr)
@@ -177,7 +184,7 @@ contains
             Nests_Move = Nests_Move(ind_Fi,:)
             Nests = Nests(ind_Fi,:)
             
-            ! Store Optimum Fitness value
+            ! Store Fitness values
             allocate(character(len=3) :: istr)
             write(istr, '(1f3.1)') IV%Ma
             print *, 'Current best solutions:' , Fi(1:6)
@@ -256,16 +263,39 @@ contains
                     end if
                 end do
                      
-                ! Update Values (Fitness, Nest Locations)
-                call ReEvaluateDistortion(NoCPDim, tempNests, Fi(ii))
-                if (oob == .true.) then
-                    Fi(ii) = 1
-                    oob = .false.
+                if (IV%POD == .true.) then
+                    ! Update Values for POD (Fitness, Nest Locations)
+                    call ReEvaluateDistortion(NoCPDim, tempNests, Fi(ii))
+                    if (oob == .true.) then
+                        Fi(ii) = 1
+                        oob = .false.
+                    end if
+                    ! Output: ONE Fitnessvalue(Fi)
+                else
+                    !*** Generate Full Fidelity Solution of new Nest ***!
+                    SolutionNumber = IV%NoSnap + (iii - 1)*IV%NoNests + ii
+                    ! ****Generate initial Meshes/Snapshots**** !
+                    call IdentifyBoundaryFlags()
+                    ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
+                    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
+                    if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
+                    print *, "Generating Mesh", SolutionNumber
+                    RD%coord_temp = RD%coord
+                    call SubGenerateMesh(tempNests)
+                    ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
+                
+                    ! Write Snapshot to File
+                    call InitSnapshots(SolutionNumber)
+                    deallocate(RD%coord_temp)
+                    ! Process Nest
+                    call PreProcessing(SolutionNumber)   
+                    call Solver(SolutionNumber)
                 end if
-                ! Output: ONE Fitnessvalue(Fi)
+                
+                ! Embed temporary Nest into Nests
                 Nests_Move(ii,:) = tempNests_Move
                 Nests(ii,:) = tempNests
-                          
+                
             end do
             
             !!*** Loop over Top Nests ***!!
@@ -335,24 +365,77 @@ contains
             
                 end do
                     
-                ! Update Values (Fitness, Nest Locations)
-                call ReEvaluateDistortion(NoCPDim, tempNests, Ftemp)
-                if (oob == .true.) then
-                    Fi(ii) = 1
-                    oob = .false.
-                end if
-                ! Output: ONE Fitnessvalue(Fi)
+                if (IV%POD == .true.) then
+                    ! Update Values (Fitness, Nest Locations)
+                    call ReEvaluateDistortion(NoCPDim, tempNests, Ftemp)
+                    if (oob == .true.) then
+                        Fi(ii) = 1
+                        oob = .false.
+                    end if
+                    ! Output: ONE Fitnessvalue(Fi)
                     
-                ! Check if new Fitness is better than a Random Top Nest, If yes replace values
-                call random_number(rn)
-                randomNest = nint((1 + (NoTop - 1)*rn))
-                if (Ftemp < Fi(randomNest)) then
-                    Nests_Move(randomNest,:) = tempNests_Move
-                    Nests(randomNest,:) = tempNests
-                    Fi(randomNest) = Ftemp
-                 end if
-                 
-             end do
+                    ! Check if new Fitness is better than a Random Top Nest, If yes replace values
+                    call random_number(rn)
+                    randomNest = nint((1 + (NoTop - 1)*rn))
+                    if (Ftemp < Fi(randomNest)) then
+                        Nests_Move(randomNest,:) = tempNests_Move
+                        Nests(randomNest,:) = tempNests
+                        Fi(randomNest) = Ftemp
+                     end if
+                else
+                    !*** Generate High Fidelity Solution of new Nest ***!
+                    SolutionNumber = IV%NoSnap + (iii - 1)*IV%NoNests + ii
+                    !****Generate initial Meshes/Snapshots**** !
+                    call IdentifyBoundaryFlags()
+                    ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
+                    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
+                        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
+                    print *, "Generating Mesh", SolutionNumber
+                    RD%coord_temp = RD%coord
+                    call SubGenerateMesh(tempNests)
+                    ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
+                
+                    ! Write Snapshot to File
+                    call InitSnapshots(SolutionNumber)
+                    deallocate(RD%coord_temp)
+                    ! Process
+                    call PreProcessing(SolutionNumber)   
+                    call Solver(SolutionNumber)
+                
+                    TopNest(ii,:) = tempNests
+                    TopNest_move(ii,:) = tempNests_move
+                end if
+                
+            end do
+            
+            if (IV%POD == .false.) then
+                ! Check for High Fidelity Solutions
+                SolutionNumber = IV%NoSnap + iii*IV%NoNests
+                
+                call Sleep(SolutionNumber) 
+                ii = 0
+                call CheckforConvergence2(ii)
+                print*, 'All Solutions converged'
+                
+                ! Evaluate Fitness of High Fidelity Nest Solutions
+                print *, 'Extract Pressure of Generation', iii
+                call ExtractPressure((SolutionNumber - IV%NoNests + 1), SolutionNumber)         
+                do ii = 1, NoTop            
+                    call getDistortion(Ftemp, ii)
+                    ! Check if new Fitness is better than a Random Top Nest, If yes replace values
+                    call random_number(rn)
+                    randomNest = nint((1 + (NoTop - 1)*rn))
+                    if (Ftemp < Fi(randomNest)) then
+                        Nests_Move(randomNest,:) = TopNest_Move(ii,:)
+                        Nests(randomNest,:) = TopNest(ii,:)
+                        Fi(randomNest) = Ftemp
+                    end if
+                end do
+                do ii = (NoTop + 1), IV%NoNests
+                    call getDistortion(Fi(ii), ii)
+                end do
+                deallocate(pressure)
+            end if
 
             !!*** Adaptive Sampling - Finish and Integrate New Jobs (first and last Fitness) ***!!
             if (iii > 1 .and. iii < (IV%NoG - 1) .and. IV%AdaptSamp == .true.) then
@@ -366,7 +449,7 @@ contains
                 
                 ! Check if Jobs for new Snapshot are ready
                 IV%NoSnap = IV%NoSnap + 2
-                call Sleep()
+                call Sleep(IV%NoSnap)
                 IV%NoSnap = IV%NoSnap - 2
                 
                 ! Convergence Check
@@ -445,10 +528,10 @@ contains
         end do
         print *, 'Finished Cuckoo Search'   
         
-        ! Find Optimum Cuckoo and write in File
+        ! Write Results in File
         call QSort(Fi,size(Fi, dim = 1), 'y', ind_Fi)
         Fopt = Fi(1)
-        write(19,'(1f13.10)') Fi(1)
+        write(19,'(<IV%NoNests>f13.10)') Fi
         close(19)
         
         ! write final Nests in File
@@ -471,19 +554,18 @@ contains
 !!! Calculate Error??
         
     end subroutine SubOptimization
-        
-    subroutine POD()
+    
+    subroutine ExtractPressure(Start, Ending)
         
         ! Variables
         implicit none
+        integer :: Start, Ending, Length
         real :: Vamb, rho_amb, Rspec, gamma
         real, dimension(:), allocatable :: Output, Vx, Vy, rho, e
-        double precision, dimension(:,:), allocatable :: pressure2, modestemp, V, ones
         character(len=:), allocatable :: istr
 
-        ! Body of POD
-        allocate(ones(RD%np,1),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        ! Body of Extract Pressure
+        Length = Ending - Start + 1
         allocate(rho(RD%np),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         allocate(e(RD%np),stat=allocateStatus)
@@ -494,20 +576,20 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         allocate(Output(6*RD%np),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
-        allocate(pressure(RD%np, IV%NoSnap),stat=allocateStatus)
+        allocate(pressure(RD%np, Length),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         
-        ! Precalculat ambient Parameters
-        print *, 'Start POD'
+        ! Precalculate ambient Parameters
+        print *, 'Start Pressure Extraction'
         Vamb = IV%Ma*sqrt(IV%gamma*IV%R*IV%Tamb)          ! ambient velocity
         rho_amb = (IV%Pamb)/(IV%Tamb*IV%R)             ! ambient Density
             
-        !Extract pressure of Snapshot Output file
-        do i = 1, IV%NoSnap
-            
+        !Extract pressure of Snapshot Output file      
+        do i = Start, Ending
+           
             ! Determine correct String number
             call DetermineStrLen(istr, i)
-            
+           
             !if (IV%SystemType == 'W') then
             !     call TransferSolutionOutput()
             !     call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
@@ -519,7 +601,7 @@ contains
             else
                 open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp', form='formatted',status='old')
             end if
-            
+          
             read(11, *) Output  ! index, rho, Vx, Vy, Vz, e
             
             k = 0
@@ -533,7 +615,7 @@ contains
             end do
                 
             ! Calculate Pressure
-            pressure(:,i) = rho_amb*(IV%gamma - 1)*rho*(Vamb**2)*(e - 0.5*(Vx**2 + Vy**2))
+            pressure(:,(i - Start + 1)) = rho_amb*(IV%gamma - 1)*rho*(Vamb**2)*(e - 0.5*(Vx**2 + Vy**2))
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) 
             
             close(11)
@@ -547,12 +629,26 @@ contains
         deallocate(Vy)
         deallocate(e)
         deallocate(rho)
+                      
+    end subroutine ExtractPressure
+    
+    subroutine POD()
+        
+        ! Variables
+        implicit none
+        double precision, dimension(:,:), allocatable :: pressure2, modestemp, V
+
+        ! Body of POD
+        print *, 'Get POD modes and coefficients of Snapshots'
+        
+        ! Extract pressure of Snapshot Output file           
+        call ExtractPressure(1, IV%NoSnap)
 
         ! Perform Single Value Decomposition
         allocate(pressure2(RD%np, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         pressure2 = pressure
-        call SVD(pressure2, size(pressure, Dim = 1), size(pressure, Dim = 2),modestemp)
+        call SVD(pressure2, size(pressure, Dim = 1), size(pressure, Dim = 2), modestemp)
         deallocate(pressure2)
         print *, 'Finished SVD'
                 
@@ -1304,7 +1400,7 @@ subroutine SVD(A, M, N, U)
                 
             end do
             
-            call Sleep()
+            call Sleep(IV%NoSnap)
             
             Iter = Iter + 1
             
@@ -1333,9 +1429,9 @@ subroutine SVD(A, M, N, U)
             
         ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
         if (IV%SystemType == 'W') then
-            open(1, file=OutFolder//'/'//trim(IV%filename)//istr//'.rsd', STATUS="OLD")
+            open(1, file=OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
         else
-            open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', STATUS="OLD")
+            open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
         end if       
         inquire(1, size = FileSize)           
         LastLine = FileSize/106
@@ -1358,6 +1454,106 @@ subroutine SVD(A, M, N, U)
         deallocate(istr)
             
     end subroutine FileCheckConvergence
+    
+    recursive subroutine CheckforConvergence2(Iter)
+    
+        ! Variables
+        implicit none
+        integer :: ii
+        integer, save :: NoConv
+        integer,intent(inout) :: Iter
+        logical :: Converge
+        character(len=200) :: strCommand
+        integer, dimension(:), allocatable :: DivNestPos
+        real, dimension(:), allocatable :: MidPoints
+        
+        allocate(DivNestPos(IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
+        allocate(MidPoints(IV%NoCP*IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
+    
+        ! Body of CheckforConvergence
+        print *, 'Iteration', (Iter + 1)
+        Converge = .true.
+        NoConv = 0
+        do i = SolutionNumber, (SolutionNumber - IV%NoNests), -1
+            
+          call FileCheckConvergence(Converge, i)  
+            
+            ! All diverged nests are pulled halfway to midpoint(no movement center)
+            if (Converge == .false.) then
+                
+                    print *, 'File', i, 'failed to converge and will be resimulated'
+                    NoConv = NoConv + 1
+                    DivNestPos(NoConv) = i
+                    MidPoints = MxDisp(:,1) - (MxDisp(:,1) - MxDisp(:,2))/2.0  ! Midpoint calculation  
+                    Nests_Move(i,:) = Nests_Move(i,:) - ((Nests_Move(i,:) - MidPoints)/2.0) ! Half way between current Nest and Midpoint
+                    Nests(i,:) = Nests(i,:) - ((Nests(i,:) - MidPoints)/2.0)
+                    
+            end if
+            Converge = .true.
+            
+        end do
+        
+        if (NoConv /= 0) then
+            
+            !!! Re-Do Mesh of diverged Nest
+            allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main " 
+            do ii = 1, NoConv
+            
+                print *, "Regenerating Mesh", DivNestPos(ii), "/", NoConv
+                RD%coord_temp = RD%coord
+                call SubGenerateMesh(Snapshots(DivNestPos(ii),:))
+                ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
+            
+!!!!! implement mesh quality test
+            
+                ! write snapshot to file
+                call InitSnapshots(DivNestPos(ii))
+
+            end do
+            deallocate(RD%coord_temp)
+            
+            !! PreProcessing
+            do ii = 1, NoConv
+                call PreProcessing(DivNestPos(ii))
+            end do
+            
+            !! Solver
+            do ii = 1, NoConv
+                
+                call Solver(DivNestPos(ii))
+                
+                ! Determine correct String      
+                call DetermineStrLen(istr, DivNestPos(ii))
+        
+                call DeleteErrorFiles(istr)
+                if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine           
+                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
+                else
+                    call system('chmod a+x ./FileCreateDir.scr')
+                    call system('./FileCreateDir.scr')
+                end if
+                
+                deallocate(istr)
+                
+            end do
+            
+            call Sleep(SolutionNumber)
+            
+            Iter = Iter + 1
+            
+            if (Iter < 4) then
+                call CheckforConvergence(Iter)
+            end if
+            
+            if (NoConv /= 0) then
+                STOP 'Convergence of CFD Simulations could not be achieved. Check initial Mesh and/or Movement constraints!'
+            end if
+        end if
+        
+    end subroutine CheckforConvergence2
     
     subroutine AllocateModesCoeff()
     

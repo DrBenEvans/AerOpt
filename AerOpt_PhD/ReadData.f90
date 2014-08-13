@@ -94,7 +94,6 @@ contains
         call DetermineStrLen(istr, ii) 
         
         open(99, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
-        !open(99, file = OutFolder//'/'//trim(IV%filename)//istr//'.dat')
         write(99,*) 1
         write(99,*) 'David Naumann'
         write(99,*) 'NoTrgElem NoNodes NoBound'        
