@@ -25,6 +25,7 @@ contains
     
         ! Variables
         implicit none
+        integer :: i
     
         ! Body of ReadData
         open(1, file= InFolder//'/Mesh_fine.txt', form='formatted',status='old')
@@ -86,7 +87,7 @@ contains
     
         ! Variables
         implicit none
-        integer :: ii
+        integer :: ii, j
     
         ! Body of InitSnapshots
         

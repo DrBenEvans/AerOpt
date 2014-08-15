@@ -10,7 +10,7 @@
 
     ! Variables
     implicit none
-    integer :: lb
+    integer :: lb, i, k, j
     real, dimension(IV%NoCP*IV%NoDim) :: NestDisp
     real, dimension(:), allocatable :: dCP2N, CP_ind, size_ib
     integer, dimension(:,:), allocatable :: IB
@@ -87,6 +87,7 @@
 
     ! Variables
     implicit none
+    integer :: k
     real, dimension(2) :: point
 
     ! Body of IdentifyBoundaryFlags

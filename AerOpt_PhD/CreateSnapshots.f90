@@ -7,20 +7,23 @@ module CreateSnapshots
         real, dimension(:,:), allocatable :: MxDisp_Move      ! Matrix with only moving min/max Displacements
         integer, dimension(:), allocatable :: cond            ! Identifies zero/non-zero values
         real, dimension(:,:), allocatable :: Snapshots     ! Matrix containing the initial Nests
-        integer :: av                                         ! Allocater Variable
         
     contains
     
     subroutine SubCreateSnapshots()
+    ! Objective: Create Nests (Locations of  for Snapshots
     
         ! Variables
         implicit none
+        integer :: i, j
         integer, dimension(IV%NoCP) :: ones                      ! Vector with Ones                                    
         allocate(MxDisp((IV%NoCP*IV%NoDim),2))
         allocate(cond(IV%NoCP*IV%NoDim))
-        allocate(Snapshots(IV%NoSnap,IV%NoDim*IV%NoCP),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-
+        allocate(Snapshots(IV%NoSnap,maxDoF),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
+        allocate(MxDisp_Move(DoF,2),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
+        
         
         !!****Body of SubCreateSnapshots****!!      
         ones = (/ (1, i=1,IV%NoCP) /)
@@ -31,31 +34,14 @@ module CreateSnapshots
         MxDisp(:,2) = (/IV%xmax*(-1)*ones, IV%ymax*(-1)*ones, IV%zmax*(-1)*ones/)
         
         !**Reduction of MxDisp to Nonzero Values - (only for LHS-routine to reduce processing time)**!
-        cond = MxDisp(:,1) /= MxDisp(:,2)
-        
-        ! Derive size for reduced Matrix
-        av = 0
-        if (IV%xmax /= 0.00) then
-            av = av + 1
-        end if
-        if (IV%ymax /= 0.00 .and. IV%NoDim > 1) then
-            av = av + 1
-        end if
-        if (IV%zmax /= 0.00 .and. IV%NoDim == 3) then
-            av = av + 1
-        end if
-        allocate(MxDisp_Move(av*IV%NoCP,2))
-        
-        ! Reduce Matrix     
+        cond = MxDisp(:,1) /= MxDisp(:,2)         
         j = 1
         do i = 1, size(cond)            
             if (cond(i) == -1) then
                 MxDisp_Move(j,:) = MxDisp(i,:)
                 j = j + 1
             end if
-        end do
-        !**END Reduction of...**!
-               
+        end do               
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
         call LHS(Snapshots, IV%NoSnap, IV%NoCP)     
@@ -69,7 +55,7 @@ module CreateSnapshots
         ! Variables
         implicit none
         integer :: NoSampPoints, NoPerm
-        integer :: ms
+        integer :: i, j, ms
         real, dimension(NoSampPoints, IV%NoDim*NoPerm) :: Sampling
         real, dimension(:,:), allocatable :: Sampling_1D
         integer, dimension(:), allocatable :: zeros
@@ -157,7 +143,7 @@ module CreateSnapshots
     
         ! Variables
         implicit none
-        integer :: NoSampPoints, NoPerm
+        integer :: NoSampPoints, NoPerm, i, j, k
         real, dimension(NoSampPoints,NoPerm), intent(out) :: Sampling_1D
         integer, dimension(NoSampPoints) :: rp
         real, dimension(NoPerm,2) :: MD_Move 

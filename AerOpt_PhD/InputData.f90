@@ -45,11 +45,13 @@ module InputData
     end type InputVariablesData
     
     type(InputVariablesData) :: IV
-    integer :: i, j, k                                          ! Simple Loop Variables
     integer :: allocatestatus                                   ! Check Allocation Status for Large Arrays
     character(len=10) :: InFolder = 'Input_Data'                ! Input Folder Name
     character(len=11) :: OutFolder = 'Output_Data'              ! Output Folder Name
     integer :: IntSystem                                        ! Length of System command string; used for character variable allocation
+    integer :: maxDoF                                           ! maximum Degrees of Freedom available
+    integer :: DoF                                              ! actual Degrees of Freedom in the System
+    integer :: av                                               ! Allocater Variable
     real :: waitTime                                            ! waiting time for Simulation Results
     integer :: jobcheck                                         ! Check Variable for Simulation 
     character(len=:), allocatable :: istr                       ! Number of I/O file
@@ -113,10 +115,44 @@ contains
         open(1,file = InFolder//'/AerOpt_InputParameters.txt',form='formatted',status='old')
         read(1,InputVariables)
         close(1)
-        IV%NoNests = 10*IV%NoDim*IV%NoCP! Number of Nests (Cuckoo Search)
         
+        ! Derive Degrees of Freedom
+        av = 0
+        if (IV%xmax /= 0.00) then
+            av = av + 1
+        end if
+        if (IV%ymax /= 0.00 .and. IV%NoDim > 1) then
+            av = av + 1
+        end if
+        if (IV%zmax /= 0.00 .and. IV%NoDim == 3) then
+            av = av + 1
+        end if
+        DoF = av*IV%NoCP
+        maxDoF = IV%Nodim*IV%NoCP
+        
+        ! Number of Nests per Generation 
+        IV%NoNests = 10*DoF     
         if (IV%NoNests > IV%NoSnap) then
             IV%NoNests = IV%NoSnap
+        end if
+        
+        ! Path for PreProcessor
+        if (IV%SystemType == 'Q') then
+            allocate(character(len=61) :: pathLin_Prepro)
+            pathLin_Prepro = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
+        else
+            allocate(character(len=56) :: pathLin_Prepro)
+            pathLin_Prepro = '/home/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
+        end if
+        pathWin = 'Flite2D\PreProcessing'   
+   
+        ! Path for Solver
+        if (IV%SystemType /= 'B') then
+            allocate(character(len=55) :: pathLin_Solver)
+            pathLin_Solver = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
+        else
+            allocate(character(len=50) :: pathLin_Solver)
+            pathLin_Solver = '/home/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
         end if
         
     end subroutine SubInputData

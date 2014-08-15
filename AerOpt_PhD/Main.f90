@@ -11,7 +11,6 @@ program AerOpt
     use FDGD
     
     implicit none
-    integer :: ii
     
     print *, ''
     print *, '**************************************************************************'
@@ -23,6 +22,11 @@ program AerOpt
     print *, '*********************   supervised by Dr. BEN EVANS    *******************'
     print *, '**************************************************************************'
     print *, ''
+    
+    !! Technical Terms
+    ! Geometry - A distinct Mesh/Shape
+    ! Nest - Coordinates of all Control Points applied to one Geometry
+    ! Snapshot - Can mean both the initial Geometry or initial Nest applied to construct the POD
     
     ! ****User Input****** !
     call SubInputData(IV)
@@ -72,11 +76,10 @@ program AerOpt
     end if
 
 
-    ! ****Sub-Section: Create Initial Nests for the CFD Solver****** ! 
-    ! ***********included in CreateSnapshots module************** !
+    ! **** Create Initial Nests for the Snapshots****** ! 
     print *, 'Start LHS Sampling - Create Initial Nests'
-    call SubCreateSnapshots()                !Sampling of initial points/nests via LHC    
-    ! Output: Snapshots - Sampling Points for initial Nests
+    call SubCreateSnapshots()    
+    ! Output: Initial Nests - Sampling Points for Snapshots
     
     allocate(character(len=3) :: istr)
     write(istr, '(1f3.1)') IV%Ma
@@ -87,90 +90,13 @@ program AerOpt
     close(29)
     
 !!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
-    
-    ! ****Generate initial Meshes/Snapshots**** !
+
     call IdentifyBoundaryFlags()
     ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
-    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
-    do ii = 1, IV%NoSnap
-        print *, "Generating Mesh", ii, "/", IV%NoSnap
-        RD%coord_temp = RD%coord
-        
-        if (IV%MeshGeneration == 'FDGD') then
-            call SubFDGD(dble(Snapshots(ii,:)))
-        else if (IV%MeshGeneration == 'RBF') then
-            call SubGenerateMesh(Snapshots(ii,:))
-        end if
-        ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
-        
-!!!!! IMPLEMENT Mesh Quality Test
 
-        ! Write Snapshot to File
-        call InitSnapshots(ii)
-
-    end do
-    deallocate(RD%coord_temp)
-    
-    if (IV%Meshtest == .true.) then
-      pause
-    end if
-    
-    
-    ! ****Call 2D Preprocessor and pass on input parameters**** !
-    print *, 'Start Preprocessing'
-    if (IV%SystemType == 'Q') then
-        allocate(character(len=61) :: pathLin_Prepro)
-        pathLin_Prepro = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
-    else
-        allocate(character(len=56) :: pathLin_Prepro)
-        pathLin_Prepro = '/home/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
-    end if
-    pathWin = 'Flite2D\PreProcessing'   
-    do ii = 1, IV%NoSnap
-    
-        call PreProcessing(ii)
-    
-    end do
-    print *, 'Finished Preprocessing'
-    
-    
-    ! ****Call 2D FLITE Solver and pass on input parameters**** !
-    print *, 'Call FLITE 2D Solver'
-    if (IV%SystemType /= 'B') then
-        allocate(character(len=55) :: pathLin_Solver)
-        pathLin_Solver = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
-    else
-        allocate(character(len=50) :: pathLin_Solver)
-        pathLin_Solver = '/home/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
-    end if
-    
-    do ii = 1, IV%NoSnap
-            
-       call Solver(ii) 
-                
-    end do
-    print *, 'Finished Submitting Jobs to FLITE 2D Solver'
-    
-    
-    ! ****Wait & Check for FLITE Solver Output**** !
-    call Sleep(IV%NoSnap)
-    
-    if (IV%SystemType == 'W') then
-        call TransferSolutionOutput()
-    end if
-    
-    
-    ! ****Check Simulation Results**** !
-    print *, ''
-    print *, '*************************************'
-    print *, '***  Start Check for Convergence  ***'
-    print *, '*************************************'
-    print *, ''
-    ii = 0
-    call CheckforConvergence(ii)
-    print*, 'All Solutions converged'
-     
+    ! **** Generate Full Fidelity Solutions of Snapshots**** !
+    call SubCFD(1, IV%NoSnap, Snapshots, IV%NoSnap)
+    call PostSolverCheck(IV%NoSnap, 0)
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
     call SubOptimization()

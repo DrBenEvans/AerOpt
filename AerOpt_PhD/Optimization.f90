@@ -12,11 +12,11 @@ module Optimization
     real, dimension(:), allocatable :: Fi                               ! Vector with all current Fitness values
     real, dimension(:), allocatable :: NestOpt                          ! Control Point Coordinates of Optimum Geometry
     double precision :: alpha, beta                                     ! Matrix Multiplicaion LAPACK variables
-    double precision, dimension(:), allocatable :: PolCoeff
-    double precision, dimension(:,:), allocatable :: Weights
+    double precision, dimension(:), allocatable :: PolCoeff             ! Polynomial Coefficients for POD RBF interpolation
+    double precision, dimension(:,:), allocatable :: Weights            ! Weights for POD RBF interpolation
     real, dimension(:,:), allocatable :: Nests_Move, Nests              ! Nest regenerated with each generation
-    logical :: oob
     integer :: SolutionNumber                                           ! Current Number of High Fidelity solutions
+    logical :: InitConv                                                 ! Initial Convergence Check - TRUE: yes
         
 contains
     
@@ -25,32 +25,32 @@ contains
         ! Variables
         implicit none
         real :: Ac, Ftemp, Fopt
-        integer :: NoSteps, ii, iii, NoCPdim, NoTop, NoDiscard, l, randomNest, NoConv, NoTest
+        integer :: i,j, k, l, ii, iii, NoSteps, NoTop, NoDiscard, randomNest, NoConv, NoTest
         real, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
-        real, dimension(:,:), allocatable :: Snapshots_Move, tempSnapshots, newSnapshots, NestsTest, TopNest, TopNest_Move
+        real, dimension(:,:), allocatable :: Snapshots_Move, tempSnapshots, newSnapshots, NestsTest, TopNest, TopNest_Move, tempNestA
         integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial, ConvA
         logical :: Converge
         character(len=5) :: strNoSnap
 
-        allocate(NormFact(av*IV%NoCP),stat=allocateStatus)
+        allocate(NormFact(DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(tempNests_Move(av*IV%NoCP),stat=allocateStatus)
+        allocate(tempNests_Move(DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(dist(av*IV%NoCP),stat=allocateStatus)
+        allocate(dist(DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(Snapshots_Move(IV%NoSnap,av*IV%NoCP),stat=allocateStatus)
+        allocate(Snapshots_Move(IV%NoSnap,DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(Nests_Move(IV%NoNests,av*IV%NoCP),stat=allocateStatus)
+        allocate(Nests_Move(IV%NoNests,DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(Nests(IV%NoNests,IV%NoDim*IV%NoCP),stat=allocateStatus)
+        allocate(Nests(IV%NoNests,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(tempNests(IV%NoDim*IV%NoCP),stat=allocateStatus)
+        allocate(tempNests(maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(NestOpt(IV%NoDim*IV%NoCP),stat=allocateStatus)
+        allocate(NestOpt(maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         
         ! Specific for Adaptive Sampling
-        allocate(newSnapshots(2,IV%NoDim*IV%NoCP),stat=allocateStatus)
+        allocate(newSnapshots(2,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fcompare(2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
@@ -59,9 +59,9 @@ contains
                
         if (IV%POD == .false.) then
             ! Specific Parameters required for Full Fidelity application
-            allocate(TopNest(NoTop,IV%NoDim*IV%NoCP),stat=allocateStatus)
+            allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-            allocate(TopNest_Move(NoTop,av*IV%NoCP),stat=allocateStatus)
+            allocate(TopNest_Move(NoTop,DoF),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         end if
         
@@ -76,11 +76,10 @@ contains
         print *, '*************************************'
         print *, ''
         
-        NoCPdim = av*IV%NoCP
         NoDiscard = nint(IV%Top2Low*IV%NoNests)
         NoTop = IV%NoNests - NoDiscard
-        IV%Aconst = (sqrt(real(NoCPDim))/IV%NoLeviSteps)*IV%Aconst
-        tempNests = (/ (0, i=1,(IV%NoDim*IV%NoCP)) /)
+        IV%Aconst = (sqrt(real(DoF))/IV%NoLeviSteps)*IV%Aconst
+        tempNests = (/ (0, i=1,(maxDoF)) /)
         alpha = 1.0
         beta = 0.0
         
@@ -94,7 +93,7 @@ contains
         end do
                    
         ! Normalize Snapshots between 0 and 1
-        do i = 1, NoCPdim        
+        do i = 1, DoF        
             NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
             Snapshots_Move(:,i) = Snapshots_Move(:,i)/NormFact(i) + 0.5
         end do
@@ -106,7 +105,7 @@ contains
             ! Output: allocated modes and coeff based on the Number of POD Modes desired. If < 0, all Modes are considered.
             call POD()
             ! Output: Modes and Coefficients of POD  
-            call ComputeRBFWeights(NoCPdim)
+            call ComputeRBFWeights(DoF)
             ! Output: Weights for RBF interpolation
         else
             call ExtractPressure(1, IV%NoSnap)
@@ -202,31 +201,16 @@ contains
             !!****** Adaptive Sampling - Start New Jobs (first and last Fitness) *******!!
             if (iii > 1 .and. iii < (IV%NoG - 1) .and. IV%AdaptSamp == .true.) then
                 
-                print *, 'Adaptive Sampling - Start'
+                print *, 'Adaptive Sampling - Start Part 1 / 2'
                 ! Extract First and Last Nest
                 newSnapshots(1,:) = Nests(1,:)
                 newSnapshots(2,:) = Nests(IV%NoNests,:)
                 Fcompare(1) = Fi(1)
                 Fcompare(2) = Fi(IV%NoNests)
                 ! Get High Fidelity Solution
-                allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-                if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
-                do ii = 1, 2
-                    print *, "Generating Mesh", (IV%NoSnap + ii), "/", 2
-                    RD%coord_temp = RD%coord
-                    call SubGenerateMesh(newSnapshots(ii,:))
-                    ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest      
-!!!!! IMPLEMENT Mesh Quality Test
- 
-                    ! Write Snapshot to File
-                    call InitSnapshots((IV%NoSnap + ii))
-                    ! Preprocessing
-                    call PreProcessing((IV%NoSnap + ii))
-                    ! Solver
-                    call Solver((IV%NoSnap + ii))
-
-                end do
-                deallocate(RD%coord_temp)
+                call SubCFD((IV%NoSnap + 1), (IV%NoSnap + 2), newSnapshots, 2)
+                print *, 'Adaptive Sampling - Finish Part 1 / 2'
+                
             end if
             
             !!*** Loop over Discarded Nests ***!!
@@ -240,11 +224,11 @@ contains
                 call random_number(rn)
                 NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                 NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
-                tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + Nests_Move(ii,:)
+                tempNests_Move = Ac*LevyWalk(NoSteps, DoF) + Nests_Move(ii,:)
                 
                 ! Check if out of bounds
                 if (IV%constrain == .true.) then                
-                    do k = 1, NoCPdim
+                    do k = 1, DoF
                         if (tempNests_Move(k) > 1) then
                             tempNests_Move(k) = 1
                         end if
@@ -265,31 +249,16 @@ contains
                      
                 if (IV%POD == .true.) then
                     ! Update Values for POD (Fitness, Nest Locations)
-                    call ReEvaluateDistortion(NoCPDim, tempNests, Fi(ii))
-                    if (oob == .true.) then
-                        Fi(ii) = 1
-                        oob = .false.
-                    end if
+                    call ReEvaluateDistortion(DoF, tempNests, Fi(ii))
                     ! Output: ONE Fitnessvalue(Fi)
                 else
                     !*** Generate Full Fidelity Solution of new Nest ***!
                     SolutionNumber = IV%NoSnap + (iii - 1)*IV%NoNests + ii
-                    ! ****Generate initial Meshes/Snapshots**** !
-                    call IdentifyBoundaryFlags()
-                    ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
-                    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-                    if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
-                    print *, "Generating Mesh", SolutionNumber
-                    RD%coord_temp = RD%coord
-                    call SubGenerateMesh(tempNests)
-                    ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
-                
-                    ! Write Snapshot to File
-                    call InitSnapshots(SolutionNumber)
-                    deallocate(RD%coord_temp)
-                    ! Process Nest
-                    call PreProcessing(SolutionNumber)   
-                    call Solver(SolutionNumber)
+                    allocate(tempNestA(1,maxDoF),stat=allocateStatus)
+                    if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+                    tempNestA(1,:) = tempNests
+                    call SubCFD(SolutionNumber, SolutionNumber, tempNestA, 1)
+                    deallocate(tempNestA)
                 end if
                 
                 ! Embed temporary Nest into Nests
@@ -314,7 +283,7 @@ contains
                     call random_number(rn)
                     NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                     NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
-                    tempNests_Move = Ac*LevyWalk(NoSteps, NoCPdim) + Nests_Move(ii,:)
+                    tempNests_Move = Ac*LevyWalk(NoSteps, DoF) + Nests_Move(ii,:)
                     
                 else    ! Different Nest
                     
@@ -345,7 +314,7 @@ contains
                     
                 ! Check if out of bounds
                 if (IV%constrain == .true.) then                
-                    do k = 1, NoCPdim
+                    do k = 1, DoF
                         if (tempNests_Move(k) > 1) then
                             tempNests_Move(k) = 1
                         end if
@@ -367,11 +336,7 @@ contains
                     
                 if (IV%POD == .true.) then
                     ! Update Values (Fitness, Nest Locations)
-                    call ReEvaluateDistortion(NoCPDim, tempNests, Ftemp)
-                    if (oob == .true.) then
-                        Fi(ii) = 1
-                        oob = .false.
-                    end if
+                    call ReEvaluateDistortion(DoF, tempNests, Ftemp)
                     ! Output: ONE Fitnessvalue(Fi)
                     
                     ! Check if new Fitness is better than a Random Top Nest, If yes replace values
@@ -383,39 +348,26 @@ contains
                         Fi(randomNest) = Ftemp
                      end if
                 else
-                    !*** Generate High Fidelity Solution of new Nest ***!
+                    !*** Generate Full Fidelity Solution of new Nest ***!
                     SolutionNumber = IV%NoSnap + (iii - 1)*IV%NoNests + ii
-                    !****Generate initial Meshes/Snapshots**** !
-                    call IdentifyBoundaryFlags()
-                    ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
-                    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-                        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
-                    print *, "Generating Mesh", SolutionNumber
-                    RD%coord_temp = RD%coord
-                    call SubGenerateMesh(tempNests)
-                    ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
-                
-                    ! Write Snapshot to File
-                    call InitSnapshots(SolutionNumber)
-                    deallocate(RD%coord_temp)
-                    ! Process
-                    call PreProcessing(SolutionNumber)   
-                    call Solver(SolutionNumber)
+                    allocate(tempNestA(1,maxDoF),stat=allocateStatus)
+                    if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+                    tempNestA(1,:) = tempNests
+                    call SubCFD(SolutionNumber, SolutionNumber, tempNestA, 1)
+                    deallocate(tempNestA)
                 
                     TopNest(ii,:) = tempNests
                     TopNest_move(ii,:) = tempNests_move
+                    
                 end if
                 
             end do
             
             if (IV%POD == .false.) then
+                
                 ! Check for High Fidelity Solutions
                 SolutionNumber = IV%NoSnap + iii*IV%NoNests
-                
-                call Sleep(SolutionNumber) 
-                ii = 0
-                call CheckforConvergence2(ii)
-                print*, 'All Solutions converged'
+                call PostSolverCheck(SolutionNumber, 1, SolutionNumber, Nests_Move, Nests)
                 
                 ! Evaluate Fitness of High Fidelity Nest Solutions
                 print *, 'Extract Pressure of Generation', iii
@@ -439,18 +391,16 @@ contains
 
             !!*** Adaptive Sampling - Finish and Integrate New Jobs (first and last Fitness) ***!!
             if (iii > 1 .and. iii < (IV%NoG - 1) .and. IV%AdaptSamp == .true.) then
-                print *, 'Adaptive Sampling - End'
+                print *, 'Adaptive Sampling - Start Part 2 / 2'
                 
                 ! Store Snapshots in temporary Container
-                allocate(tempSnapshots((IV%NoSnap + 2*IV%NoG),IV%NoDim*IV%NoCP),stat=allocateStatus)
+                allocate(tempSnapshots((IV%NoSnap + 2*IV%NoG),maxDoF),stat=allocateStatus)
                 if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
                 tempSnapshots(1:IV%NoSnap,:) = Snapshots
                 deallocate(Snapshots)
                 
-                ! Check if Jobs for new Snapshot are ready
-                IV%NoSnap = IV%NoSnap + 2
-                call Sleep(IV%NoSnap)
-                IV%NoSnap = IV%NoSnap - 2
+                ! Check if Jobs for new Snapshots are ready
+                call Sleep(IV%NoSnap + 2)
                 
                 ! Convergence Check
                 NoConv = 0
@@ -460,7 +410,7 @@ contains
                     call FileCheckConvergence(Converge, (IV%NoSnap + k))
                     if (Converge == .true.) then ! If Converged
                         
-                        ! Include new Snapshots)
+                        ! Include new Snapshot
                         NoConv = NoConv + 1
                         tempSnapshots((IV%NoSnap + NoConv),:) = newSnapshots(k,:)
                         ConvA(k) = 1
@@ -494,10 +444,12 @@ contains
                     call getDistortion(Ftemp, (IV%NoSnap + 1))
                     write(19,'(1I3, 1f13.10)',advance="no") 0, Ftemp
                     print *, 'Real Fitness best: ', Ftemp
-                    if (Fcompare(1) == Fi(1)) then  ! Replace POD fitness with real fitness if still the same value                       
-                        print *, 'Comparison POD/Real Fitness best: ', Fi(1), '/', Ftemp
-                        Fi(1) = Ftemp
-                    end if
+                    do k = 1, NoTop
+                        if (Fcompare(1) == Fi(k)) then  ! Replace POD fitness with real fitness if still the same value                       
+                            print *, 'Comparison POD/Real Fitness best: ', Fi(k), '/', Ftemp
+                            Fi(k) = Ftemp
+                        end if
+                    end do
                 else ! Not converged set fitness to worst fitness to exclude solution
                     Fi(1) = Fi(IV%NoNests)
                 end if
@@ -505,11 +457,7 @@ contains
                 if (ConvA(2) == 1) then ! If converged check fitness
                     call getDistortion(Ftemp, (IV%NoSnap + 2))
                     write(19,'(1I3, 1f13.10)',advance="no") 1, Ftemp
-                    print *, 'Real Fitness worst: ', Ftemp
-                    if (Fcompare(2) == Fi(IV%NoNests)) then ! Replace POD fitness with real fitness if still the same value                     
-                        print *, 'Comparison POD/Real Fitness worst: ', Fi(IV%NoNests), '/', Ftemp
-                        Fi(IV%NoNests) = Ftemp                      
-                    end if
+                    print *, 'Comparison POD/Real Fitness worst: ', Fcompare(2), '/', Ftemp 
                 end if
                 
                 deallocate(pressure)
@@ -517,10 +465,11 @@ contains
                 
                 ! Resize Snapshots Array to include new Snapshots
                 IV%NoSnap = IV%NoSnap + NoConv
-                allocate(Snapshots(IV%NoSnap,IV%NoDim*IV%NoCP),stat=allocateStatus)
+                allocate(Snapshots(IV%NoSnap,maxDoF),stat=allocateStatus)
                 if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "              
                 Snapshots = tempSnapshots(1:IV%NoSnap,:)
                 deallocate(tempSnapshots)
+                print *, 'Adaptive Sampling - Finish Part 2 / 2'
                 
             end if
             write(19,*) ''
@@ -559,7 +508,7 @@ contains
         
         ! Variables
         implicit none
-        integer :: Start, Ending, Length
+        integer :: Start, Ending, Length, i, k, j
         real :: Vamb, rho_amb, Rspec, gamma
         real, dimension(:), allocatable :: Output, Vx, Vy, rho, e
         character(len=:), allocatable :: istr
@@ -685,7 +634,7 @@ contains
         
         ! Variables
         implicit none
-        integer :: NoEngIN, NoSnapshot
+        integer :: NoEngIN, NoSnapshot, j
         real, dimension(:), allocatable :: PlaneX, PlaneY, dPress, h, Area_trap, Pmid_x, Pmid_y, Area, Press_mid
         real :: Press_ave, L, Distortion
  
@@ -761,6 +710,7 @@ contains
         
         ! Variables
         implicit none
+        integer :: i,j
         integer, dimension(:,:), allocatable :: nodesall
         real, dimension(:), allocatable :: nodesvec
         real, dimension(2) :: point
@@ -850,18 +800,18 @@ subroutine SVD(A, M, N, U)
             
     end subroutine SVD
     
-    function LevyWalk(NoSteps, NoCPdim)
+    function LevyWalk(NoSteps, DoF)
     
         ! Variables
         implicit none
-        integer :: median, scale, l, m, NoSteps, NoCPdim
+        integer :: median, scale, l, m, NoSteps, DoF
         real, parameter :: pi = 3.14159265359
-        real, dimension(NoCPdim) :: LevyWalk
+        real, dimension(DoF) :: LevyWalk
         real, dimension(NoSteps) :: y
     
         ! Body of LevyWalk - Each Dimension walks
                 
-        do l = 1, NoCPdim
+        do l = 1, DoF
       
             ! Cauchy distribution
             median = 0
@@ -878,14 +828,14 @@ subroutine SVD(A, M, N, U)
     
     end function LevyWalk
     
-    subroutine ReEvaluateDistortion(NoCPDim, tempNests, Distortion)
+    subroutine ReEvaluateDistortion(DoF, tempNests, Distortion)
     ! Objective: Determine the Distortion of each Snapshot by using the Area Weighted Average Pressure and Trapezoidal Numerical Integration
         
         ! Variables
         implicit none
-        integer :: NoEngIN, NoCPDim
+        integer :: NoEngIN, DoF, k
         real, dimension(:), allocatable :: PlaneX, PlaneY, dPress, h, Area_trap, Pmid_x, Pmid_y, Area, Press_mid
-        real, dimension(IV%NoDim*IV%NoCP) :: tempNests
+        real, dimension(maxDoF) :: tempNests
         real :: Distortion
         real :: Press_ave, L
         double precision, dimension(:), allocatable :: newpressure
@@ -937,29 +887,29 @@ subroutine SVD(A, M, N, U)
                 
         ! Area Weighted Average Pressure (calculated based on the Areas)
         if (IV%OldvsNew == .true.) then
-            call PressInterp(NoCPDim, newpressure, tempNests)
-            call InterpolateCoefficients(tempNests, newpressure, NoCPDim)
+            call PressInterp(DoF, newpressure, tempNests)
+            call InterpolateCoefficients(tempNests, newpressure, DoF)
             pause
         else if (IV%sort == .true.) then
-            call PressInterp(NoCPDim, newpressure, tempNests)
+            call PressInterp(DoF, newpressure, tempNests)
             IV%sort = .false.
-            call PressInterp(NoCPDim, newpressure, tempNests)
+            call PressInterp(DoF, newpressure, tempNests)
             IV%sort = .true.
             pause
         else if (IV%multiquadric == .true.) then
             deallocate(PolCoeff)
             deallocate(Weights)
-            call ComputeRBFWeights(NoCPDim)
-            call InterpolateCoefficients(tempNests, newpressure, NoCPDim)
+            call ComputeRBFWeights(DoF)
+            call InterpolateCoefficients(tempNests, newpressure, DoF)
             IV%multiquadric = .false.
             deallocate(PolCoeff)
             deallocate(Weights)
-            call ComputeRBFWeights(NoCPDim)
-            call InterpolateCoefficients(tempNests, newpressure, NoCPDim)
+            call ComputeRBFWeights(DoF)
+            call InterpolateCoefficients(tempNests, newpressure, DoF)
             IV%multiquadric = .true.
             pause
         else
-            call InterpolateCoefficients(tempNests, newpressure, NoCPDim)
+            call InterpolateCoefficients(tempNests, newpressure, DoF)
         end if
         Press_mid = newpressure(engInNodes(2:(NoEngIN-1))) ! Extract Pressure of middle engine Inlet Nodes
         Press_ave = sum(Press_mid*Area, dim = 1)/sum(Area, dim = 1)
@@ -984,7 +934,7 @@ subroutine SVD(A, M, N, U)
   
     end subroutine ReEvaluateDistortion
     
-    subroutine ComputeRBFWeights(NoCPdim)
+    subroutine ComputeRBFWeights(DoF)
     ! Objective: Compute Weights for the RBF interpolation scheme applied later in the POD reconstruction
     
         ! Variables
@@ -992,7 +942,7 @@ subroutine SVD(A, M, N, U)
         double precision, dimension(:,:),allocatable :: RBFMatrix, A, b, coeff_temp
         double precision, dimension(:), allocatable :: PolBasis, x, NormFact
         double precision :: z, ShapeParameter
-        integer :: l, m, LWMAX, LWORK, Info, NoCPdim
+        integer :: l, m, LWMAX, LWORK, Info, DoF
         parameter        ( LWMAX = 10000)
         double precision, dimension(:), allocatable ::  WORK, Ipiv
     
@@ -1029,7 +979,7 @@ subroutine SVD(A, M, N, U)
             allocate(x(IV%NoSnap),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "      
         end if
-        allocate(NormFact(av*IV%NoCP),stat=allocateStatus)
+        allocate(NormFact(DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         
         ! Body of CoefficientInterpolation
@@ -1037,7 +987,7 @@ subroutine SVD(A, M, N, U)
         ! Details, see Computation Approach Book
         
         ! Normalize Snapshots between 0 and 10
-        !do i = 1, NoCPdim        
+        !do i = 1, DoF        
         !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
         !    Snapshots(:,i) = (Snapshots(:,i)/NormFact(i) + 0.5)
         !end do
@@ -1109,7 +1059,7 @@ subroutine SVD(A, M, N, U)
         close(23)
         
         ! Denormalize Snapshots
-        !do i = 1, NoCPdim        
+        !do i = 1, DoF        
         !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
         !    Snapshots(:,i) = (Snapshots(:,i) - 0.5)*NormFact(i)
         !end do
@@ -1135,26 +1085,26 @@ subroutine SVD(A, M, N, U)
     
     end function Multiquadratic
     
-    subroutine InterpolateCoefficients(newNest, newpressure, NOCPdim)
+    subroutine InterpolateCoefficients(newNest, newpressure, DoF)
     
         ! Variables
         implicit none
         double precision, dimension(RD%np) :: newpressure
-        real, dimension(IV%NoDim*IV%NoCP) :: newNest
+        real, dimension(maxDoF) :: newNest
         double precision, dimension (:), allocatable :: RBFVector, NormFact
         double precision, dimension(:,:), allocatable :: newCoeff
         double precision :: x, RBFterm, ShapeParameter
-        integer :: l, m, NoCPdim
+        integer :: l, m, DoF
     
         allocate(RBFVector(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in InterpolateCoefficients "
         allocate(newCoeff(IV%NoSnap,1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in InterpolateCoefficients "
-        allocate(NormFact(av*IV%NoCP),stat=allocateStatus)
+        allocate(NormFact(DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "     
         
         ! Normalize Snapshots between 0 and 10
-        !do i = 1, NoCPdim        
+        !do i = 1, DoF        
         !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
         !    Snapshots(:,i) = (Snapshots(:,i)/NormFact(i) + 0.5)
         !end do
@@ -1194,7 +1144,7 @@ subroutine SVD(A, M, N, U)
         end if
         
         ! Denormalize Snapshots
-        !do i = 1, NoCPdim        
+        !do i = 1, DoF        
         !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
         !    Snapshots(:,i) = ((Snapshots(:,i) - 0.5)*NormFact(i))
         !end do
@@ -1202,7 +1152,7 @@ subroutine SVD(A, M, N, U)
         
     end subroutine InterpolateCoefficients
     
-    subroutine PressInterp(NoCPDim, newpressure, tempNests)
+    subroutine PressInterp(DoF, newpressure, tempNests)
     ! Objective: Interpolation of Coefficients with Radial Basis Functions, based on normalized Gaussian RBF (see Hardy theory)
     
         ! Variables
@@ -1210,10 +1160,10 @@ subroutine SVD(A, M, N, U)
         double precision, dimension(:,:), allocatable :: B_ar, CoeffVec, Lambda, newCoeff, InitNests, coeff_temp
         real, dimension(:), allocatable :: Init_Nests_temp, Ipiv
         integer, dimension(:), allocatable :: ind_IN
-        real, dimension(IV%NoDim*IV%NoCP) :: tempNests
+        real, dimension(maxDoF) :: tempNests
         double precision, dimension(RD%np) :: newpressure
         real :: a, b, d, a2
-        integer :: NoCPDim, l, m, n, LWMAX, LWORK, Info, tu
+        integer :: DoF, i, l, m, n, LWMAX, LWORK, Info, tu
         parameter        ( LWMAX = 10000)
         double precision, dimension(:), allocatable ::  WORK
     
@@ -1221,7 +1171,7 @@ subroutine SVD(A, M, N, U)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(Work(LWMAX),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-        allocate(InitNests(IV%NoSnap,IV%NoDim*IV%NoCP),stat=allocateStatus)
+        allocate(InitNests(IV%NoSnap,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
         allocate(Init_Nests_temp(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
@@ -1251,7 +1201,7 @@ subroutine SVD(A, M, N, U)
         
         if (IV%sort == .true.) then
             ind_IN = (/ (i, i=1,IV%NoSnap) /)      
-            Init_Nests_temp = InitNests(:, (1+IV%NoDim*IV%NoCP-NoCPDim)) ! only for QSort
+            Init_Nests_temp = InitNests(:, (1+maxDoF-DoF)) ! only for QSort
             call QSort(Init_Nests_temp, size(InitNests, dim = 1), 'y', ind_IN) ! Index only required
             deallocate(Init_Nests_temp)
             
@@ -1315,245 +1265,6 @@ subroutine SVD(A, M, N, U)
         end if
         
     end subroutine PressInterp
-    
-    recursive subroutine CheckforConvergence(Iter)
-    
-        ! Variables
-        implicit none
-        integer :: ii
-        integer, save :: NoConv
-        integer,intent(inout) :: Iter
-        logical :: Converge
-        character(len=200) :: strCommand
-        integer, dimension(:), allocatable :: DivNestPos
-        real, dimension(:), allocatable :: MidPoints
-        
-        allocate(DivNestPos(IV%NoSnap),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckForConvergence "
-        allocate(MidPoints(IV%NoCP*IV%NoDim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckforConvergence "
-    
-        ! Body of CheckforConvergence
-        print *, 'Iteration', (Iter + 1)
-        Converge = .true.
-        NoConv = 0
-        do i = 1, IV%NoSnap
-            
-          call FileCheckConvergence(Converge, i)  
-            
-            ! All diverged nests are pulled halfway to midpoint(no movement center)
-            if (Converge == .false.) then
-                
-                    print *, 'File', i, 'failed to converge and will be resimulated'
-                    NoConv = NoConv + 1
-                    DivNestPos(NoConv) = i
-                    MidPoints = MxDisp(:,1) - (MxDisp(:,1) - MxDisp(:,2))/2.0  ! Midpoint calculation
-                    Snapshots(i,:) = Snapshots(i,:) - ((Snapshots(i,:) - MidPoints)/2.0)   ! Half way between current Nest and Midpoint
-                    
-            end if
-            Converge = .true.
-            
-        end do
-        
-        if (NoConv /= 0) then
-            
-            !!! Re-Do Mesh of diverged Nest
-            allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main " 
-            do ii = 1, NoConv
-            
-                print *, "Regenerating Mesh", DivNestPos(ii), "/", NoConv
-                RD%coord_temp = RD%coord
-                call SubGenerateMesh(Snapshots(DivNestPos(ii),:))
-                ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
-            
-!!!!! implement mesh quality test
-            
-                ! write snapshot to file
-                call InitSnapshots(DivNestPos(ii))
-
-            end do
-            deallocate(RD%coord_temp)
-            
-            !! PreProcessing
-            do ii = 1, NoConv
-                call PreProcessing(DivNestPos(ii))
-            end do
-            
-            !! Solver
-            do ii = 1, NoConv
-                
-                call Solver(DivNestPos(ii))
-                
-                ! Determine correct String      
-                call DetermineStrLen(istr, DivNestPos(ii))
-        
-                call DeleteErrorFiles(istr)
-                if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine           
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-                else
-                    call system('chmod a+x ./FileCreateDir.scr')
-                    call system('./FileCreateDir.scr')
-                end if
-                
-                deallocate(istr)
-                
-            end do
-            
-            call Sleep(IV%NoSnap)
-            
-            Iter = Iter + 1
-            
-            if (Iter < 4) then
-                call CheckforConvergence(Iter)
-            end if
-            
-            if (NoConv /= 0) then
-                STOP 'Convergence of CFD Simulations could not be achieved. Check initial Mesh and/or Movement constraints!'
-            end if
-        end if
-        
-    end subroutine CheckforConvergence
-    
-    subroutine FileCheckConvergence(Converge, NoFile)
-    
-        ! Variables
-        implicit none
-        integer :: FileSize, LastLine, NoFile
-        real, dimension(8) :: Input
-        logical, intent(in out) :: Converge
-    
-        ! Body of FileCheckConvergence
-        ! Determine correct String number
-        call DetermineStrLen(istr, NoFile)
-            
-        ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
-        if (IV%SystemType == 'W') then
-            open(1, file=OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
-        else
-            open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
-        end if       
-        inquire(1, size = FileSize)           
-        LastLine = FileSize/106
-            
-        ! Read until last line
-        do j = 1, (LastLine - 1)
-            read(1, *) Input
-        end do
-        read(1, *) Input
-        close(1)
-            
-        ! Convergence = false if last line contains 'NaN'
-        do j = 1, 8
-            if (isnan(Input(j))) then
-                Converge = .false.
-                exit   
-            end if       
-        end do
-        
-        deallocate(istr)
-            
-    end subroutine FileCheckConvergence
-    
-    recursive subroutine CheckforConvergence2(Iter)
-    
-        ! Variables
-        implicit none
-        integer :: ii
-        integer, save :: NoConv
-        integer,intent(inout) :: Iter
-        logical :: Converge
-        character(len=200) :: strCommand
-        integer, dimension(:), allocatable :: DivNestPos
-        real, dimension(:), allocatable :: MidPoints
-        
-        allocate(DivNestPos(IV%NoSnap),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-        allocate(MidPoints(IV%NoCP*IV%NoDim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
-    
-        ! Body of CheckforConvergence
-        print *, 'Iteration', (Iter + 1)
-        Converge = .true.
-        NoConv = 0
-        do i = SolutionNumber, (SolutionNumber - IV%NoNests), -1
-            
-          call FileCheckConvergence(Converge, i)  
-            
-            ! All diverged nests are pulled halfway to midpoint(no movement center)
-            if (Converge == .false.) then
-                
-                    print *, 'File', i, 'failed to converge and will be resimulated'
-                    NoConv = NoConv + 1
-                    DivNestPos(NoConv) = i
-                    MidPoints = MxDisp(:,1) - (MxDisp(:,1) - MxDisp(:,2))/2.0  ! Midpoint calculation  
-                    Nests_Move(i,:) = Nests_Move(i,:) - ((Nests_Move(i,:) - MidPoints)/2.0) ! Half way between current Nest and Midpoint
-                    Nests(i,:) = Nests(i,:) - ((Nests(i,:) - MidPoints)/2.0)
-                    
-            end if
-            Converge = .true.
-            
-        end do
-        
-        if (NoConv /= 0) then
-            
-            !!! Re-Do Mesh of diverged Nest
-            allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main " 
-            do ii = 1, NoConv
-            
-                print *, "Regenerating Mesh", DivNestPos(ii), "/", NoConv
-                RD%coord_temp = RD%coord
-                call SubGenerateMesh(Snapshots(DivNestPos(ii),:))
-                ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
-            
-!!!!! implement mesh quality test
-            
-                ! write snapshot to file
-                call InitSnapshots(DivNestPos(ii))
-
-            end do
-            deallocate(RD%coord_temp)
-            
-            !! PreProcessing
-            do ii = 1, NoConv
-                call PreProcessing(DivNestPos(ii))
-            end do
-            
-            !! Solver
-            do ii = 1, NoConv
-                
-                call Solver(DivNestPos(ii))
-                
-                ! Determine correct String      
-                call DetermineStrLen(istr, DivNestPos(ii))
-        
-                call DeleteErrorFiles(istr)
-                if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine           
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-                else
-                    call system('chmod a+x ./FileCreateDir.scr')
-                    call system('./FileCreateDir.scr')
-                end if
-                
-                deallocate(istr)
-                
-            end do
-            
-            call Sleep(SolutionNumber)
-            
-            Iter = Iter + 1
-            
-            if (Iter < 4) then
-                call CheckforConvergence(Iter)
-            end if
-            
-            if (NoConv /= 0) then
-                STOP 'Convergence of CFD Simulations could not be achieved. Check initial Mesh and/or Movement constraints!'
-            end if
-        end if
-        
-    end subroutine CheckforConvergence2
     
     subroutine AllocateModesCoeff()
     
