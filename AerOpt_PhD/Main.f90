@@ -91,10 +91,8 @@ program AerOpt
     
 !!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
 
-    call IdentifyBoundaryFlags()
-    ! Output: Boundary Matrix incluing flags of adiabatic viscous wall, far field & engine inlet (boundf)
-
     ! **** Generate Full Fidelity Solutions of Snapshots**** !
+    call PreMeshing()
     call SubCFD(1, IV%NoSnap, Snapshots, IV%NoSnap)
     call PostSolverCheck(IV%NoSnap, 0)
     
@@ -111,7 +109,7 @@ program AerOpt
     ! Output: Optimum Coordinates - 1 Mesh with moved boundaries based on optimum Control Point Coordinates
     
     ! Safe Optimum Geometry in Text File
-    call InitSnapshots(005)
+    call writeDatFile(005)
     call timestamp()
     
     end program AerOpt

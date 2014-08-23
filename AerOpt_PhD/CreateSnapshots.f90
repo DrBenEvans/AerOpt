@@ -2,11 +2,11 @@ module CreateSnapshots
     
         use Toolbox
         use InputData
-        real :: rn                                            ! Counts random numbers
-        real, dimension(:,:), allocatable :: MxDisp           ! Matrix with min/max Displacements
-        real, dimension(:,:), allocatable :: MxDisp_Move      ! Matrix with only moving min/max Displacements
+        double precision :: rn                                            ! Counts random numbers
+        double precision, dimension(:,:), allocatable :: MxDisp           ! Matrix with min/max Displacements
+        double precision, dimension(:,:), allocatable :: MxDisp_Move      ! Matrix with only moving min/max Displacements
         integer, dimension(:), allocatable :: cond            ! Identifies zero/non-zero values
-        real, dimension(:,:), allocatable :: Snapshots     ! Matrix containing the initial Nests
+        double precision, dimension(:,:), allocatable :: Snapshots     ! Matrix containing the initial Nests
         
     contains
     
@@ -56,8 +56,8 @@ module CreateSnapshots
         implicit none
         integer :: NoSampPoints, NoPerm
         integer :: i, j, ms
-        real, dimension(NoSampPoints, IV%NoDim*NoPerm) :: Sampling
-        real, dimension(:,:), allocatable :: Sampling_1D
+        double precision, dimension(NoSampPoints, IV%NoDim*NoPerm) :: Sampling
+        double precision, dimension(:,:), allocatable :: Sampling_1D
         integer, dimension(:), allocatable :: zeros
         
         ! Body of LHS
@@ -144,9 +144,9 @@ module CreateSnapshots
         ! Variables
         implicit none
         integer :: NoSampPoints, NoPerm, i, j, k
-        real, dimension(NoSampPoints,NoPerm), intent(out) :: Sampling_1D
+        double precision, dimension(NoSampPoints,NoPerm), intent(out) :: Sampling_1D
         integer, dimension(NoSampPoints) :: rp
-        real, dimension(NoPerm,2) :: MD_Move 
+        double precision, dimension(NoPerm,2) :: MD_Move 
         double precision, dimension(NoSampPoints) :: linSamp, linSamp2
         double precision :: max, min, first, last, dlS, ds, dlL1, dlL2, dL, dbound
     

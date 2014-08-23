@@ -14,7 +14,7 @@ module CFD
         ! Variables
         implicit none
         integer :: Start, Ending, i, size
-        real, dimension(size, maxDoF) :: CN_Coordinates
+        double precision, dimension(size, maxDoF) :: CN_Coordinates
         
     
         ! Body of SubCFD
@@ -31,11 +31,11 @@ module CFD
                 call SubGenerateMesh(CN_Coordinates(i - Start + 1,:))
             end if
             ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
-        
+  
     !!!!! IMPLEMENT Mesh Quality Test
 
             ! Write Snapshot to File
-            call InitSnapshots(i)
+            call writeDatFile(i)
 
         end do
         deallocate(RD%coord_temp)
@@ -66,8 +66,8 @@ module CFD
         implicit none
         integer :: m, ii, InitConv
         integer, optional :: SolutionNumber
-        real, dimension(IV%NoNests,DoF), optional :: Nests_Move
-        real, dimension(IV%NoNests,maxDoF), optional :: Nests
+        double precision, dimension(IV%NoNests,DoF), optional :: Nests_Move
+        double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
     
         ! Body of PostSolverCheck
         ! ****Wait & Check for FLITE Solver Output**** !
@@ -242,10 +242,10 @@ module CFD
         logical :: Converge
         character(len=200) :: strCommand
         integer, dimension(:), allocatable :: DivNestPos
-        real, dimension(:), allocatable :: MidPoints
+        double precision, dimension(:), allocatable :: MidPoints
         integer, optional :: SolutionNumber      
-        real, dimension(IV%NoNests,DoF), optional :: Nests_Move
-        real, dimension(IV%NoNests,maxDoF), optional :: Nests
+        double precision, dimension(IV%NoNests,DoF), optional :: Nests_Move
+        double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
         
         allocate(DivNestPos(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckForConvergence "
@@ -342,7 +342,7 @@ module CFD
         ! Variables
         implicit none
         integer :: FileSize, LastLine, NoFile, j
-        real, dimension(8) :: Input
+        double precision, dimension(8) :: Input
         logical, intent(in out) :: Converge
     
         ! Body of FileCheckConvergence

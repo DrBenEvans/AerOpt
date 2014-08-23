@@ -4,19 +4,20 @@ module ReadData
     use Toolbox
     type ReadVariablesData
     
-        integer :: ne, np, nbf, nbc                             ! Number of elements, Nodes/Points & boundary faces
-        integer, dimension(:,:), allocatable :: connecc         ! Connectivity Matrix of Coarse Mesh    
-        integer, dimension(:,:), allocatable :: connecf, boundf ! Connectivity & Boundary Matrix of Fine Mesh    
-        real, dimension(:,:), allocatable :: coord              ! Coordinates Matrix of Fine Mesh (includes coordinates of coarse mesh)
-        real, dimension(:,:), allocatable :: coarse             ! includes element allocation of nodes to coarse triangles and Area Coefficients of each node
-        real, dimension(:,:), allocatable :: Coord_CP           ! desired Coordinates of the Control Points
-        real, dimension(:,:), allocatable :: Rect               ! Rectangle definition of 'Influence Box'
-        real, dimension(:,:), allocatable :: coord_temp         ! Coordinates Matrix of Fine Mesh
-    
+        integer :: ne, np, nbf, nbc, NoParts                                ! Number of elements, Nodes/Points & boundary faces
+        integer, dimension(:), allocatable :: MovingParts                   ! Connectivity Matrix of Coarse Mesh
+        integer, dimension(:,:), allocatable :: connecc                     ! Connectivity Matrix of Coarse Mesh    
+        integer, dimension(:,:), allocatable :: connecf, boundf             ! Connectivity & Boundary Matrix of Fine Mesh    
+        double precision, dimension(:,:), allocatable :: coord              ! Coordinates Matrix of Fine Mesh (includes coordinates of coarse mesh)
+        double precision, dimension(:,:), allocatable :: coarse             ! includes element allocation of nodes to coarse triangles and Area Coefficients of each node
+        double precision, dimension(:,:), allocatable :: Coord_CP           ! desired Coordinates of the Control Points
+        double precision, dimension(:,:), allocatable :: Rect               ! Rectangle definition of 'Influence Box'
+        double precision, dimension(:,:), allocatable :: coord_temp         ! Coordinates Matrix of Fine Mesh
+        
     end type ReadVariablesData
     
     type(ReadVariablesData) :: RD
-    real, dimension(:,:), allocatable :: ArrayTemp
+    double precision, dimension(:,:), allocatable :: ArrayTemp
     
 contains
       
@@ -29,6 +30,14 @@ contains
     
         ! Body of ReadData
         open(1, file= InFolder//'/Mesh_fine.txt', form='formatted',status='old')
+        read(1, 11) RD%NoParts
+        if (RD%NoParts /= 0) then
+            allocate(RD%MovingParts(RD%NoParts),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+            do i = 1, RD%NoParts
+                read(1, 11) RD%MovingParts(i)
+            end do
+        end if
         read(1, 11) RD%ne
         allocate(RD%connecf(RD%ne,IV%NoDim+1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
@@ -36,7 +45,7 @@ contains
         allocate(RD%coord(RD%np,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         read(1, 11) RD%nbf
-        allocate(RD%boundf(RD%nbf,IV%NoDim + 1),stat=allocateStatus)
+        allocate(RD%boundf(RD%nbf,IV%NoDim + 2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         do i = 1, RD%ne
             read(1, *) RD%connecf(i,:)
@@ -45,7 +54,7 @@ contains
             read(1, *) RD%coord(i,:)
         end do
         do i = 1, RD%nbf
-            read(1, *) RD%boundf(i,1:2)
+            read(1, *) RD%boundf(i,:)
         end do 
     11  format(1I8)        
         close(1)
@@ -82,14 +91,14 @@ contains
     
     end subroutine SubReadData
     
-    subroutine InitSnapshots(ii)
+    subroutine writeDatFile(ii)
     !Objective: Create Outputfile of each Snapshot as Input for the Pre Processor
     
         ! Variables
         implicit none
         integer :: ii, j
     
-        ! Body of InitSnapshots
+        ! Body of writeDatFile
         
         ! Determine correct String      
         call DetermineStrLen(istr, ii) 
@@ -115,7 +124,7 @@ contains
         close(99)
         deallocate (istr)
     
-    end subroutine InitSnapshots
+    end subroutine writeDatFile
     
     subroutine PreProInpFile()
     ! Objective: Create the Inputfile for the PreProcessor in Case of the Windows Executable

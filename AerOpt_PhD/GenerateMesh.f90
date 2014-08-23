@@ -11,10 +11,10 @@
     ! Variables
     implicit none
     integer :: lb, i, k, j
-    real, dimension(IV%NoCP*IV%NoDim) :: NestDisp
-    real, dimension(:), allocatable :: dCP2N, CP_ind, size_ib
+    double precision, dimension(IV%NoCP*IV%NoDim) :: NestDisp
+    double precision, dimension(:), allocatable :: dCP2N, CP_ind, size_ib
     integer, dimension(:,:), allocatable :: IB
-    real :: c, w, dis, x1, y1, x2, y2, x3, y3, xp, yp
+    double precision :: c, w, dis, x1, y1, x2, y2, x3, y3, xp, yp
 
     ! Body of GenerateInitialMeshes
     allocate(dCP2N(RD%nbf),stat=allocateStatus)
@@ -82,27 +82,5 @@
     end do
 
     end subroutine SubGenerateMesh
-
-    subroutine IdentifyBoundaryFlags()
-
-    ! Variables
-    implicit none
-    integer :: k
-    real, dimension(2) :: point
-
-    ! Body of IdentifyBoundaryFlags
-    do k = 1, RD%nbf
-        point(1) = (RD%coord(RD%boundf(k,1),1)*15 + RD%coord(RD%boundf(k,2),1)*15)/2.0
-        point(2) = (RD%coord(RD%boundf(k,1),2)*15 + RD%coord(RD%boundf(k,2),2)*15)/2.0
-        if (point(1) < 20 .and. point(1) > 0 .and. point(2) < 3 .and. point(2) > (-2)) then
-            RD%boundf(k,3) = 6    ! Adiabatic Viscous Wall
-        elseif (point(1) == 0 .and. point(2) < 1 .and. point(2) > 0) then
-            RD%boundf(k,3) = 8    ! Engine Inlet
-        else    
-            RD%boundf(k,3) = 3    ! Far Field
-        end if       
-    end do
-
-    end subroutine IdentifyBoundaryFlags
 
 end module GenerateMesh

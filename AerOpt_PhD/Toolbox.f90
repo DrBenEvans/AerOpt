@@ -26,8 +26,11 @@
     ! Objective: Calculate the Distance in any Dimension
 
     ! Variables
-    optional :: Ya, Yb, Za, Zb
-    real ::  DistP2P
+    implicit none
+    integer :: NoDim
+    double precision :: Xa, Xb
+    double precision, optional :: Ya, Yb, Za, Zb
+    double precision ::  DistP2P
 
     ! Body of DistP2P
     select case (NoDim)
@@ -45,8 +48,8 @@
     ! Objective: Check of values to be positioned in a Rectangle
 
     ! Variables
-    real, dimension(2) :: AB, BC, AP, BP, p
-    real, dimension(8) :: r
+    double precision, dimension(2) :: AB, BC, AP, BP, p
+    double precision, dimension(8) :: r
     logical :: Rectcheck
 
     ! Body or RectCheck
@@ -91,7 +94,7 @@
 
     ! Dummy Arguments
     integer, intent(in) :: nA
-    real, dimension(nA), intent(in out) :: A
+    double precision, dimension(nA), intent(in out) :: A
     integer, dimension(nA), intent(in out), optional :: ind
     character(len=1), optional :: sel
 
@@ -144,13 +147,72 @@
     end if
 
     end subroutine QSort
+    
+    recursive subroutine QSortInt(a,na, sel, ind)
+    ! Objective: Sort/Order an Array in ascending order
+
+    ! Dummy Arguments
+    integer, intent(in) :: nA
+    integer, dimension(nA), intent(in out) :: A
+    integer, dimension(nA), intent(in out), optional :: ind
+    character(len=1), optional :: sel
+
+    ! Local Variables
+    integer :: left, right
+    real :: random
+    real :: pivot
+    integer :: marker
+    real :: temp
+
+    if (nA > 1) then
+
+    call random_number(random)
+    pivot = A(int(random*real(nA-1))+1)   ! random pivor (not best performance, but avoids worst-case)
+    left = 0
+    right = nA + 1
+
+    do while (left < right)
+        right = right - 1
+        do while (A(right) > pivot)
+            right = right - 1
+        end do
+        left = left + 1
+        do while (A(left) < pivot)
+            left = left + 1
+        end do
+
+        ! Swap numbers
+        if (left < right) then
+            temp = A(left)
+            A(left) = A(right)
+            A(right) = temp
+            if (sel == 'y') then
+                temp = ind(left)
+                ind(left) = ind(right)
+                ind(right) = temp
+            end if
+        end if
+    end do
+
+    if (left == right) then
+        marker = left + 1
+    else
+        marker = left
+    end if
+
+    call QSortInt(A(:marker-1),marker-1, sel, ind(:marker-1)) ! recursive call -1
+    call QSortInt(A(marker:),nA-marker+1, sel, ind(marker:))  ! recursive call +1
+
+    end if
+
+    end subroutine QSortInt
 
     subroutine Unique(vector_in, sz, vector_out)
 
     ! Variables
     integer :: sz
-    real, dimension(sz), intent(in) :: vector_in
-    real, dimension(:), allocatable, intent(out) :: vector_out
+    double precision, dimension(sz), intent(in) :: vector_in
+    double precision, dimension(:), allocatable, intent(out) :: vector_out
     integer, dimension(sz) :: marker
 
     ! Body of Unique
@@ -175,6 +237,37 @@
     end do
 
     end subroutine Unique
+    
+    subroutine UniqueInt(vector_in, sz, vector_out)
+
+    ! Variables
+    integer :: sz
+    integer, dimension(sz), intent(in) :: vector_in
+    integer, dimension(:), allocatable, intent(out) :: vector_out
+    integer, dimension(sz) :: marker
+
+    ! Body of Unique
+    j = 1
+    marker(1) = 0
+    do i = 2, sz
+        if (vector_in(i) == vector_in(i-1)) then
+            marker(i) = 1
+        else
+            marker(i) = 0
+            j = j + 1
+        end if   
+    end do
+
+    allocate(vector_out(j))
+    j = 1
+    do i = 1, sz            
+        if (marker(i) == 0) then
+            vector_out(j) = vector_in(i)
+            j = j + 1
+        end if
+    end do
+
+    end subroutine UniqueInt
 
     subroutine randperm(N, p)
 
@@ -335,7 +428,7 @@
     implicit none
     integer :: N, ID, j, icode
     double precision, dimension(N,N) :: A
-    real :: Det
+    double precision :: Det
     integer, dimension(N) :: INDX(N)
 
 
@@ -358,9 +451,9 @@
     ! Objective: Performs the LU - Decomposition
 
     ! Variables
-    PARAMETER(NMAX=100,TINY=1.5D-17)
-    REAL*8  AMAX,DUM, SUM, A(N,N),VV(NMAX)
-    INTEGER CODE, D, INDX(N)
+    parameter (NMAX=100,TINY=1.5D-17)
+    double precision ::  AMAX,DUM, SUM, A(N,N),VV(NMAX)
+    integer :: CODE, D, INDX(N)
 
     ! Body of LU Decomposition
     D=1; CODE=0

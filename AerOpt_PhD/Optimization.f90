@@ -7,14 +7,13 @@ module Optimization
     use GenerateMesh
     use CFD
     double precision, dimension(:,:), allocatable :: modes, coeff       ! Modes and Coefficient derived by the POD method
-    real, dimension(:), allocatable :: engInNodes                       ! Engine inlet Nodes
+    double precision, dimension(:), allocatable :: engInNodes           ! Engine inlet Nodes
     double precision, dimension(:,:), allocatable :: pressure           ! Pressure of All initial Snapshots
-    real, dimension(:), allocatable :: Fi                               ! Vector with all current Fitness values
-    real, dimension(:), allocatable :: NestOpt                          ! Control Point Coordinates of Optimum Geometry
-    double precision :: alpha, beta                                     ! Matrix Multiplicaion LAPACK variables
+    double precision, dimension(:), allocatable :: Fi                   ! Vector with all current Fitness values
+    double precision, dimension(:), allocatable :: NestOpt              ! Control Point Coordinates of Optimum Geometry
     double precision, dimension(:), allocatable :: PolCoeff             ! Polynomial Coefficients for POD RBF interpolation
     double precision, dimension(:,:), allocatable :: Weights            ! Weights for POD RBF interpolation
-    real, dimension(:,:), allocatable :: Nests_Move, Nests              ! Nest regenerated with each generation
+    double precision, dimension(:,:), allocatable :: Nests_Move, Nests              ! Nest regenerated with each generation
     integer :: SolutionNumber                                           ! Current Number of High Fidelity solutions
     logical :: InitConv                                                 ! Initial Convergence Check - TRUE: yes
         
@@ -24,10 +23,10 @@ contains
     
         ! Variables
         implicit none
-        real :: Ac, Ftemp, Fopt
+        double precision :: Ac, Ftemp, Fopt
         integer :: i,j, k, l, ii, iii, NoSteps, NoTop, NoDiscard, randomNest, NoConv, NoTest
-        real, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
-        real, dimension(:,:), allocatable :: Snapshots_Move, tempSnapshots, newSnapshots, NestsTest, TopNest, TopNest_Move, tempNestA
+        double precision, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
+        double precision, dimension(:,:), allocatable :: Snapshots_Move, tempSnapshots, newSnapshots, NestsTest, TopNest, TopNest_Move, tempNestA
         integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial, ConvA
         logical :: Converge
         character(len=5) :: strNoSnap
@@ -509,8 +508,8 @@ contains
         ! Variables
         implicit none
         integer :: Start, Ending, Length, i, k, j
-        real :: Vamb, rho_amb, Rspec, gamma
-        real, dimension(:), allocatable :: Output, Vx, Vy, rho, e
+        double precision :: Vamb, rho_amb, Rspec, gamma
+        double precision, dimension(:), allocatable :: Output, Vx, Vy, rho, e
         character(len=:), allocatable :: istr
 
         ! Body of Extract Pressure
@@ -635,8 +634,8 @@ contains
         ! Variables
         implicit none
         integer :: NoEngIN, NoSnapshot, j
-        real, dimension(:), allocatable :: PlaneX, PlaneY, dPress, h, Area_trap, Pmid_x, Pmid_y, Area, Press_mid
-        real :: Press_ave, L, Distortion
+        double precision, dimension(:), allocatable :: PlaneX, PlaneY, dPress, h, Area_trap, Pmid_x, Pmid_y, Area, Press_mid
+        double precision :: Press_ave, L, Distortion
  
         allocate(PlaneX(size(engInNodes)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
@@ -712,8 +711,8 @@ contains
         implicit none
         integer :: i,j
         integer, dimension(:,:), allocatable :: nodesall
-        real, dimension(:), allocatable :: nodesvec
-        real, dimension(2) :: point
+        double precision, dimension(:), allocatable :: nodesvec
+        double precision, dimension(2) :: point
         
         allocate(nodesall(RD%nbf,2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getEngineInlet "
@@ -805,9 +804,9 @@ subroutine SVD(A, M, N, U)
         ! Variables
         implicit none
         integer :: median, scale, l, m, NoSteps, DoF
-        real, parameter :: pi = 3.14159265359
-        real, dimension(DoF) :: LevyWalk
-        real, dimension(NoSteps) :: y
+        double precision, parameter :: pi = 3.14159265359
+        double precision, dimension(DoF) :: LevyWalk
+        double precision, dimension(NoSteps) :: y
     
         ! Body of LevyWalk - Each Dimension walks
                 
@@ -834,10 +833,10 @@ subroutine SVD(A, M, N, U)
         ! Variables
         implicit none
         integer :: NoEngIN, DoF, k
-        real, dimension(:), allocatable :: PlaneX, PlaneY, dPress, h, Area_trap, Pmid_x, Pmid_y, Area, Press_mid
-        real, dimension(maxDoF) :: tempNests
-        real :: Distortion
-        real :: Press_ave, L
+        double precision, dimension(:), allocatable :: PlaneX, PlaneY, dPress, h, Area_trap, Pmid_x, Pmid_y, Area, Press_mid
+        double precision, dimension(maxDoF) :: tempNests
+        double precision :: Distortion
+        double precision :: Press_ave, L
         double precision, dimension(:), allocatable :: newpressure
  
         allocate(newpressure(RD%np),stat=allocateStatus)
@@ -889,13 +888,11 @@ subroutine SVD(A, M, N, U)
         if (IV%OldvsNew == .true.) then
             call PressInterp(DoF, newpressure, tempNests)
             call InterpolateCoefficients(tempNests, newpressure, DoF)
-            pause
         else if (IV%sort == .true.) then
             call PressInterp(DoF, newpressure, tempNests)
             IV%sort = .false.
             call PressInterp(DoF, newpressure, tempNests)
             IV%sort = .true.
-            pause
         else if (IV%multiquadric == .true.) then
             deallocate(PolCoeff)
             deallocate(Weights)
@@ -907,9 +904,11 @@ subroutine SVD(A, M, N, U)
             call ComputeRBFWeights(DoF)
             call InterpolateCoefficients(tempNests, newpressure, DoF)
             IV%multiquadric = .true.
-            pause
-        else
+        else if (IV%pol == .true.) then
             call InterpolateCoefficients(tempNests, newpressure, DoF)
+            IV%pol = .false.
+            call InterpolateCoefficients(tempNests, newpressure, DoF)
+            IV%pol = .true.
         end if
         Press_mid = newpressure(engInNodes(2:(NoEngIN-1))) ! Extract Pressure of middle engine Inlet Nodes
         Press_ave = sum(Press_mid*Area, dim = 1)/sum(Area, dim = 1)
@@ -1090,7 +1089,7 @@ subroutine SVD(A, M, N, U)
         ! Variables
         implicit none
         double precision, dimension(RD%np) :: newpressure
-        real, dimension(maxDoF) :: newNest
+        double precision, dimension(maxDoF) :: newNest
         double precision, dimension (:), allocatable :: RBFVector, NormFact
         double precision, dimension(:,:), allocatable :: newCoeff
         double precision :: x, RBFterm, ShapeParameter
@@ -1158,11 +1157,11 @@ subroutine SVD(A, M, N, U)
         ! Variables
         implicit none
         double precision, dimension(:,:), allocatable :: B_ar, CoeffVec, Lambda, newCoeff, InitNests, coeff_temp
-        real, dimension(:), allocatable :: Init_Nests_temp, Ipiv
+        double precision, dimension(:), allocatable :: Init_Nests_temp, Ipiv
         integer, dimension(:), allocatable :: ind_IN
-        real, dimension(maxDoF) :: tempNests
+        double precision, dimension(maxDoF) :: tempNests
         double precision, dimension(RD%np) :: newpressure
-        real :: a, b, d, a2
+        double precision :: a, b, d, a2
         integer :: DoF, i, l, m, n, LWMAX, LWORK, Info, tu
         parameter        ( LWMAX = 10000)
         double precision, dimension(:), allocatable ::  WORK
