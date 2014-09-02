@@ -53,7 +53,7 @@ program AerOpt
     ! Get Time and Date for File and Folder Name creation
     call DATE_AND_TIME(date, time)
     
-    newdir = '2DEngInletSnapshots_1.6_140319_1945' !'2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4)
+    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4)
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
     print *, 'Start Read Data'
@@ -92,7 +92,10 @@ program AerOpt
 !!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
 
     ! **** Generate Full Fidelity Solutions of Snapshots**** !
+    print *, 'Start PreMeshing'
     call PreMeshing()
+    print *, 'End PreMeshing - All Area Coefficients calculated'
+    print *, ''
     call SubCFD(1, IV%NoSnap, Snapshots, IV%NoSnap)
     call PostSolverCheck(IV%NoSnap, 0)
     

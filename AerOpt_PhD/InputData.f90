@@ -34,16 +34,11 @@ module InputData
         character(len=3) :: version
         character(len=4) :: MeshGeneration
         logical :: Meshtest
-        logical :: AllSurface
         logical :: Pol                  ! POD using Polynomial
         logical :: sort                 ! POD sorting the Snapshots
         logical :: OldvsNew
         logical :: multiquadric         ! RBF type for POD
         logical :: POD
-        
-        character(len=5) :: GeomType
-        real, dimension(4) :: BoundDomain
-        logical :: MoveAllGeom                             ! Is all the geometry moving?
     
     end type InputVariablesData
     
@@ -92,7 +87,6 @@ contains
         IV%NoCP = 7			            ! Number of Control Points 
         IV%NoDim = 2			        ! Number of Dimensions in Space 
         IV%NoG = 100		            ! Number of Generations
-        IV%NoNests = 0                  ! Number of Nests (Cuckoo Search)
         IV%NoPOMod = -1			        ! No of POD Modes considered 
         IV%NoLeviSteps = 100         	! Number of Levy walks per movement 
         IV%NoIter = -3               	! Batch File variable - Number of Iterations 
@@ -119,10 +113,6 @@ contains
         ! For Mesh Deformation
         IV%MeshGeneration = 'RBF'
         IV%Meshtest = .true.
-        IV%AllSurface = .false.
-        IV%BoundDomain = (/10, -10, 10, -10/)
-        IV%GeomType = 'close'
-        IV%MoveAllGeom = .true.
         
         open(1,file = InFolder//'/AerOpt_InputParameters.txt',form='formatted',status='old')
         read(1,InputVariables)

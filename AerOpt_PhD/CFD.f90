@@ -26,11 +26,11 @@ module CFD
             print *, "Generating Mesh", i, "/", Ending
             RD%coord_temp = RD%coord 
             if (IV%MeshGeneration == 'FDGD') then
-                call SubFDGD(dble(CN_Coordinates(i - Start + 1,:)))
+                call SubFDGD(CN_Coordinates(i - Start + 1,:))
             else if (IV%MeshGeneration == 'RBF') then
                 call SubGenerateMesh(CN_Coordinates(i - Start + 1,:))
             end if
-            ! Output: new coordinates - Mesh with moved boundaries based on Initial Nest
+            !Output: new coordinates - Mesh with moved boundaries based on Initial Nest
   
     !!!!! IMPLEMENT Mesh Quality Test
 
