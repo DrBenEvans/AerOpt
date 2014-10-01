@@ -9,37 +9,31 @@ module CFD
     
     contains
     
-    subroutine SubCFD(Start, Ending, CN_Coordinates, size)
+    subroutine SubCFD(Start, Ending, CN_CoordinatesArray, sizing)
     
         ! Variables
         implicit none
-        integer :: Start, Ending, i, size
-        double precision, dimension(size, maxDoF) :: CN_Coordinates
+        integer :: Start, Ending, i, sizing
+        double precision, dimension(sizing, maxDoF) :: CN_CoordinatesArray
         
     
         ! Body of SubCFD
         ! ****Generate Snapshots (initial Meshes)**** !
         allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "    
-        do i = Start, Ending
-            
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
+        do i = Start, Ending          
             print *, "Generating Mesh", i, "/", Ending
             RD%coord_temp = RD%coord 
-            if (IV%MeshGeneration == 'FDGD') then
-                call SubFDGD(CN_Coordinates(i - Start + 1,:))
-            else if (IV%MeshGeneration == 'RBF') then
-                call SubGenerateMesh(CN_Coordinates(i - Start + 1,:))
-            end if
+            call SubMovemesh(CN_CoordinatesArray(i - Start + 1,:))
             !Output: new coordinates - Mesh with moved boundaries based on Initial Nest
-  
+            
     !!!!! IMPLEMENT Mesh Quality Test
-
+    
             ! Write Snapshot to File
             call writeDatFile(i)
-
         end do
         deallocate(RD%coord_temp)
-    
+ 
         if (IV%Meshtest == .true.) then
           pause
         end if
@@ -60,18 +54,17 @@ module CFD
         
     end subroutine SubCFD
     
-    subroutine PostSolverCheck(m, InitConv, SolutionNumber, Nests_Move, Nests)
+    subroutine PostSolverCheck(NoFiles, InitConv, Nests_Move, Nests)
     
         ! Variables
         implicit none
-        integer :: m, ii, InitConv
-        integer, optional :: SolutionNumber
+        integer :: NoFiles, ii, InitConv
         double precision, dimension(IV%NoNests,DoF), optional :: Nests_Move
         double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
     
         ! Body of PostSolverCheck
         ! ****Wait & Check for FLITE Solver Output**** !
-        call Sleep(m)
+        call Sleep(NoFiles)
     
         if (IV%SystemType == 'W') then
             call TransferSolutionOutput()
@@ -84,7 +77,7 @@ module CFD
         print *, '*************************************'
         print *, ''
         ii = 0
-        call CheckforConvergence(ii, InitConv, SolutionNumber, Nests_Move, Nests)
+        call CheckforConvergence(ii, InitConv, NoFiles, Nests_Move, Nests)
         print*, 'All Solutions converged'
         
     end subroutine PostSolverCheck
@@ -174,11 +167,11 @@ module CFD
     
     end subroutine Solver
     
-    subroutine Sleep(m)
+    subroutine Sleep(NoFiles)
     
         ! Variables
         implicit none
-        integer :: i, m, j
+        integer :: i, NoFiles, j
     
         ! Body of Sleep
         print*, 'Start Sleep'
@@ -195,7 +188,7 @@ module CFD
         
             ! Check Status of Simulation by checking the existence of all error files
 
-            do i = m, 1, -1
+            do i = NoFiles, 1, -1
 
                 ! Determine correct String      
                 call DetermineStrLen(istr, i)
@@ -232,7 +225,7 @@ module CFD
         
     end subroutine Sleep
     
-    recursive subroutine CheckforConvergence(Iter, InitConv, SolutionNumber, Nests_Move, Nests)
+    recursive subroutine CheckforConvergence(Iter, InitConv, NoFiles, Nests_Move, Nests)
     
         ! Variables
         implicit none
@@ -243,7 +236,7 @@ module CFD
         character(len=200) :: strCommand
         integer, dimension(:), allocatable :: DivNestPos
         double precision, dimension(:), allocatable :: MidPoints
-        integer, optional :: SolutionNumber      
+        integer, optional :: NoFiles      
         double precision, dimension(IV%NoNests,DoF), optional :: Nests_Move
         double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
         
@@ -275,7 +268,7 @@ module CFD
             
             end do          
         else           
-            do i = SolutionNumber, (SolutionNumber - IV%NoNests), -1
+            do i = NoFiles, (NoFiles - IV%NoNests), -1
             
                 call FileCheckConvergence(Converge, i)  
             
@@ -321,7 +314,7 @@ module CFD
             if (InitConv == 0) then
                 call Sleep(IV%NoSnap)
             else
-                call Sleep(SolutionNumber)
+                call Sleep(NoFiles)
             end if
             
             Iter = Iter + 1

@@ -29,6 +29,12 @@ module CreateSnapshots
         ones = (/ (1, i=1,IV%NoCP) /)
         
         ! Initialize min/max Displacement Matrix
+        if (IV%alpha /= 0) then
+            IV%xmax = 0
+            IV%ymax = IV%alpha
+            IV%zmax = 0
+        end if
+        
         ! NoDim automatically defines the size of the Matrix
         MxDisp(:,1) = (/IV%xmax*ones, IV%ymax*ones, IV%zmax*ones/)
         MxDisp(:,2) = (/IV%xmax*(-1)*ones, IV%ymax*(-1)*ones, IV%zmax*(-1)*ones/)
@@ -45,8 +51,12 @@ module CreateSnapshots
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
         call LHS(Snapshots, IV%NoSnap, IV%NoCP)     
-        !Output: Snapshots - an initial Sampling via LHS
-        Snapshots(1,:) = (/ (0, i=1,(IV%NoCP*IV%NoDim)) /)
+        !Output: Snapshots - an initial Sampling via LHS      
+        if (IV%alpha == 0) then
+            Snapshots(1,:) = (/ (0, i=1,(IV%NoCP*IV%NoDim)) /)
+        else
+            Snapshots(:,3) = (/ (0, i=1,IV%NoSnap) /)
+        end if
 
     end subroutine SubCreateSnapshots
     

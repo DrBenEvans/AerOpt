@@ -9,6 +9,8 @@ module InputData
         real :: zmax                    ! Maximum lateral displacement of Control Nodes
         real :: gamma                   ! Ratio of specific heats
         real :: R                       ! specific gas constant
+        real :: Re                      ! Reynoldsnumber
+        real :: AlphaInflowDirection    ! Angle/Direction of Flow within the Solver(0: Left to Right, 180: Right to Left)
         real :: Tamb					! ambient Temperature [K]
         real :: Pamb    				! ambient Pressure [Pa]
         real :: engFMF                  ! Solver variable - engines Front Mass Flow
@@ -20,11 +22,13 @@ module InputData
         integer :: NoG                  ! Number of Generations
         integer :: NoPOMod              ! No of POD Modes considered
         integer :: NoLeviSteps          ! Number of Levy walks per movement
-        integer :: NoIter               ! Batch File variable - Number of Iterations    
+        integer :: NoIter               ! Batch File variable - Number of Iterations
+        integer :: turbulencemodel      ! Turbulence Model applied in Solver
         logical :: constrain            ! Constrain: Include boundaries of design space for Levy Walk - 1:Yes 0:no
         logical :: AdaptSamp            ! Adaptive Sampling - T: Active
         integer :: delay                ! Delay per check in seconds
         integer :: waitMax              ! maximum waiting time in hours
+        integer :: NoDelBP              ! Number of Points placed on boundars for Delaunay Triangulation
         real :: Aconst                  ! Levy Flight parameter (determined emperically)   
         character(len=20) :: filename    ! I/O file of initial Meshes for FLITE solver
         character :: runOnCluster       ! Run On Cluster or Run on Engine?
@@ -32,20 +36,21 @@ module InputData
         character(len=20) :: UserName    ! Putty Username - Cluster: egnaumann
         character(len=20) :: Password    ! Putty Password
         character(len=3) :: version
-        character(len=4) :: MeshGeneration
+        integer :: MeshMovement
+        integer :: ObjectiveFunction
         logical :: Meshtest
         logical :: Pol                  ! POD using Polynomial
-        logical :: sort                 ! POD sorting the Snapshots
-        logical :: OldvsNew
         logical :: multiquadric         ! RBF type for POD
         logical :: POD
+        logical :: samemovement
+        real :: alpha
     
     end type InputVariablesData
     
     type(InputVariablesData) :: IV
     integer :: allocatestatus                                   ! Check Allocation Status for Large Arrays
-    character(len=10) :: InFolder = 'Input_Data'                ! Input Folder Name
-    character(len=11) :: OutFolder = 'Output_Data'              ! Output Folder Name
+    character(len=10) :: InFolder = 'Input_Data2'                ! Input Folder Name
+    character(len=11) :: OutFolder = 'Output_Data2'              ! Output Folder Name
     integer :: IntSystem                                        ! Length of System command string; used for character variable allocation
     integer :: maxDoF                                           ! maximum Degrees of Freedom available
     integer :: DoF                                              ! actual Degrees of Freedom in the System
@@ -78,10 +83,13 @@ contains
         IV%Pamb = 101325				! ambient Pressure [Pa]
         IV%R = 287                  	! specific gas constant
         IV%gamma = 1.4                  ! Ratio of specific heats
+        IV%Re = 0.0						! Reynoldsnumber
         IV%xmax = 0.00			        ! Maximum horizontal displacement of Control Nodes    
         IV%ymax = 0.02			        ! Maximum vertical displacement of Control Nodes    
         IV%zmax = 0.00			        ! Maximum lateral displacement of Control Nodes    
         IV%engFMF = 1.0			        ! engines Front Mass Flow(Solver variable)
+        IV%AlphaInflowDirection = 0.0   ! Angle/Direction of Flow within the Solver(0: Left to Right, 180: Right to Left)
+        IV%turbulencemodel = 0          ! Turbulence Model applied in Solver
         IV%Top2Low = 0.75		        ! Fraction of Top to Low Cuckoo Nests
         IV%NoSnap = 1000                ! Number of initial Snapshots
         IV%NoCP = 7			            ! Number of Control Points 
@@ -100,18 +108,20 @@ contains
         IV%UserName = 'egnaumann'       ! Putty Username - Cluster: egnaumann
         IV%Password = 'Fleur666'        ! Putty Password
         IV%version = '1.8'
+        IV%NoDelBP = 8                  ! Number of Delaunay Boundary Points
+        IV%samemovement = .false.
+        IV%alpha = 0                    ! For Aerofoil Angle of Attack Test
+        IV%ObjectiveFunction = 1        ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion
         
         ! TESTING
         IV%Pol = .true.                 ! Application of Polynomial?
-        IV%sort = .false.               ! Test sort algorithm to old algorithm
-        IV%OldvsNew = .false.           ! Test old vs new POD algorithm
         IV%multiquadric = .true.        ! using multiquadratic RBF function for POD
         
         IV%AdaptSamp = .FALSE.          ! Adaptive Sampling - T: Active
         IV%POD = .true.                 ! Activation of POD - TRUE is ACTIVE
         
         ! For Mesh Deformation
-        IV%MeshGeneration = 'RBF'
+        IV%MeshMovement = 1
         IV%Meshtest = .true.
         
         open(1,file = InFolder//'/AerOpt_InputParameters.txt',form='formatted',status='old')
@@ -134,7 +144,7 @@ contains
         
         ! Number of Nests per Generation 
         IV%NoNests = 10*DoF     
-        if (IV%NoNests > IV%NoSnap) then
+        if (IV%NoNests > IV%NoSnap .or. IV%POD == .false.) then
             IV%NoNests = IV%NoSnap
         end if
         

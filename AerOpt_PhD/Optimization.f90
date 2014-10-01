@@ -6,6 +6,8 @@ module Optimization
     use ReadData
     use GenerateMesh
     use CFD
+    use FDGD
+    
     double precision, dimension(:,:), allocatable :: modes, coeff       ! Modes and Coefficient derived by the POD method
     double precision, dimension(:), allocatable :: engInNodes           ! Engine inlet Nodes
     double precision, dimension(:,:), allocatable :: pressure           ! Pressure of All initial Snapshots
@@ -14,7 +16,6 @@ module Optimization
     double precision, dimension(:), allocatable :: PolCoeff             ! Polynomial Coefficients for POD RBF interpolation
     double precision, dimension(:,:), allocatable :: Weights            ! Weights for POD RBF interpolation
     double precision, dimension(:,:), allocatable :: Nests_Move, Nests              ! Nest regenerated with each generation
-    integer :: SolutionNumber                                           ! Current Number of High Fidelity solutions
     logical :: InitConv                                                 ! Initial Convergence Check - TRUE: yes
         
 contains
@@ -23,12 +24,12 @@ contains
     
         ! Variables
         implicit none
-        double precision :: Ac, Ftemp, Fopt
+        double precision :: Ac, Ftemp, Fopt, temp
         integer :: i,j, k, l, ii, iii, NoSteps, NoTop, NoDiscard, randomNest, NoConv, NoTest
         double precision, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
         double precision, dimension(:,:), allocatable :: Snapshots_Move, tempSnapshots, newSnapshots, NestsTest, TopNest, TopNest_Move, tempNestA
         integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial, ConvA
-        logical :: Converge
+        logical :: Converge, initPOD
         character(len=5) :: strNoSnap
 
         allocate(NormFact(DoF),stat=allocateStatus)
@@ -55,14 +56,7 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ConvA(2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-               
-        if (IV%POD == .false.) then
-            ! Specific Parameters required for Full Fidelity application
-            allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-            allocate(TopNest_Move(NoTop,DoF),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
-        end if
+        
         
         ! Body of SubOptimization
         print *, ''
@@ -75,12 +69,21 @@ contains
         print *, '*************************************'
         print *, ''
         
+        ! Initializing general parameters
         NoDiscard = nint(IV%Top2Low*IV%NoNests)
         NoTop = IV%NoNests - NoDiscard
         IV%Aconst = (sqrt(real(DoF))/IV%NoLeviSteps)*IV%Aconst
         tempNests = (/ (0, i=1,(maxDoF)) /)
         alpha = 1.0
         beta = 0.0
+        
+        ! Specific Parameters required for Full Fidelity application
+        if (IV%POD == .false.) then
+            allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+            allocate(TopNest_Move(NoTop,DoF),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
+        end if
         
         ! Extract moving initial Nests
         j = 1
@@ -104,7 +107,7 @@ contains
             ! Output: allocated modes and coeff based on the Number of POD Modes desired. If < 0, all Modes are considered.
             call POD()
             ! Output: Modes and Coefficients of POD  
-            call ComputeRBFWeights(DoF)
+            call ComputeRBFWeights()
             ! Output: Weights for RBF interpolation
         else
             call ExtractPressure(1, IV%NoSnap)
@@ -114,7 +117,7 @@ contains
                
         call getengineInlet() ! Get boundary nodes, that define the Engine Inlet Plane
         ! Output: Engine Inlet Nodes(engInNodes)
-        
+         
         allocate(ind_Fi_initial(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ind_Fi(IV%NoNests),stat=allocateStatus)
@@ -123,15 +126,23 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fi_initial(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-          
-        ! Determine Distortion
-        do ii = 1, IV%NoSnap
-            call getDistortion(Ftemp, ii)
+         
+        ! Determine Objective Function
+        initPOD = .true.
+        if (IV%POD == .false.) then
+            initPOD = .false.
+        end if
+        IV%POD = .false.
+        do ii = 1, IV%NoSnap 
+            call getObjectiveFunction(Ftemp, Snapshots(ii,:), NoSnapshot=ii)
             Fi_initial(ii) = Ftemp
         end do
+        if (initPOD == .true.) then
+            IV%POD = .true.
+        end if
         deallocate(pressure)
         ! Output: Distortion of all Snapshots as the Fitness (Fi)
-         
+      
         ! Pass on Top Snapshot parameters to Nests
         ind_Fi_initial = (/ (i, i=1,IV%NoSnap) /)
         call QSort(Fi_initial,size(Fi_initial), 'y', ind_Fi_initial) ! Result in Ascending order
@@ -146,13 +157,13 @@ contains
         write(istr, '(1f3.1)') IV%Ma
         open(29,file=newdir//'/Nests'//istr//'.txt', form='formatted',status='unknown')   
         write(29, *) 'Snapshots'
-        write(29,'(<IV%NoSnap>f13.10)') Snapshots
+        write(29,'(<IV%NoSnap>f17.10)') Snapshots
         close(29)
         open(19,file=newdir//'/Fitness'//istr//'.txt', form='formatted',status='unknown')
         write(19,*) 'Fitness'
         close(19)
         deallocate(istr)
-        
+       
         !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
         do iii = 1, (IV%NoG - 1)
             print *, ''
@@ -165,11 +176,15 @@ contains
             ! Re-order Fitness in ascending order
             ind_Fi = (/ (i, i=1,IV%NoNests) /)
             call QSort(Fi,size(Fi), 'y', ind_Fi)
-            !! Change to Descending Order in Case of Maximization Problem
-            !do j = 1, nint(IV%NoNests/2.0)
-            !    Fi(j) = Fi(IV%NoNests-j+1)
-            !    ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
-            !end do
+            ! Change to Descending Order for Maximization Problem
+            do j = 1, int(IV%NoNests/2.0)
+                temp = Fi(j)
+                Fi(j) = Fi(IV%NoNests-j+1)
+                Fi(IV%NoNests-j+1) = temp
+                temp = ind_Fi(j)
+                ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
+                ind_Fi(IV%NoNests-j+1) = temp
+            end do
             
             ! Error Test: If a Fitness is negative something is wrong!!!
             do ii = 1, IV%NoNests
@@ -187,16 +202,16 @@ contains
             write(istr, '(1f3.1)') IV%Ma
             print *, 'Current best solutions:' , Fi(1:6)
             open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
-            write(19,'(<IV%NoNests>f13.10)') Fi
+            write(19,'(<IV%NoNests>f17.10)') Fi
             close(19) 
                     
             ! Store moved Nests in Output Analysis File
             open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
             write(29, *) 'Generation', iii
-            write(29,'(<IV%NoNests>f13.10)') Nests
+            write(29,'(<IV%NoNests>f17.10)') Nests
             close(29)
             deallocate(istr)
-            
+          
             !!****** Adaptive Sampling - Start New Jobs (first and last Fitness) *******!!
             if (iii > 1 .and. iii < (IV%NoG - 1) .and. IV%AdaptSamp == .true.) then
                 
@@ -225,6 +240,11 @@ contains
                 NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
                 tempNests_Move = Ac*LevyWalk(NoSteps, DoF) + Nests_Move(ii,:)
                 
+!EXTRA term for specfic 2 CN case, first node being fixed
+                if (IV%alpha /= 0) then
+                    tempNests_Move(1) = 0.5
+                end if
+               
                 ! Check if out of bounds
                 if (IV%constrain == .true.) then                
                     do k = 1, DoF
@@ -236,7 +256,7 @@ contains
                         end if                   
                     end do
                 end if
-                    
+                 
                 ! Refill tempNests
                 l = 1
                 do k = 1, size(cond)            
@@ -245,33 +265,30 @@ contains
                         l = l + 1
                     end if
                 end do
-                     
+
                 if (IV%POD == .true.) then
-                    ! Update Values for POD (Fitness, Nest Locations)
-                    call ReEvaluateDistortion(DoF, tempNests, Fi(ii))
+                    ! calculate Objective Function via POD (Fitness, Nest Locations)
+                    call getObjectiveFunction(Fi(ii), tempNests)               
                     ! Output: ONE Fitnessvalue(Fi)
-                else
-                    !*** Generate Full Fidelity Solution of new Nest ***!
-                    SolutionNumber = IV%NoSnap + (iii - 1)*IV%NoNests + ii
-                    allocate(tempNestA(1,maxDoF),stat=allocateStatus)
-                    if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-                    tempNestA(1,:) = tempNests
-                    call SubCFD(SolutionNumber, SolutionNumber, tempNestA, 1)
-                    deallocate(tempNestA)
                 end if
-                
+               
                 ! Embed temporary Nest into Nests
                 Nests_Move(ii,:) = tempNests_Move
                 Nests(ii,:) = tempNests
                 
             end do
+
+            ! Full Fidelity Solutions passed on to Solver
+            if (IV%POD == .false.) then        
+                call SubCFD((iii*IV%NoNests + NoTop + 1), ((iii + 1)*IV%NoNests), Nests((NoTop + 1):IV%NoNests,:), NoDiscard)             
+            end if            
             
             !!*** Loop over Top Nests ***!!
             print *, ''
             print *, 'Modify Top Cuckoos for Generation', (iii+1)
             print *, ''
             do ii = 1, NoTop
-            
+           
                 ! Pick one of the Top Nests
                 call random_number(rn)
                 randomNest = nint((1 + (NoTop - 1)*rn))
@@ -286,14 +303,14 @@ contains
                     
                 else    ! Different Nest
                     
-                    if (Fi(ii) < Fi(randomNest)) then
+                    if (Fi(ii) > Fi(randomNest)) then
                         
                         ! Cross-bread Nests in Direction of Nest j by Golden Ratio
                         dist = Nests_Move(randomNest,:) - Nests_Move(ii,:)   ! Calculate Distance between Nests
                         dist = dist/(0.5*(1+sqrt(5.0)))                           ! Apply Golden Ratio
                         tempNests_Move = Nests_Move(ii,:) + dist              ! Move Less Fit Nest
                         
-                    elseif (Fi(randomNest) < Fi(ii)) then
+                    elseif (Fi(randomNest) > Fi(ii)) then
                         
                         ! Cross-bread in Direction of randomNest by Golden Ratio
                         dist = Nests_Move(ii,:) - Nests_Move(randomNest,:)   ! Calculate Distance between Nests
@@ -310,6 +327,11 @@ contains
                     end if
                    
                 end if
+                
+!EXTRA term for specfic 2 CN case, first node being fixed
+                if (IV%alpha /= 0) then
+                    tempNests_Move(1) = 0.5
+                end if
                     
                 ! Check if out of bounds
                 if (IV%constrain == .true.) then                
@@ -334,56 +356,55 @@ contains
                 end do
                     
                 if (IV%POD == .true.) then
-                    ! Update Values (Fitness, Nest Locations)
-                    call ReEvaluateDistortion(DoF, tempNests, Ftemp)
+                    ! Update Objective Function via POD (Fitness, Nest Locations)
+                    call getObjectiveFunction(Ftemp, tempNests)
                     ! Output: ONE Fitnessvalue(Fi)
                     
                     ! Check if new Fitness is better than a Random Top Nest, If yes replace values
                     call random_number(rn)
                     randomNest = nint((1 + (NoTop - 1)*rn))
-                    if (Ftemp < Fi(randomNest)) then
+                    if (Ftemp > Fi(randomNest)) then
                         Nests_Move(randomNest,:) = tempNests_Move
                         Nests(randomNest,:) = tempNests
                         Fi(randomNest) = Ftemp
                      end if
-                else
-                    !*** Generate Full Fidelity Solution of new Nest ***!
-                    SolutionNumber = IV%NoSnap + (iii - 1)*IV%NoNests + ii
-                    allocate(tempNestA(1,maxDoF),stat=allocateStatus)
-                    if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-                    tempNestA(1,:) = tempNests
-                    call SubCFD(SolutionNumber, SolutionNumber, tempNestA, 1)
-                    deallocate(tempNestA)
-                
+                else                    
+                    ! Store tempNests
                     TopNest(ii,:) = tempNests
-                    TopNest_move(ii,:) = tempNests_move
-                    
+                    TopNest_move(ii,:) = tempNests_move                    
                 end if
                 
             end do
             
-            if (IV%POD == .false.) then
-                
-                ! Check for High Fidelity Solutions
-                SolutionNumber = IV%NoSnap + iii*IV%NoNests
-                call PostSolverCheck(SolutionNumber, 1, SolutionNumber, Nests_Move, Nests)
-                
-                ! Evaluate Fitness of High Fidelity Nest Solutions
+            ! Store moved Nests in Output Analysis File
+            open(29,file=newdir//'/TopNest.txt',form='formatted',status='unknown',position='append')
+            write(29, *) 'Generation', iii
+            write(29,'(<NoTop>f17.10)') TopNest
+            close(29)
+            
+            if (IV%POD == .false.) then                
+                !Generate Full Fidelity Solution of new TopNest      
+                call SubCFD((iii*IV%NoNests + 1), (iii*IV%NoNests + NoTop), TopNest, NoTop)
+                ! Check ALL new Nests
+                call PostSolverCheck(((iii + 1)*IV%NoNests), 1, Nests_Move, Nests)   
+
+                ! Evaluate Fitness of Full Fidelity Nest Solutions
                 print *, 'Extract Pressure of Generation', iii
-                call ExtractPressure((SolutionNumber - IV%NoNests + 1), SolutionNumber)         
-                do ii = 1, NoTop            
-                    call getDistortion(Ftemp, ii)
+                call ExtractPressure((iii*IV%NoNests + 1), ((iii + 1)*IV%NoNests))         
+                do ii = 1, NoTop 
+                    call getObjectiveFunction(Ftemp, NoSnapshot=(iii*IV%NoNests + ii))              
+                    
                     ! Check if new Fitness is better than a Random Top Nest, If yes replace values
                     call random_number(rn)
                     randomNest = nint((1 + (NoTop - 1)*rn))
-                    if (Ftemp < Fi(randomNest)) then
+                    if (Ftemp > Fi(randomNest)) then
                         Nests_Move(randomNest,:) = TopNest_Move(ii,:)
                         Nests(randomNest,:) = TopNest(ii,:)
                         Fi(randomNest) = Ftemp
                     end if
                 end do
                 do ii = (NoTop + 1), IV%NoNests
-                    call getDistortion(Fi(ii), ii)
+                    call getObjectiveFunction(Fi(ii), NoSnapshot=(iii*IV%NoNests + ii))
                 end do
                 deallocate(pressure)
             end if
@@ -440,8 +461,8 @@ contains
                 IV%NoSnap = IV%NoSnap - NoConv
                 
                 if (ConvA(1) == 1) then ! If converged check fitness
-                    call getDistortion(Ftemp, (IV%NoSnap + 1))
-                    write(19,'(1I3, 1f13.10)',advance="no") 0, Ftemp
+                    call getObjectiveFunction(Ftemp, NoSnapshot=(IV%NoSnap + 1))
+                    write(19,'(1I3, 1f17.10)',advance="no") 0, Ftemp
                     print *, 'Real Fitness best: ', Ftemp
                     do k = 1, NoTop
                         if (Fcompare(1) == Fi(k)) then  ! Replace POD fitness with real fitness if still the same value                       
@@ -454,8 +475,8 @@ contains
                 end if
                 
                 if (ConvA(2) == 1) then ! If converged check fitness
-                    call getDistortion(Ftemp, (IV%NoSnap + 2))
-                    write(19,'(1I3, 1f13.10)',advance="no") 1, Ftemp
+                    call getObjectiveFunction(Ftemp, NoSnapshot=(IV%NoSnap + 2))
+                    write(19,'(1I3, 1f17.10)',advance="no") 1, Ftemp
                     print *, 'Comparison POD/Real Fitness worst: ', Fcompare(2), '/', Ftemp 
                 end if
                 
@@ -479,12 +500,12 @@ contains
         ! Write Results in File
         call QSort(Fi,size(Fi, dim = 1), 'y', ind_Fi)
         Fopt = Fi(1)
-        write(19,'(<IV%NoNests>f13.10)') Fi
+        write(19,'(<IV%NoNests>f17.10)') Fi
         close(19)
         
         ! write final Nests in File
         write(29, *) 'Generation', (iii-1)
-        write(29,'(<IV%NoNests>f13.10)') Nests
+        write(29,'(<IV%NoNests>f17.10)') Nests
         close(29)
         
         NestOpt = Nests(ind_Fi(1),:)
@@ -538,18 +559,7 @@ contains
             ! Determine correct String number
             call DetermineStrLen(istr, i)
            
-            !if (IV%SystemType == 'W') then
-            !     call TransferSolutionOutput()
-            !     call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-            !     call system('move '//trim(IV%filename)//istr//'.resp '//OutFolder//trim(IV%filename)//istr//'.resp')
-            !end if
-            !
-            if (IV%SystemType == 'W') then
-                open(11, file=OutFolder//'/'//trim(IV%filename)//istr//'.resp', form='formatted',status='old')
-            else
-                open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp', form='formatted',status='old')
-            end if
-          
+            open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp', form='formatted',status='old')     
             read(11, *) Output  ! index, rho, Vx, Vy, Vz, e
             
             k = 0
@@ -563,12 +573,12 @@ contains
             end do
                 
             ! Calculate Pressure
-            pressure(:,(i - Start + 1)) = rho_amb*(IV%gamma - 1)*rho*(Vamb**2)*(e - 0.5*(Vx**2 + Vy**2))
+            pressure(:,(i - Start + 1)) = rho_amb*(IV%gamma - 1.0)*rho*(Vamb**2)*(e - 0.5*(Vx**2 + Vy**2))
+            ! Non-dimensional:  pressure(:,(i - Start + 1)) = (IV%gamma - 1.0)*rho*((e - 0.5*(Vx**2 + Vy**2)))
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) 
             
             close(11)
             deallocate(istr)
-            !print *,'Pressure Snapshot', i 
                 
         end do
         print *,'Pressure of .resp files extracted'
@@ -700,6 +710,7 @@ contains
         ! Apply Trapezoidal Rule to numerically integrate the Distortion
         Area_trap = h*(dPress(1:(NoEngIN-1)) + dPress(2:NoEngIN))/2.0
         Distortion = sum(Area_trap, dim = 1)/(Press_ave*L)
+        Distortion = Distortion*(-1) ! To adapt to maximization Problem
         ! Output: Distortion
   
     end subroutine getDistortion
@@ -716,7 +727,7 @@ contains
         
         allocate(nodesall(RD%nbf,2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getEngineInlet "
-        
+      
         ! Body of getengineInlet
         j = 0
         do i = 1, RD%nbf
@@ -734,10 +745,10 @@ contains
         call QSort(nodesvec, size(nodesvec), 'n')   
         call Unique(nodesvec, size(nodesvec), engInNodes)
         ! Output: unique vector engInNodes
-    
+   
     end subroutine getengineInlet
         
-subroutine SVD(A, M, N, U)
+    subroutine SVD(A, M, N, U)
 
         ! Parameters
         implicit none
@@ -827,12 +838,12 @@ subroutine SVD(A, M, N, U)
     
     end function LevyWalk
     
-    subroutine ReEvaluateDistortion(DoF, tempNests, Distortion)
+    subroutine ReEvaluateDistortion(tempNests, Distortion)
     ! Objective: Determine the Distortion of each Snapshot by using the Area Weighted Average Pressure and Trapezoidal Numerical Integration
         
         ! Variables
         implicit none
-        integer :: NoEngIN, DoF, k
+        integer :: NoEngIN, k
         double precision, dimension(:), allocatable :: PlaneX, PlaneY, dPress, h, Area_trap, Pmid_x, Pmid_y, Area, Press_mid
         double precision, dimension(maxDoF) :: tempNests
         double precision :: Distortion
@@ -885,31 +896,7 @@ subroutine SVD(A, M, N, U)
         Pmid_y(NoEngIN-1) = PlaneY(NoEngIN)
                 
         ! Area Weighted Average Pressure (calculated based on the Areas)
-        if (IV%OldvsNew == .true.) then
-            call PressInterp(DoF, newpressure, tempNests)
-            call InterpolateCoefficients(tempNests, newpressure, DoF)
-        else if (IV%sort == .true.) then
-            call PressInterp(DoF, newpressure, tempNests)
-            IV%sort = .false.
-            call PressInterp(DoF, newpressure, tempNests)
-            IV%sort = .true.
-        else if (IV%multiquadric == .true.) then
-            deallocate(PolCoeff)
-            deallocate(Weights)
-            call ComputeRBFWeights(DoF)
-            call InterpolateCoefficients(tempNests, newpressure, DoF)
-            IV%multiquadric = .false.
-            deallocate(PolCoeff)
-            deallocate(Weights)
-            call ComputeRBFWeights(DoF)
-            call InterpolateCoefficients(tempNests, newpressure, DoF)
-            IV%multiquadric = .true.
-        else if (IV%pol == .true.) then
-            call InterpolateCoefficients(tempNests, newpressure, DoF)
-            IV%pol = .false.
-            call InterpolateCoefficients(tempNests, newpressure, DoF)
-            IV%pol = .true.
-        end if
+        call InterpolateCoefficients(tempNests, newpressure)
         Press_mid = newpressure(engInNodes(2:(NoEngIN-1))) ! Extract Pressure of middle engine Inlet Nodes
         Press_ave = sum(Press_mid*Area, dim = 1)/sum(Area, dim = 1)
             
@@ -928,12 +915,13 @@ subroutine SVD(A, M, N, U)
         ! Apply Trapezoidal Rule to numerically integrate the Distortion
         Area_trap = h*(dPress(1:(NoEngIN-1)) + dPress(2:NoEngIN))/2.0
         Distortion = sum(Area_trap, dim = 1)/(Press_ave*L)
+        Distortion = Distortion*(-1) ! To adapt to maximization Problem
         ! Output: Distortion
 
   
     end subroutine ReEvaluateDistortion
     
-    subroutine ComputeRBFWeights(DoF)
+    subroutine ComputeRBFWeights()
     ! Objective: Compute Weights for the RBF interpolation scheme applied later in the POD reconstruction
     
         ! Variables
@@ -941,7 +929,7 @@ subroutine SVD(A, M, N, U)
         double precision, dimension(:,:),allocatable :: RBFMatrix, A, b, coeff_temp
         double precision, dimension(:), allocatable :: PolBasis, x, NormFact
         double precision :: z, ShapeParameter
-        integer :: l, m, LWMAX, LWORK, Info, DoF
+        integer :: l, m, LWMAX, LWORK, Info
         parameter        ( LWMAX = 10000)
         double precision, dimension(:), allocatable ::  WORK, Ipiv
     
@@ -1050,12 +1038,12 @@ subroutine SVD(A, M, N, U)
         
         end do
         
-        open(23,file=newdir//'/Weights.txt')
-        write(23,'(10f55.10)') Weights(1:10,:)           
-        close(23)
-        open(23,file=newdir//'/Polynomial.txt')
-        write(23,'(1f25.10)') PolCoeff           
-        close(23)
+        !open(23,file=newdir//'/Weights.txt')
+        !write(23,'(10f55.10)') Weights(1:10,:)           
+        !close(23)
+        !open(23,file=newdir//'/Polynomial.txt')
+        !write(23,'(1f25.10)') PolCoeff           
+        !close(23)
         
         ! Denormalize Snapshots
         !do i = 1, DoF        
@@ -1084,7 +1072,7 @@ subroutine SVD(A, M, N, U)
     
     end function Multiquadratic
     
-    subroutine InterpolateCoefficients(newNest, newpressure, DoF)
+    subroutine InterpolateCoefficients(newNest, newpressure)
     
         ! Variables
         implicit none
@@ -1093,7 +1081,7 @@ subroutine SVD(A, M, N, U)
         double precision, dimension (:), allocatable :: RBFVector, NormFact
         double precision, dimension(:,:), allocatable :: newCoeff
         double precision :: x, RBFterm, ShapeParameter
-        integer :: l, m, DoF
+        integer :: l, m
     
         allocate(RBFVector(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in InterpolateCoefficients "
@@ -1131,16 +1119,10 @@ subroutine SVD(A, M, N, U)
         
         ! Matmul: var1 = modes*newCoeff   newpressure = matmul(modes,newCoeff(:,1))
         CALL DGEMM('N','N',size( modes, dim = 1), size( newCoeff, dim = 2), size( modes, dim = 2),alpha,modes,size( modes, dim = 1),newCoeff,size( newCoeff, dim = 1),beta,newpressure,size( newpressure, dim = 1))
-        
-        if (IV%multiquadric == .false.) then
-            open(23,file=newdir//'/NewPressure.txt')
-            write(23,'(1f25.10)') newpressure           
-            close(23)
-        else
-            open(23,file=newdir//'/NewPressureMQ.txt')
-            write(23,'(1f25.10)') newpressure           
-            close(23)
-        end if
+       
+        open(23,file=newdir//'/NewPressure.txt')
+        write(23,'(1f25.10)') newpressure           
+        close(23)
         
         ! Denormalize Snapshots
         !do i = 1, DoF        
@@ -1197,16 +1179,13 @@ subroutine SVD(A, M, N, U)
         ! Sort InitNests Matrix
         InitNests = Snapshots
         coeff_temp = coeff
-        
-        if (IV%sort == .true.) then
-            ind_IN = (/ (i, i=1,IV%NoSnap) /)      
-            Init_Nests_temp = InitNests(:, (1+maxDoF-DoF)) ! only for QSort
-            call QSort(Init_Nests_temp, size(InitNests, dim = 1), 'y', ind_IN) ! Index only required
-            deallocate(Init_Nests_temp)
+        ind_IN = (/ (i, i=1,IV%NoSnap) /)      
+        Init_Nests_temp = InitNests(:, (1+maxDoF-DoF)) ! only for QSort
+        call QSort(Init_Nests_temp, size(InitNests, dim = 1), 'y', ind_IN) ! Index only required
+        deallocate(Init_Nests_temp)
             
-            InitNests = InitNests(ind_IN,:)
-            coeff_temp = coeff_temp(:,ind_IN)
-        end if
+        InitNests = InitNests(ind_IN,:)
+        coeff_temp = coeff_temp(:,ind_IN)
         coeff_temp = transpose(coeff_temp) 
         
         ! Compute Shape Parameter
@@ -1252,16 +1231,10 @@ subroutine SVD(A, M, N, U)
         end do        
         ! Matmul: var1 = modes*newCoeff   newpressure = matmul(modes,newCoeff(:,1))
         CALL DGEMM('N','N',size( modes, dim = 1), size( newCoeff, dim = 2), size( modes, dim = 2),alpha,modes,size( modes, dim = 1),newCoeff,size( newCoeff, dim = 1),beta,newpressure,size( newpressure, dim = 1))
-        
-        if (IV%sort == .true.) then
-            open(23,file=newdir//'/NewPressureOldsort.txt')
-            write(23,'(1f25.10)') newpressure           
-            close(23)
-        else            
-            open(23,file=newdir//'/NewPressureOld.txt')
-            write(23,'(1f25.10)') newpressure           
-            close(23)
-        end if
+                
+        open(23,file=newdir//'/NewPressureOld.txt')
+        write(23,'(1f25.10)') newpressure           
+        close(23)
         
     end subroutine PressInterp
     
@@ -1285,4 +1258,150 @@ subroutine SVD(A, M, N, U)
     
     end subroutine AllocateModesCoeff
     
+    subroutine getObjectiveFunction(Fi, tempNests, NoSnapshot)
+    
+        ! Variables
+        implicit none
+        double precision, dimension(maxDoF), optional :: tempNests
+        integer, optional :: NoSnapshot
+        double precision :: Fi
+    
+        ! Body of getObjectiveFunction
+        if (IV%POD == .true.) then
+            if (IV%ObjectiveFunction == 2) then
+                call ReEvaluateDistortion(tempNests, Fi)
+            elseif (IV%ObjectiveFunction == 1) then
+                allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
+                if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
+                RD%coord_temp = RD%coord 
+                call SubMovemesh(tempNests)
+                call getLiftandDrag(tempNests, Fi)
+                deallocate(RD%coord_temp)              
+            end if
+        else
+            if (IV%ObjectiveFunction == 2) then
+                call getDistortion(Fi, NoSnapshot)
+            elseif (IV%ObjectiveFunction == 1) then
+                call getLiftandDrag2(Fi, NoSnapshot)
+!print *, 'F real', Fi
+!allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
+!if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
+!RD%coord_temp = RD%coord 
+!call SubMovemesh(tempNests)
+!call getLiftandDrag(tempNests, Fi)
+!deallocate(RD%coord_temp)
+!print *, 'F calc', Fi
+!pause
+            end if
+        end if
+    
+    end subroutine getObjectiveFunction
+    
+    subroutine getLiftandDrag(tempNests, Fi)
+    
+        ! Variables
+        implicit none
+        double precision :: Lift, Drag, Fi, p, dx, norm, ralpha
+        double precision, dimension(2) :: n, m, k, tangent, vec1, vec2
+        integer :: intexit, i, j, NoIB
+        double precision, dimension(:,:), allocatable :: tangentArray
+        double precision, dimension(:), allocatable :: lengthArray
+        double precision, dimension(:), allocatable :: newpressure
+        double precision, dimension(maxDoF) :: tempNests
+        double precision, parameter :: pi = 3.14159265359
+  
+        ! Body of getLiftandDrag
+        NoIB = size(Innerbound)
+        allocate(newpressure(RD%np),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        allocate(tangentArray(NoIB, IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        allocate(lengthArray(NoIB),stat=allocateStatus)
+        
+        ! Calculate Tangents and face lengths for each boundary point
+        tangentArray = 0.0
+        lengthArray = 0.0
+        do i = 1, RD%nbf
+            vec1 = RD%coord_temp(RD%boundf(i,1),:)
+            vec2 = RD%coord_temp(RD%boundf(i,2),:)
+            tangent = vec2 - vec1
+            dx = DistP2P(IV%NoDim, vec1(1), vec2(1), vec1(2), vec2(2))
+            intexit = 0
+            do j = 1, NoIB
+                if (RD%boundf(i,1) == Innerbound(j)) then
+                    tangentArray(j,:) = tangentArray(j,:) + tangent
+                    lengthArray(j) = lengthArray(j) + dx
+                    intexit = intexit + 1
+                    if (intexit == 2) then
+                        EXIT
+                    end if
+                end if
+                if (RD%boundf(i,2) == Innerbound(j)) then
+                    tangentArray(j,:) = tangentArray(j,:) + tangent
+                    lengthArray(j) = lengthArray(j) + dx
+                    intexit = intexit + 1
+                    if (intexit == 2) then
+                        EXIT
+                    end if
+                end if
+            end do
+        end do
+        lengthArray = lengthArray*0.5
+
+        ! normalize tangents
+        do i = 1, NoIB
+            norm = sqrt(sum(tangentArray(i,:)**2))
+            tangentArray(i,:) = tangentArray(i,:)/norm
+        end do
+
+        ! calculate Lift and Drag
+        call InterpolateCoefficients(tempNests, newpressure)
+        ralpha = IV%AlphaInflowDirection*Pi/180
+        m = (/cos(ralpha), sin(ralpha)/)  ! tangent to flow direction
+        k = (/- m(2), m(1)/)                                                ! normal of flow direction 
+        do i = 2, NoIB
+            
+            ! pressure portion
+            n = (/ -tangentArray(i,2), tangentArray(i,1)/)                 ! normal to tangent, pointing into the geometry
+            p = newpressure(Innerbound(i))
+            dx = lengthArray(i)
+
+            Lift = Lift - 2.0*p*sum(n*k)*dx
+            Drag = Drag - 2.0*p*sum(n*m)*dx
+
+            ! skin friction(viscosity/boundary layer) portion
+            ! later
+            
+        end do
+        Fi = Lift/Drag
+        
+    end subroutine getLiftandDrag
+    
+    subroutine getLiftandDrag2(Fi, NoSnapshot)
+    
+        ! Variables
+        implicit none
+        integer :: FileSize, LastLine, NoSnapshot, j
+        double precision, dimension(8) :: Input      
+        double precision :: Lift, Drag, Fi
+       
+        ! Body of getLiftandDrag
+        call DetermineStrLen(istr, NoSnapshot)
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        deallocate(istr)
+        inquire(11, size = FileSize)           
+        LastLine = FileSize/106
+            
+        ! Read until last line
+        do j = 1, (LastLine - 1)
+            read(11, *) Input
+        end do
+        read(11, *) Input
+        close(11)
+        Lift = Input(3)
+        Drag = Input(4)
+        Fi = Lift/Drag
+        
+    end subroutine getLiftandDrag2
+        
 end module Optimization

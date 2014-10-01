@@ -3,10 +3,27 @@
     use ReadData
     use InputData
     use CreateSnapshots
+    use FDGD
 
     contains
+    
+    subroutine SubMovemesh(CN_CoordinatesVector)
+    
+        ! Variables
+        implicit none
+        integer :: size
+        double precision, dimension(maxDoF) :: CN_CoordinatesVector
 
-    subroutine SubGenerateMesh(NestDisp)
+        ! Body of SubMovemesh
+        if (IV%MeshMovement == 1) then
+            call SubFDGD(CN_CoordinatesVector)
+        else if (IV%MeshMovement == 2) then
+            call SubRBF(CN_CoordinatesVector)
+        end if
+    
+    end subroutine SubMovemesh
+
+    subroutine SubRBF(NestDisp)
 
     ! Variables
     implicit none
@@ -16,15 +33,15 @@
     integer, dimension(:,:), allocatable :: IB
     double precision :: c, w, dis, x1, y1, x2, y2, x3, y3, xp, yp
 
-    ! Body of GenerateInitialMeshes
+    ! Body of RBF
     allocate(dCP2N(RD%nbf),stat=allocateStatus)
-    if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+    if(allocateStatus/=0) STOP "ERROR: Not enough memory in RBF "
     allocate(IB(RD%nbf, IV%NoCP),stat=allocateStatus)
-    if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+    if(allocateStatus/=0) STOP "ERROR: Not enough memory in RBF "
     allocate(CP_ind(IV%NoCP),stat=allocateStatus)
-    if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+    if(allocateStatus/=0) STOP "ERROR: Not enough memory in RBF "
     allocate(size_ib(IV%NoCP),stat=allocateStatus)
-    if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+    if(allocateStatus/=0) STOP "ERROR: Not enough memory in RBF "
 
     ! Find Real Control Nodes based on Coordinates - !! on long terms redundant only required to run once           
     ! Also Identify boundary nodes within the influence box of each Control Point
@@ -81,6 +98,6 @@
         RD%coord_temp((i+RD%nbf),:) = (/xp, yp/)
     end do
 
-    end subroutine SubGenerateMesh
+    end subroutine SubRBF
 
 end module GenerateMesh

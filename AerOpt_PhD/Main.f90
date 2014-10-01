@@ -75,40 +75,48 @@ program AerOpt
             
     end if
 
-
     ! **** Create Initial Nests for the Snapshots****** ! 
     print *, 'Start LHS Sampling - Create Initial Nests'
     call SubCreateSnapshots()    
     ! Output: Initial Nests - Sampling Points for Snapshots
     
+! Same movement    
+    if (IV%samemovement == .true.) then
+        Snapshots(:,1) = IV%xmax
+        Snapshots(:,2) = IV%xmax
+        Snapshots(:,3) = IV%ymax
+        Snapshots(:,4) = IV%ymax
+    end if
+
     allocate(character(len=3) :: istr)
     write(istr, '(1f3.1)') IV%Ma
-    open(29, file=newdir//'/Snapshots'//istr//'.txt', form='formatted',status='new')
+    open(29, file=newdir//'/Snapshots'//istr//'.txt', form='formatted',status='unknown')
     deallocate(istr)
-    write(29, *) 'Snapshots'
-    write(29,'(<IV%NoSnap>f13.10)') Snapshots
+    write(29, *) 'Snapshots'   
+    write(29,'(<IV%NoSnap>f17.10)') Snapshots
     close(29)
-    
+
 !!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
 
-    ! **** Generate Full Fidelity Solutions of Snapshots**** !
-    print *, 'Start PreMeshing'
-    call PreMeshing()
-    print *, 'End PreMeshing - All Area Coefficients calculated'
+    ! ****Generate Full Fidelity Solutions of Snapshots**** !
+    if (IV%MeshMovement == 1) then
+        print *, 'Start PreMeshing'
+        call PreMeshing()
+        print *, 'End PreMeshing - All Area Coefficients calculated'
+    end if
     print *, ''
     call SubCFD(1, IV%NoSnap, Snapshots, IV%NoSnap)
     call PostSolverCheck(IV%NoSnap, 0)
-    
+   
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
     call SubOptimization()
     ! Output: Optimized mesh via Modified Cuckoo Search and POD
-    
     
     ! ****Generate Optimum Mesh and Safe in file**** !
     allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
     if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main " 
     RD%coord_temp = RD%coord
-    call SubGenerateMesh(NestOpt)
+    call SubMovemesh(NestOpt)
     ! Output: Optimum Coordinates - 1 Mesh with moved boundaries based on optimum Control Point Coordinates
     
     ! Safe Optimum Geometry in Text File
