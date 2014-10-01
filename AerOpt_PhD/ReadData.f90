@@ -114,11 +114,11 @@ contains
         end do
         write(99,*) 'Coordinates'
         do j = 1, RD%np
-            write(99,*) j, RD%coord_temp(j,:)*15.0
+            write(99,*) j, RD%coord_temp(j,:) !*15.0
         end do
         write(99,*) 'Boundary Faces'
         do j = 1, RD%nbf
-            write(99,*) RD%boundf(j,:)
+            write(99,*) RD%boundf(j,1:3)
         end do
 10      format(2f12.7)        
         close(99)
@@ -152,6 +152,10 @@ contains
         character(len=:), allocatable :: fname
         character(len=7) :: strEFMF, strMa      ! String for Ma number & Engine Inlet Front Mass Flow Number
         character(len=2) :: strNI               ! String for Number of Iterations
+        character(len=12) :: strRe              ! String for Reynoldsnumber
+        character(len=5) :: strAlpha            ! String for Solver inflow direction
+        character(len=5) :: strGamma            ! String for Gamma Ratio
+        character(len=1) :: strturbulencemodel  ! String for Turbulence model
         character(len=255) :: Output
         integer :: fileLength
     
@@ -162,33 +166,38 @@ contains
         write( strEFMF, '(F7.3)' )  IV%engFMF
         write( strMa, '(F7.3)' )  IV%Ma
         write( strNI, '(I2)' )  IV%NoIter
+        write( strRe, '(F12.2)' )  IV%Re
+        write( strAlpha, '(F5.2)' )  IV%AlphaInflowDirection
+        write( strGamma, '(F5.2)' )  IV%gamma
+        write( strturbulencemodel, '(I1)' )  IV%turbulencemodel
+        
         
         ! Create Input File for Solver
         open(5, file=fname, form='formatted',status='unknown')
         write(5,*) '&inputVariables'
         write(5,*) 'ivd%numberOfMGIterations = ' ,strNI , ','
         write(5,*) 'ivd%numberOfGridsToUse = 1,'
-        write(5,*) 'ivd%viscosityScheme = 1,'
-        write(5,*) 'ivd%boundaryTerm = 1,'
+        write(5,*) 'ivd%viscosityScheme = 1,'       ! how to turn viscosity off?
+        write(5,*) 'ivd%boundaryTerm = 1,'          ! ??
         write(5,*) 'ivd%CFLNumber = 1.0,'
         write(5,*) 'ivd%turbulenceCFLFactor = 1.0,'
-        write(5,*) 'ivd%alpha = 180,'
-        write(5,*) 'ivd%MachNumber = ' ,strMa, ','
+        write(5,*) 'ivd%alpha = ' ,trim(strAlpha), ','
+        write(5,*) 'ivd%MachNumber = ' ,trim(strMa), ','
         write(5,*) 'ivd%numberOfRelaxationSteps = 1, '
-        write(5,*) 'ivd%ReynoldsNumber = 6500000.0,'
-        write(5,*) 'ivd%gamma = 1.4,'
-        write(5,*) 'ivd%turbulenceModel = 1,'
+        write(5,*) 'ivd%ReynoldsNumber = ', trim(strRe), ','
+        write(5,*) 'ivd%gamma = ', trim(strGamma), ','
+        write(5,*) 'ivd%turbulenceModel = ', trim(strturbulencemodel), ','
         write(5,*) 'ivd%multigridScheme = 3,'
         write(5,*) 'ivd%tripFactor = 1.0,'
         write(5,*) 'ivd%dissipationScheme = 2,'
         write(5,*) 'ivd%coarseGriddissipationScheme = 2,'
-        write(5,*) 'ivd%secondOrderDissipationFactor = 0.3,'
+        write(5,*) 'ivd%secondOrderDissipationFactor = 0.2,'
         write(5,*) 'ivd%fourthOrderDissipationFactor = 0.2,'
         write(5,*) 'ivd%coarseGridDissipationFactor = 0.5,'
         write(5,*) 'ivd%turbulenceSmoothingFactor = 0.0,'
         write(5,*) 'ivd%numberOfRSSteps = 0,'
-        write(5,*) 'ivd%tripNodes(1) = 203,'
-        write(5,*) 'ivd%tripNodes(2) = 252,'
+        write(5,*) 'ivd%tripNodes(1) = 203,'                ! ?? very specific?
+        write(5,*) 'ivd%tripNodes(2) = 252,'                ! ?? very specific?
         write(5,*) 'ivd%residualSmoothingFactor = 0.0,'
         write(5,*) 'ivd%numberOfPSSteps = 0,'
         write(5,*) 'ivd%prolongationSmoothingFactor = 0.0,'
@@ -199,8 +208,10 @@ contains
         write(5,*) 'ivd%normalComponentRelaxation = 1.0,'
         write(5,*) 'ivd%sizeOfSeparationField = 25,'
         write(5,*) 'ivd%numberOfTriperations = 0,'
-        write(5,*) 'ivd%enginesFrontMassFlow = ', strEFMF, ','
+        write(5,*) 'ivd%enginesFrontMassFlow = ', trim(strEFMF), ','
         write(5,*) 'ivd%maxitt = 50000,'
+        write(5,*) 'ivd%numberOfDissipationLayers = 0,'
+        write(5,*) 'ivd%HighOrder=.false.,'
         write(5,*) '/'
         close(5)
         
@@ -402,7 +413,7 @@ contains
         elseif (IV%SystemType == 'B') then
             write(1,*) 'cd ..'
             write(1,*) 'cd ..'
-            Output = 'mv /home/'//trim(IV%UserName)//'/AerOpt'//newdir//'/'//InFolder//'/check.txt check.txt'
+            Output = 'mv /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check.txt check.txt'
             write(1, '(A)') trim(Output)
         end if
         close(1)
