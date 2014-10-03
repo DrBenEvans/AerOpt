@@ -11,7 +11,7 @@ program AerOpt
     use FDGD
     
     implicit none
-    
+
     print *, ''
     print *, '**************************************************************************'
     print *, '**                                                                      **'
@@ -59,7 +59,6 @@ program AerOpt
     print *, 'Start Read Data'
     call SubReadData()
     ! Output: Boundf, Coord, Connecf, Coord_CP
-    
     
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     print *, 'Create Directories'

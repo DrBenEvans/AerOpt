@@ -59,7 +59,7 @@ module FDGD
         call CheckforIntersections()        
         deallocate(DelaunayCoord)
         deallocate(DelaunayElem)
-       
+      
         ! Move Mesh of Domain Nodes
         call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
         allocate(DelaunayElem(size(DelaunayElemDomain, dim = 1),size(DelaunayElemDomain, dim = 2)),stat=allocateStatus)
@@ -105,7 +105,7 @@ module FDGD
         call getAreaCoefficients(DomainIndex, size(DomainIndex), AreaCoeffDomain)
         deallocate(DelaunayCoord)
         deallocate(DelaunayElem)
-   
+  
     end subroutine PreMeshing
     
     

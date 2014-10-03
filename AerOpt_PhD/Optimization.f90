@@ -94,7 +94,7 @@ contains
             end if
         end do
                    
-        ! Normalize Snapshots between 0 and 1
+        ! Normalize Snapshots(move) between 0 and 1
         do i = 1, DoF        
             NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
             Snapshots_Move(:,i) = Snapshots_Move(:,i)/NormFact(i) + 0.5
@@ -114,9 +114,10 @@ contains
         end if             
         call timestamp()
              
-               
-        call getengineInlet() ! Get boundary nodes, that define the Engine Inlet Plane
-        ! Output: Engine Inlet Nodes(engInNodes)
+        if (IV%ObjectiveFunction == 2) then
+            call getengineInlet() ! Get boundary nodes, that define the Engine Inlet Plane
+            ! Output: Engine Inlet Nodes(engInNodes)
+        end if
          
         allocate(ind_Fi_initial(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
@@ -460,6 +461,7 @@ contains
                 call POD()
                 IV%NoSnap = IV%NoSnap - NoConv
                 
+                open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
                 if (ConvA(1) == 1) then ! If converged check fitness
                     call getObjectiveFunction(Ftemp, NoSnapshot=(IV%NoSnap + 1))
                     write(19,'(1I3, 1f17.10)',advance="no") 0, Ftemp
@@ -473,13 +475,13 @@ contains
                 else ! Not converged set fitness to worst fitness to exclude solution
                     Fi(1) = Fi(IV%NoNests)
                 end if
-                
+ 
                 if (ConvA(2) == 1) then ! If converged check fitness
                     call getObjectiveFunction(Ftemp, NoSnapshot=(IV%NoSnap + 2))
                     write(19,'(1I3, 1f17.10)',advance="no") 1, Ftemp
                     print *, 'Comparison POD/Real Fitness worst: ', Fcompare(2), '/', Ftemp 
                 end if
-                
+                close(19)
                 deallocate(pressure)
                                
                 
@@ -498,12 +500,23 @@ contains
         print *, 'Finished Cuckoo Search'   
         
         ! Write Results in File
+        open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
         call QSort(Fi,size(Fi, dim = 1), 'y', ind_Fi)
+        ! Change to Descending Order for Maximization Problem
+        do j = 1, int(IV%NoNests/2.0)
+            temp = Fi(j)
+            Fi(j) = Fi(IV%NoNests-j+1)
+            Fi(IV%NoNests-j+1) = temp
+            temp = ind_Fi(j)
+            ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
+            ind_Fi(IV%NoNests-j+1) = temp
+        end do
         Fopt = Fi(1)
         write(19,'(<IV%NoNests>f17.10)') Fi
         close(19)
         
         ! write final Nests in File
+        open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
         write(29, *) 'Generation', (iii-1)
         write(29,'(<IV%NoNests>f17.10)') Nests
         close(29)
@@ -519,8 +532,6 @@ contains
         print *, 'Optimum Geometry:'
         print *, ''
         print *, NestOpt
-        
-!!! Calculate Error??
         
     end subroutine SubOptimization
     
@@ -573,8 +584,8 @@ contains
             end do
                 
             ! Calculate Pressure
-            pressure(:,(i - Start + 1)) = rho_amb*(IV%gamma - 1.0)*rho*(Vamb**2)*(e - 0.5*(Vx**2 + Vy**2))
-            ! Non-dimensional:  pressure(:,(i - Start + 1)) = (IV%gamma - 1.0)*rho*((e - 0.5*(Vx**2 + Vy**2)))
+            !pressure(:,(i - Start + 1)) = rho_amb*(IV%gamma - 1.0)*rho*(Vamb**2)*(e - 0.5*(Vx**2 + Vy**2))
+            pressure(:,(i - Start + 1)) = (IV%gamma - 1.0)*rho*((e - 0.5*(Vx**2 + Vy**2))) ! Non-dimensional:  
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) 
             
             close(11)
@@ -607,7 +618,7 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         pressure2 = pressure
         call SVD(pressure2, size(pressure, Dim = 1), size(pressure, Dim = 2), modestemp)
-        deallocate(pressure2)
+        !deallocate(pressure2)
         print *, 'Finished SVD'
                 
         modes = modestemp
@@ -626,13 +637,13 @@ contains
         !open(23,file=newdir//'/Modes.txt')
         !write(23,'(10f13.10)') modes(:,1:10)           
         !close(23)
-        !pressure2(:,5) = matmul(modes,coeff(:,5))
-        !open(23,file=newdir//'/Pressure_Reconstruct.txt')
-        !write(23,'(1f25.10)') pressure2(:,5)           
-        !close(23)
-        !open(23,file=newdir//'/Pressure.txt')
-        !write(23,'(1f25.10)') pressure(:,5)           
-        !close(23)
+        pressure2(:,2) = matmul(modes,coeff(:,2))
+        open(23,file=newdir//'/Pressure_Reconstruct.txt')
+        write(23,'(1f25.10)') pressure2(:,2)           
+        close(23)
+        open(23,file=newdir//'/Pressure_Real.txt')
+        write(23,'(1f25.10)') pressure(:,2)           
+        close(23)
         
         print *, 'All Modes and Coefficients Calculated'
 
@@ -731,9 +742,7 @@ contains
         ! Body of getengineInlet
         j = 0
         do i = 1, RD%nbf
-            point(1) = (RD%coord(RD%boundf(i,1),1)*15 + RD%coord(RD%boundf(i,2),1)*15)/2.0
-            point(2) = (RD%coord(RD%boundf(i,1),2)*15 + RD%coord(RD%boundf(i,2),2)*15)/2.0
-            if (point(1) == 0 .and. point(2) < 1 .and. point(2) > 0) then
+            if (RD%boundf(i,3) == 8) then
                 j = j + 1
                 nodesall(j,:) = RD%boundf(i,1:2)           
             end if
@@ -838,7 +847,7 @@ contains
     
     end function LevyWalk
     
-    subroutine ReEvaluateDistortion(tempNests, Distortion)
+    subroutine getDistortionPOD(tempNests, Distortion)
     ! Objective: Determine the Distortion of each Snapshot by using the Area Weighted Average Pressure and Trapezoidal Numerical Integration
         
         ! Variables
@@ -851,27 +860,27 @@ contains
         double precision, dimension(:), allocatable :: newpressure
  
         allocate(newpressure(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(PlaneX(size(engInNodes)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(PlaneY(size(engInNodes)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(dPress(size(engInNodes)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(h(size(engInNodes)-1),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(Area_trap(size(engInNodes)-1),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(Pmid_x(size(engInNodes)-1),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(Pmid_y(size(engInNodes)-1),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(Press_mid(size(engInNodes)-2),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(Area(size(engInNodes)-2),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         
-        ! Body of getDistortion
+        ! Body of getDistortionPOD
         NoEngIN = size(engInNodes)
             
         ! Output: engInNodes
@@ -919,7 +928,7 @@ contains
         ! Output: Distortion
 
   
-    end subroutine ReEvaluateDistortion
+    end subroutine getDistortionPOD
     
     subroutine ComputeRBFWeights()
     ! Objective: Compute Weights for the RBF interpolation scheme applied later in the POD reconstruction
@@ -1269,35 +1278,39 @@ contains
         ! Body of getObjectiveFunction
         if (IV%POD == .true.) then
             if (IV%ObjectiveFunction == 2) then
-                call ReEvaluateDistortion(tempNests, Fi)
+                call getDistortionPOD(tempNests, Fi)
             elseif (IV%ObjectiveFunction == 1) then
                 allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
                 if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
                 RD%coord_temp = RD%coord 
                 call SubMovemesh(tempNests)
-                call getLiftandDrag(tempNests, Fi)
+                call getLiftandDragPOD(tempNests, Fi)
                 deallocate(RD%coord_temp)              
             end if
         else
             if (IV%ObjectiveFunction == 2) then
                 call getDistortion(Fi, NoSnapshot)
+                print *, 'F real', Fi
+                call getDistortionPOD(tempNests, Fi)
+                print *, 'F calc', Fi
+                pause
             elseif (IV%ObjectiveFunction == 1) then
-                call getLiftandDrag2(Fi, NoSnapshot)
-!print *, 'F real', Fi
-!allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
-!if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
-!RD%coord_temp = RD%coord 
-!call SubMovemesh(tempNests)
-!call getLiftandDrag(tempNests, Fi)
-!deallocate(RD%coord_temp)
-!print *, 'F calc', Fi
-!pause
+                call getLiftandDrag(Fi, NoSnapshot)
+                print *, 'F real', Fi
+                allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
+                if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
+                RD%coord_temp = RD%coord 
+                call SubMovemesh(tempNests)
+                call getLiftandDragPOD(tempNests, Fi)
+                deallocate(RD%coord_temp)
+                print *, 'F calc', Fi
+                pause
             end if
         end if
     
     end subroutine getObjectiveFunction
     
-    subroutine getLiftandDrag(tempNests, Fi)
+    subroutine getLiftandDragPOD(tempNests, Fi)
     
         ! Variables
         implicit none
@@ -1313,7 +1326,7 @@ contains
         ! Body of getLiftandDrag
         NoIB = size(Innerbound)
         allocate(newpressure(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReEvaluateDistortion "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
         allocate(tangentArray(NoIB, IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(lengthArray(NoIB),stat=allocateStatus)
@@ -1375,9 +1388,9 @@ contains
         end do
         Fi = Lift/Drag
         
-    end subroutine getLiftandDrag
+    end subroutine getLiftandDragPOD
     
-    subroutine getLiftandDrag2(Fi, NoSnapshot)
+    subroutine getLiftandDrag(Fi, NoSnapshot)
     
         ! Variables
         implicit none
@@ -1402,6 +1415,6 @@ contains
         Drag = Input(4)
         Fi = Lift/Drag
         
-    end subroutine getLiftandDrag2
+    end subroutine getLiftandDrag
         
 end module Optimization

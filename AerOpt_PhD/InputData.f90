@@ -49,8 +49,8 @@ module InputData
     
     type(InputVariablesData) :: IV
     integer :: allocatestatus                                   ! Check Allocation Status for Large Arrays
-    character(len=10) :: InFolder = 'Input_Data2'                ! Input Folder Name
-    character(len=11) :: OutFolder = 'Output_Data2'              ! Output Folder Name
+    character(len=10) :: InFolder = 'Input_Data'                ! Input Folder Name
+    character(len=11) :: OutFolder = 'Output_Data'              ! Output Folder Name
     integer :: IntSystem                                        ! Length of System command string; used for character variable allocation
     integer :: maxDoF                                           ! maximum Degrees of Freedom available
     integer :: DoF                                              ! actual Degrees of Freedom in the System
@@ -110,15 +110,15 @@ contains
         IV%version = '1.8'
         IV%NoDelBP = 8                  ! Number of Delaunay Boundary Points
         IV%samemovement = .false.
-        IV%alpha = 0                    ! For Aerofoil Angle of Attack Test
+        IV%alpha = 0.0                  ! For Aerofoil Angle of Attack Test
         IV%ObjectiveFunction = 1        ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion
         
         ! TESTING
-        IV%Pol = .true.                 ! Application of Polynomial?
-        IV%multiquadric = .true.        ! using multiquadratic RBF function for POD
-        
+        IV%POD = .false.                 ! Activation of POD - TRUE is ACTIVE
+        IV%Pol = .false.                 ! Application of Polynomial?
+        IV%multiquadric = .true.        ! using multiquadratic RBF function for POD 
         IV%AdaptSamp = .FALSE.          ! Adaptive Sampling - T: Active
-        IV%POD = .true.                 ! Activation of POD - TRUE is ACTIVE
+
         
         ! For Mesh Deformation
         IV%MeshMovement = 1

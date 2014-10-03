@@ -114,7 +114,7 @@ contains
         end do
         write(99,*) 'Coordinates'
         do j = 1, RD%np
-            write(99,*) j, RD%coord_temp(j,:) !*15.0
+            write(99,*) j, RD%coord_temp(j,:)
         end do
         write(99,*) 'Boundary Faces'
         do j = 1, RD%nbf
@@ -153,7 +153,7 @@ contains
         character(len=7) :: strEFMF, strMa      ! String for Ma number & Engine Inlet Front Mass Flow Number
         character(len=2) :: strNI               ! String for Number of Iterations
         character(len=12) :: strRe              ! String for Reynoldsnumber
-        character(len=5) :: strAlpha            ! String for Solver inflow direction
+        character(len=7) :: strAlpha            ! String for Solver inflow direction
         character(len=5) :: strGamma            ! String for Gamma Ratio
         character(len=1) :: strturbulencemodel  ! String for Turbulence model
         character(len=255) :: Output
@@ -167,7 +167,7 @@ contains
         write( strMa, '(F7.3)' )  IV%Ma
         write( strNI, '(I2)' )  IV%NoIter
         write( strRe, '(F12.2)' )  IV%Re
-        write( strAlpha, '(F5.2)' )  IV%AlphaInflowDirection
+        write( strAlpha, '(F7.2)' )  IV%AlphaInflowDirection
         write( strGamma, '(F5.2)' )  IV%gamma
         write( strturbulencemodel, '(I1)' )  IV%turbulencemodel
         
