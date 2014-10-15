@@ -15,7 +15,6 @@ module CFD
         implicit none
         integer :: Start, Ending, i, sizing
         double precision, dimension(sizing, maxDoF) :: CN_CoordinatesArray
-        
     
         ! Body of SubCFD
         ! ****Generate Snapshots (initial Meshes)**** !
@@ -37,7 +36,7 @@ module CFD
         if (IV%Meshtest == .true.) then
           pause
         end if
-        
+       
         ! ****Call 2D Preprocessor and pass on input parameters**** !
         print *, 'Start Preprocessing'
         do i = Start, Ending  
@@ -158,8 +157,8 @@ module CFD
             end if
             
             ! Submits Batchfile
-            call system('chmod a+x ./Trigger.sh')
-            call system('./Trigger.sh')
+            call system('chmod a+x ./Trigger5.sh')
+            call system('./Trigger5.sh')
                     
         end if
                 
@@ -188,7 +187,7 @@ module CFD
         
             ! Check Status of Simulation by checking the existence of all error files
 
-            do i = NoFiles, 1, -1
+            do i = NoFiles, (NoFiles - IV%NoSnap + 1), -1
 
                 ! Determine correct String      
                 call DetermineStrLen(istr, i)
@@ -196,18 +195,18 @@ module CFD
                 call CheckSimStatus()
                 ! Submit File
                 if (IV%SystemType == 'W')   then
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'plink')
+                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus5.scr', 'plink')
                 else
-                    call system('chmod a+x ./CheckStatus.scr')
-                    call system('./CheckStatus.scr')
+                    call system('chmod a+x ./CheckStatus5.scr')
+                    call system('./CheckStatus5.scr')
                 end if
                 ! Creates File to transfer response from Windows to Linux
                 if (IV%SystemType == 'W')   then
                     call CheckSimStatus2()
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'psftp')
+                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus5.scr', 'psftp')
                 end if
             
-                open(1, file='check.txt',form='formatted',status='old')
+                open(1, file='check5.txt',form='formatted',status='old')
                 read(1,*) jobcheck
                 close(1)
                 deallocate(istr)
@@ -229,14 +228,13 @@ module CFD
     
         ! Variables
         implicit none
-        integer :: ii, InitConv, i
+        integer :: ii, InitConv, i, NoFiles
         integer, save :: NoConv
         integer,intent(inout) :: Iter
         logical :: Converge
         character(len=200) :: strCommand
-        integer, dimension(:), allocatable :: DivNestPos
-        double precision, dimension(:), allocatable :: MidPoints
-        integer, optional :: NoFiles      
+        integer, dimension(:), allocatable :: DivNestPos, tempArray
+        double precision, dimension(:), allocatable :: MidPoints       
         double precision, dimension(IV%NoNests,DoF), optional :: Nests_Move
         double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
         
@@ -248,56 +246,51 @@ module CFD
         ! Body of CheckforConvergence
         print *, 'Iteration', (Iter + 1)
         Converge = .true.
-        NoConv = 0
-        if (InitConv == 0) then           
-            do i = 1, IV%NoSnap
-            
-                call FileCheckConvergence(Converge, i)  
-            
-                ! All diverged Snapshots are pulled halfway to midpoint(no movement center)
-                if (Converge == .false.) then
-                
-                        print *, 'File', i, 'failed to converge and will be resimulated'
-                        NoConv = NoConv + 1
-                        DivNestPos(NoConv) = i
-                        MidPoints = MxDisp(:,1) - (MxDisp(:,1) - MxDisp(:,2))/2.0  ! Midpoint calculation                 
+        NoConv = 0 
+        do i = 1, IV%NoSnap
+
+            call FileCheckConvergence(Converge, NoFiles - IV%NoSnap + i)  
+          
+            ! All diverged Snapshots are pulled halfway to midpoint(no movement center)
+            if (Converge == .false.) then              
+                    print *, 'File', (NoFiles - IV%NoSnap + i), 'failed to converge and will be resimulated'
+                    NoConv = NoConv + 1
+                    DivNestPos(NoConv) = i
+                    MidPoints = MxDisp(:,1) - (MxDisp(:,1) - MxDisp(:,2))/2.0  ! Midpoint calculation
+                    if (InitConv == 0) then
                         Snapshots(i,:) = Snapshots(i,:) - ((Snapshots(i,:) - MidPoints)/2.0)   ! Half way between current Nest and Midpoint
-                    
-                end if
-                Converge = .true.
-            
-            end do          
-        else           
-            do i = NoFiles, (NoFiles - IV%NoNests), -1
-            
-                call FileCheckConvergence(Converge, i)  
-            
-                ! All diverged Nests are pulled halfway to midpoint(no movement center)
-                if (Converge == .false.) then
-                
-                        print *, 'File', i, 'failed to converge and will be resimulated'
-                        NoConv = NoConv + 1
-                        DivNestPos(NoConv) = i
-                        MidPoints = MxDisp(:,1) - (MxDisp(:,1) - MxDisp(:,2))/2.0  ! Midpoint calculation
+                    else
                         Nests_Move(i,:) = Nests_Move(i,:) - ((Nests_Move(i,:) - MidPoints)/2.0) ! Half way between current Nest and Midpoint
                         Nests(i,:) = Nests(i,:) - ((Nests(i,:) - MidPoints)/2.0)
-                                  
-                    
-                end if
-                Converge = .true.
+                    end if
+            end if
+            Converge = .true.
             
-            end do            
-        end if
+        end do
+        
+        ! Resize DivNestPosArray
+        allocate(tempArray(NoConv),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckForConvergence "
+        tempArray = DivNestPos(1:NoConv)
+        deallocate(DivNestPos)
+        allocate(DivNestPos(NoConv),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckForConvergence "        
+        DivNestPos = tempArray
+        deallocate(tempArray)
         
         if (NoConv /= 0) then
             
             !!** Re-Do diverged solutions **!!
             do ii = 1, NoConv
                 
-                call SubCFD(DivNestPos(ii), DivNestPos(ii), Snapshots(DivNestPos(ii),:), 1)
+                if (InitConv == 0) then
+                    call SubCFD((NoFiles - IV%NoSnap + DivNestPos(ii)), (NoFiles - IV%NoSnap + DivNestPos(ii)), Snapshots(DivNestPos(ii),:), 1)
+                else
+                    call SubCFD((NoFiles - IV%NoSnap + DivNestPos(ii)), (NoFiles - IV%NoSnap + DivNestPos(ii)), Nests(DivNestPos(ii),:), 1)    
+                end if
                 
                 ! Determine correct String      
-                call DetermineStrLen(istr, DivNestPos(ii))
+                call DetermineStrLen(istr, (NoFiles - IV%NoSnap + DivNestPos(ii)))
         
                 call DeleteErrorFiles(istr)
                 if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine           
@@ -311,16 +304,16 @@ module CFD
                 
             end do
             
-            if (InitConv == 0) then
-                call Sleep(IV%NoSnap)
-            else
-                call Sleep(NoFiles)
-            end if
+            call Sleep(NoFiles)
             
             Iter = Iter + 1
             
             if (Iter < 4) then
-                call CheckforConvergence(Iter, InitConv)
+                if (InitConv == 0) then
+                    call CheckforConvergence(Iter, InitConv, NoFiles)
+                else
+                    call CheckforConvergence(Iter, InitConv, NoFiles, Nests_Move, Nests)
+                end if
             end if
             
             if (NoConv /= 0) then
@@ -349,7 +342,7 @@ module CFD
             open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
         end if       
         inquire(1, size = FileSize)           
-        LastLine = FileSize/106
+        LastLine = FileSize/176
             
         ! Read until last line
         do j = 1, (LastLine - 1)

@@ -28,6 +28,7 @@ module InputData
         logical :: AdaptSamp            ! Adaptive Sampling - T: Active
         integer :: delay                ! Delay per check in seconds
         integer :: waitMax              ! maximum waiting time in hours
+        integer :: maxit                ! maximum Iterations for Solver File before stopping convergence try
         integer :: NoDelBP              ! Number of Points placed on boundars for Delaunay Triangulation
         real :: Aconst                  ! Levy Flight parameter (determined emperically)   
         character(len=20) :: filename    ! I/O file of initial Meshes for FLITE solver
@@ -101,6 +102,7 @@ contains
         IV%constrain = .TRUE.         	! Constrain: Include boundaries of design space for Levy Walk - 1:Yes 0:no
         IV%delay = 300               	! Sleep Time between check for Simulation Results in seconds
         IV%waitMax = 48			        ! maximum waiting time in hours
+        IV%maxit = 30000                ! maximum Number of Iterations to reach convergence in Solver
         IV%Aconst = 0.01		        ! Levy Flight parameter (determined emperically)
         IV%filename = 'Snapshot'        ! I/O file of initial Meshes for FLITE solver
         IV%runOnCluster = 'Y'           ! Run On Cluster or Run on Engine?

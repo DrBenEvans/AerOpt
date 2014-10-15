@@ -53,7 +53,7 @@ program AerOpt
     ! Get Time and Date for File and Folder Name creation
     call DATE_AND_TIME(date, time)
     
-    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4)
+    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4) 
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
     print *, 'Start Read Data'
@@ -106,7 +106,7 @@ program AerOpt
     print *, ''
     call SubCFD(1, IV%NoSnap, Snapshots, IV%NoSnap)
     call PostSolverCheck(IV%NoSnap, 0)
-   
+    
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
     call SubOptimization()
     ! Output: Optimized mesh via Modified Cuckoo Search and POD

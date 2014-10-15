@@ -155,6 +155,7 @@ contains
         character(len=12) :: strRe              ! String for Reynoldsnumber
         character(len=7) :: strAlpha            ! String for Solver inflow direction
         character(len=5) :: strGamma            ! String for Gamma Ratio
+        character(len=5) :: strmaxit            ! String for maximum Iterations
         character(len=1) :: strturbulencemodel  ! String for Turbulence model
         character(len=255) :: Output
         integer :: fileLength
@@ -169,6 +170,7 @@ contains
         write( strRe, '(F12.2)' )  IV%Re
         write( strAlpha, '(F7.2)' )  IV%AlphaInflowDirection
         write( strGamma, '(F5.2)' )  IV%gamma
+        write( strmaxit, '(I5)' )  IV%maxit
         write( strturbulencemodel, '(I1)' )  IV%turbulencemodel
         
         
@@ -209,7 +211,7 @@ contains
         write(5,*) 'ivd%sizeOfSeparationField = 25,'
         write(5,*) 'ivd%numberOfTriperations = 0,'
         write(5,*) 'ivd%enginesFrontMassFlow = ', trim(strEFMF), ','
-        write(5,*) 'ivd%maxitt = 50000,'
+        write(5,*) 'ivd%maxitt = ', trim(strmaxit), ','
         write(5,*) 'ivd%numberOfDissipationLayers = 0,'
         write(5,*) 'ivd%HighOrder=.false.,'
         write(5,*) '/'
@@ -361,7 +363,7 @@ contains
         implicit none
     
         ! Body of TriggerFile
-        open(1, file='Trigger.sh', form='formatted',status='unknown')
+        open(1, file='Trigger5.sh', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder
@@ -382,7 +384,7 @@ contains
         implicit none
     
         ! Body of TriggerFile
-        open(1, file='Trigger.sh', form='formatted',status='unknown')
+        open(1, file='Trigger5.sh', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ..'
@@ -400,20 +402,20 @@ contains
         character(len=255) :: Output
     
         ! Body of CheckSimStatus
-        open(1, file='CheckStatus.scr', form='formatted',status='unknown')
+        open(1, file='CheckStatus5.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder      
-        write(1,*) '[ -e ', trim(IV%filename), istr, '.e* ] && echo 1 > check.txt || echo 0 > check.txt'
+        write(1,*) '[ -e ', trim(IV%filename), istr, '.e* ] && echo 1 > check5.txt || echo 0 > check5.txt'
         if (IV%SystemType == 'Q')   then
             write(1,*) 'cd ..'
             write(1,*) 'cd ..'
-            Output = 'mv /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check.txt check.txt'
+            Output = 'mv /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check5.txt check5.txt'
             write(1, '(A)') trim(Output)
         elseif (IV%SystemType == 'B') then
             write(1,*) 'cd ..'
             write(1,*) 'cd ..'
-            Output = 'mv /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check.txt check.txt'
+            Output = 'mv /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check5.txt check5.txt'
             write(1, '(A)') trim(Output)
         end if
         close(1)
@@ -427,11 +429,11 @@ contains
         implicit none
     
         ! Body of CheckSimStatus
-        open(1, file='CheckStatus.scr', form='formatted',status='unknown')
+        open(1, file='CheckStatus5.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'       
         write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder
-        write(1,*) 'get check.txt'       
+        write(1,*) 'get check5.txt'       
         close(1)
     
     end subroutine CheckSimStatus2
