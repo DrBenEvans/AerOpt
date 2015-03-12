@@ -44,6 +44,7 @@ module InputData
         logical :: multiquadric         ! RBF type for POD
         logical :: POD
         logical :: samemovement
+        logical :: meanP
         real :: alpha
     
     end type InputVariablesData
@@ -110,17 +111,18 @@ contains
         IV%UserName = 'egnaumann'       ! Putty Username - Cluster: egnaumann
         IV%Password = 'Fleur666'        ! Putty Password
         IV%version = '1.8'
-        IV%NoDelBP = 8                  ! Number of Delaunay Boundary Points
-        IV%samemovement = .false.
+        IV%NoDelBP = 8                  ! Number of Delaunay Boundary Points       
         IV%alpha = 0.0                  ! For Aerofoil Angle of Attack Test
-        IV%ObjectiveFunction = 1        ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion
+        IV%ObjectiveFunction = 1        ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - zero Lift Optimisation
+
         
-        ! TESTING
+        ! POD
         IV%POD = .false.                 ! Activation of POD - TRUE is ACTIVE
         IV%Pol = .false.                 ! Application of Polynomial?
         IV%multiquadric = .true.        ! using multiquadratic RBF function for POD 
         IV%AdaptSamp = .FALSE.          ! Adaptive Sampling - T: Active
-
+        IV%meanP = .true.
+        IV%samemovement = .false.
         
         ! For Mesh Deformation
         IV%MeshMovement = 1

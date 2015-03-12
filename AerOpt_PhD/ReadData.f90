@@ -363,7 +363,7 @@ contains
         implicit none
     
         ! Body of TriggerFile
-        open(1, file='Trigger5.sh', form='formatted',status='unknown')
+        open(1, file='Trigger.sh', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder
@@ -384,7 +384,7 @@ contains
         implicit none
     
         ! Body of TriggerFile
-        open(1, file='Trigger5.sh', form='formatted',status='unknown')
+        open(1, file='Trigger.sh', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ..'
@@ -402,20 +402,20 @@ contains
         character(len=255) :: Output
     
         ! Body of CheckSimStatus
-        open(1, file='CheckStatus5.scr', form='formatted',status='unknown')
+        open(1, file='CheckStatus.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder      
-        write(1,*) '[ -e ', trim(IV%filename), istr, '.e* ] && echo 1 > check5.txt || echo 0 > check5.txt'
+        write(1,*) '[ -e ', trim(IV%filename), istr, '.e* ] && echo 1 > check.txt || echo 0 > check.txt'
         if (IV%SystemType == 'Q')   then
             write(1,*) 'cd ..'
             write(1,*) 'cd ..'
-            Output = 'mv /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check5.txt check5.txt'
+            Output = 'mv /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check.txt check.txt'
             write(1, '(A)') trim(Output)
         elseif (IV%SystemType == 'B') then
             write(1,*) 'cd ..'
             write(1,*) 'cd ..'
-            Output = 'mv /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check5.txt check5.txt'
+            Output = 'mv /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/check.txt check.txt'
             write(1, '(A)') trim(Output)
         end if
         close(1)
@@ -429,11 +429,11 @@ contains
         implicit none
     
         ! Body of CheckSimStatus
-        open(1, file='CheckStatus5.scr', form='formatted',status='unknown')
+        open(1, file='CheckStatus.scr', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'       
         write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder
-        write(1,*) 'get check5.txt'       
+        write(1,*) 'get check.txt'       
         close(1)
     
     end subroutine CheckSimStatus2

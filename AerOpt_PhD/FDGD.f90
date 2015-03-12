@@ -35,13 +35,11 @@ module FDGD
         integer :: i
         
         ! Body of SubFDGD
-        
-        ! Move Mesh of Boundary Nodes
         allocate(DelaunayCoord(size(DelaunayCoordBound, dim = 1), size(DelaunayCoordBound, dim = 2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
+ 
+        ! Relocate CN (Control Nodes)
         DelaunayCoord = DelaunayCoordBound
-  
-        ! Read in relocation of CP
         if (IV%alpha == 0) then
             do i = 1, IV%NoCP
                 DelaunayCoord(i,1) = DelaunayCoord(i,1) + NestDisp(i)
@@ -50,8 +48,8 @@ module FDGD
         else           
             call AngleofAttack(NestDisp(4))
         end if
-
-        ! Move Mesh of Boundary Nodes
+               
+        ! Move Boundary Nodes
         allocate(DelaunayElem(size(DelaunayElemBound, dim = 1),size(DelaunayElemBound, dim = 2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD "
         DelaunayElem = DelaunayElemBound
@@ -60,7 +58,7 @@ module FDGD
         deallocate(DelaunayCoord)
         deallocate(DelaunayElem)
       
-        ! Move Mesh of Domain Nodes
+        ! Move Domain Nodes
         call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
         allocate(DelaunayElem(size(DelaunayElemDomain, dim = 1),size(DelaunayElemDomain, dim = 2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD "
@@ -141,9 +139,9 @@ end if
         allocate(character(len=100) :: strSystem,stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         if (IV%systemType == 'B') then
-            strSystem = '/home/'//trim(IV%UserName)//'/AerOpt/DelaunayTriangulation < Delaunay/DelaunayInput.txt > /dev/null'
+            strSystem = '/home/'//trim(IV%UserName)//'/AerOpt/Delaunay/DelaunayTriangulation < Delaunay/DelaunayInput.txt > /dev/null'
         else
-            strSystem = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/DelaunayTriangulation < Delaunay/DelaunayInput.txt > /dev/null'
+            strSystem = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/Delaunay/DelaunayTriangulation < Delaunay/DelaunayInput.txt > /dev/null'
         end if
         call system(trim(strSystem))
         deallocate(strSystem)

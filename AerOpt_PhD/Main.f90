@@ -74,12 +74,12 @@ program AerOpt
             
     end if
 
-    ! **** Create Initial Nests for the Snapshots****** ! 
+    ! *****Create Initial Nests for the Snapshots****** ! 
     print *, 'Start LHS Sampling - Create Initial Nests'
     call SubCreateSnapshots()    
     ! Output: Initial Nests - Sampling Points for Snapshots
-    
-! Same movement    
+  
+! Same movement: Hard coded for testing Mesh Distortion for Aerofoil case - Control Nodes move equally
     if (IV%samemovement == .true.) then
         Snapshots(:,1) = IV%xmax
         Snapshots(:,2) = IV%xmax
@@ -110,16 +110,7 @@ program AerOpt
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
     call SubOptimization()
     ! Output: Optimized mesh via Modified Cuckoo Search and POD
-    
-    ! ****Generate Optimum Mesh and Safe in file**** !
-    allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-    if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main " 
-    RD%coord_temp = RD%coord
-    call SubMovemesh(NestOpt)
-    ! Output: Optimum Coordinates - 1 Mesh with moved boundaries based on optimum Control Point Coordinates
-    
-    ! Safe Optimum Geometry in Text File
-    call writeDatFile(005)
+
     call timestamp()
     
     end program AerOpt

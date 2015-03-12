@@ -9,6 +9,7 @@ module Optimization
     use FDGD
     
     double precision, dimension(:,:), allocatable :: modes, coeff       ! Modes and Coefficient derived by the POD method
+    double precision, dimension(:), allocatable :: meanpressure         ! Mean Pressure excluded of Snapshots in POD
     double precision, dimension(:), allocatable :: engInNodes           ! Engine inlet Nodes
     double precision, dimension(:,:), allocatable :: pressure           ! Pressure of All initial Snapshots
     double precision, dimension(:), allocatable :: Fi                   ! Vector with all current Fitness values
@@ -49,16 +50,19 @@ contains
         allocate(tempNests(maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(NestOpt(maxDoF),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "     
         ! Specific for Adaptive Sampling
         allocate(newSnapshots(2,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fcompare(2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ConvA(2),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "      
+        ! Specific Parameters required for Top Nest monitoring
+        allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        
+        allocate(TopNest_Move(NoTop,DoF),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         
         ! Body of SubOptimization
         print *, ''
@@ -78,12 +82,6 @@ contains
         tempNests = (/ (0, i=1,(maxDoF)) /)
         alpha = 1.0
         beta = 0.0
-        
-        ! Specific Parameters required for Top Nest monitoring
-        allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(TopNest_Move(NoTop,DoF),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         
         ! Extract moving initial Nests
         j = 1
@@ -200,13 +198,6 @@ contains
                 temp = ind_Fi(j)
                 ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
                 ind_Fi(IV%NoNests-j+1) = temp
-            end do
-            
-            ! Error Test: If a Fitness is negative something is wrong!!!
-            do ii = 1, IV%NoNests
-                if (Fi(ii) > 0 ) then
-                    print *, 'Fitness negative:', ii, Fi(ii)
-                end if
             end do
             
             ! Re-order Nests for next Generation
@@ -361,14 +352,13 @@ contains
                     end do
                 end if
                 
-                ! Refill tempNests
+                ! Refill tempNests and de-normalize
                 l = 1
                 do k = 1, size(cond)            
                     if (cond(k) == -1) then
                         tempNests(k) = (tempNests_Move(l) - 0.5)*NormFact(l)
                         l = l + 1
                     end if
-            
                 end do
                 
                 ! Store tempNests
@@ -394,8 +384,13 @@ contains
             
             ! Store moved Nests in Output Analysis File
             open(29,file=newdir//'/TopNest.txt',form='formatted',status='unknown',position='append')
-            write(29, *) 'Generation', iii
+            write(29, *) 'Generation', (iii+1)
             write(29,'(<NoTop>f17.10)') TopNest
+            close(29)
+            
+            ! Store moved Nests in Output Analysis File
+            open(29,file=newdir//'/Neststemp.txt',form='formatted',status='unknown')
+            write(29,'(<IV%NoNests>f17.10)') Nests
             close(29)
             
             if (IV%POD == .false.) then                
@@ -520,6 +515,7 @@ contains
         write(istr, '(1f3.1)') IV%Ma
         open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
         call QSort(Fi,size(Fi, dim = 1), 'y', ind_Fi)
+
         ! Change to Descending Order for Maximization Problem
         do j = 1, int(IV%NoNests/2.0)
             temp = Fi(j)
@@ -529,6 +525,7 @@ contains
             ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
             ind_Fi(IV%NoNests-j+1) = temp
         end do
+
         Fopt = Fi(1)
         write(19,'(<IV%NoNests>f17.10)') Fi
         close(19)
@@ -624,14 +621,28 @@ contains
         
         ! Variables
         implicit none
+        integer :: i
         double precision, dimension(:,:), allocatable :: pressure2, modestemp, V
 
         ! Body of POD
         print *, 'Get POD modes and coefficients of Snapshots'
+        allocate(meanpressure(RD%np),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         
         ! Extract pressure of Snapshot Output file           
         call ExtractPressure(1, IV%NoSnap)
 
+        ! Exclude mean pressure from POD       
+        if (IV%meanP == .true.) then
+            do i = 1, IV%NoSnap
+                meanpressure = meanpressure + pressure(:,i)
+            end do
+            meanpressure = (1/IV%NoSnap)*meanpressure
+            do i = 1, IV%NoSnap
+                pressure(:,i) = pressure(:,i) - meanpressure
+            end do
+        end if
+        
         ! Perform Single Value Decomposition
         allocate(pressure2(RD%np, IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
@@ -1118,13 +1129,6 @@ contains
         allocate(NormFact(DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "     
         
-        ! Normalize Snapshots between 0 and 10
-        !do i = 1, DoF        
-        !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
-        !    Snapshots(:,i) = (Snapshots(:,i)/NormFact(i) + 0.5)
-        !end do
-        !newNest = (newNest/NormFact(1) + 0.5)
-        
         ! Body of InterpolateCoefficients
         ShapeParameter = 1.0
         do l = 1, IV%NoSnap
@@ -1148,16 +1152,13 @@ contains
         ! Matmul: var1 = modes*newCoeff   newpressure = matmul(modes,newCoeff(:,1))
         CALL DGEMM('N','N',size( modes, dim = 1), size( newCoeff, dim = 2), size( modes, dim = 2),alpha,modes,size( modes, dim = 1),newCoeff,size( newCoeff, dim = 1),beta,newpressure,size( newpressure, dim = 1))
        
+        if (IV%meanP == .true.) then
+            newpressure = newpressure + meanpressure
+        end if
+        
         open(23,file=newdir//'/NewPressure.txt')
         write(23,'(1f25.10)') newpressure           
         close(23)
-        
-        ! Denormalize Snapshots
-        !do i = 1, DoF        
-        !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
-        !    Snapshots(:,i) = ((Snapshots(:,i) - 0.5)*NormFact(i))
-        !end do
-        !newNest = (newNest - 0.5)*NormFact(1)
         
     end subroutine InterpolateCoefficients
     
@@ -1305,13 +1306,17 @@ contains
                 RD%coord_temp = RD%coord 
                 call SubMovemesh(tempNests)
                 call getLiftandDragPOD(tempNests, Fi)
-                deallocate(RD%coord_temp)              
+                deallocate(RD%coord_temp)
+            elseif (IV%ObjectiveFunction == 3) then
+                call getzeroLiftPOD(tempNests, Fi)
             end if
         else
             if (IV%ObjectiveFunction == 2) then
                 call getDistortion(Fi, NoSnapshot)
             elseif (IV%ObjectiveFunction == 1) then
                 call getLiftandDrag(Fi, (NoGen*IV%NoNests + NoSnapshot))
+            elseif (IV%ObjectiveFunction == 3) then
+                call getzeroLift(Fi, (NoGen*IV%NoNests + NoSnapshot))
             end if
         end if
     
@@ -1410,7 +1415,7 @@ contains
         open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
-        LastLine = FileSize/106
+        LastLine = FileSize/176
             
         ! Read until last line
         do j = 1, (LastLine - 1)
@@ -1423,5 +1428,109 @@ contains
         Fi = Lift/Drag
         
     end subroutine getLiftandDrag
+    
+    subroutine getzeroLiftPOD(tempNests, Fi)
+    
+        ! Variables
+        implicit none
+        double precision :: Lift, Drag, Fi, p, dx, norm, ralpha
+        double precision, dimension(2) :: n, m, k, tangent, vec1, vec2
+        integer :: intexit, i, j, NoIB
+        double precision, dimension(:,:), allocatable :: tangentArray
+        double precision, dimension(:), allocatable :: lengthArray
+        double precision, dimension(:), allocatable :: newpressure
+        double precision, dimension(maxDoF) :: tempNests
+        double precision, parameter :: pi = 3.14159265359
+  
+        ! Body of getzeroLiftPOD
+        NoIB = size(Innerbound)
+        allocate(newpressure(RD%np),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
+        allocate(tangentArray(NoIB, IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        allocate(lengthArray(NoIB),stat=allocateStatus)
+        
+        ! Calculate Tangents and face lengths for each boundary point
+        tangentArray = 0.0
+        lengthArray = 0.0
+        do i = 1, RD%nbf
+            vec1 = RD%coord_temp(RD%boundf(i,1),:)
+            vec2 = RD%coord_temp(RD%boundf(i,2),:)
+            tangent = vec2 - vec1
+            dx = DistP2P(IV%NoDim, vec1(1), vec2(1), vec1(2), vec2(2))
+            intexit = 0
+            do j = 1, NoIB
+                if (RD%boundf(i,1) == Innerbound(j)) then
+                    tangentArray(j,:) = tangentArray(j,:) + tangent
+                    lengthArray(j) = lengthArray(j) + dx
+                    intexit = intexit + 1
+                    if (intexit == 2) then
+                        EXIT
+                    end if
+                end if
+                if (RD%boundf(i,2) == Innerbound(j)) then
+                    tangentArray(j,:) = tangentArray(j,:) + tangent
+                    lengthArray(j) = lengthArray(j) + dx
+                    intexit = intexit + 1
+                    if (intexit == 2) then
+                        EXIT
+                    end if
+                end if
+            end do
+        end do
+        lengthArray = lengthArray*0.5
+
+        ! normalize tangents
+        do i = 1, NoIB
+            norm = sqrt(sum(tangentArray(i,:)**2))
+            tangentArray(i,:) = tangentArray(i,:)/norm
+        end do
+
+        ! calculate Lift and Drag
+        call InterpolateCoefficients(tempNests, newpressure)
+        ralpha = IV%AlphaInflowDirection*Pi/180
+        k = (/- m(2), m(1)/)                                                ! normal of flow direction 
+        do i = 2, NoIB
+            
+            ! pressure portion
+            n = (/ -tangentArray(i,2), tangentArray(i,1)/)                 ! normal to tangent, pointing into the geometry
+            p = newpressure(Innerbound(i))
+            dx = lengthArray(i)
+
+            Lift = Lift - 2.0*p*sum(n*k)*dx
+
+            ! skin friction(viscosity/boundary layer) portion
+            ! later
+            
+        end do
+        Fi = abs(Lift)*(-1)
+        
+    end subroutine getzeroLiftPOD
+    
+    subroutine getzeroLift(Fi, NoSnapshot)
+    
+        ! Variables
+        implicit none
+        integer :: FileSize, LastLine, NoSnapshot, j
+        double precision, dimension(8) :: Input      
+        double precision :: Lift, Drag, Fi
+       
+        ! Body of getzeroLift
+        call DetermineStrLen(istr, NoSnapshot)
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        deallocate(istr)
+        inquire(11, size = FileSize)           
+        LastLine = FileSize/176
+            
+        ! Read until last line
+        do j = 1, (LastLine - 1)
+            read(11, *) Input
+        end do
+        read(11, *) Input
+        close(11)
+        Lift = Input(3)
+        Fi = abs(Lift)*(-1)
+        
+    end subroutine getzeroLift
         
 end module Optimization

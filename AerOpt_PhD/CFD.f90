@@ -15,7 +15,7 @@ module CFD
         implicit none
         integer :: Start, Ending, i, sizing
         double precision, dimension(sizing, maxDoF) :: CN_CoordinatesArray
-    
+
         ! Body of SubCFD
         ! ****Generate Snapshots (initial Meshes)**** !
         allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
@@ -157,8 +157,8 @@ module CFD
             end if
             
             ! Submits Batchfile
-            call system('chmod a+x ./Trigger5.sh')
-            call system('./Trigger5.sh')
+            call system('chmod a+x ./Trigger.sh')
+            call system('./Trigger.sh')
                     
         end if
                 
@@ -180,7 +180,7 @@ module CFD
         do while (jobcheck==0)
         
             ! Wait Function
-            print*, 'Sleep'
+            print*, 'Sleep', IV%Ma
             call SleepQQ(IV%delay*1000)
             print*, 'Wake Up - Check ', j
             j = j + 1
@@ -195,18 +195,18 @@ module CFD
                 call CheckSimStatus()
                 ! Submit File
                 if (IV%SystemType == 'W')   then
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus5.scr', 'plink')
+                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'plink')
                 else
-                    call system('chmod a+x ./CheckStatus5.scr')
-                    call system('./CheckStatus5.scr')
+                    call system('chmod a+x ./CheckStatus.scr')
+                    call system('./CheckStatus.scr')
                 end if
                 ! Creates File to transfer response from Windows to Linux
                 if (IV%SystemType == 'W')   then
                     call CheckSimStatus2()
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus5.scr', 'psftp')
+                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'psftp')
                 end if
             
-                open(1, file='check5.txt',form='formatted',status='old')
+                open(1, file='check.txt',form='formatted',status='old')
                 read(1,*) jobcheck
                 close(1)
                 deallocate(istr)
