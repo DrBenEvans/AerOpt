@@ -58,11 +58,6 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ConvA(2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "      
-        ! Specific Parameters required for Top Nest monitoring
-        allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(TopNest_Move(NoTop,DoF),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         
         ! Body of SubOptimization
         print *, ''
@@ -82,6 +77,12 @@ contains
         tempNests = (/ (0, i=1,(maxDoF)) /)
         alpha = 1.0
         beta = 0.0
+        
+        ! Specific Parameters required for Top Nest monitoring
+        allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        allocate(TopNest_Move(NoTop,DoF),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         
         ! Extract moving initial Nests
         j = 1
@@ -381,13 +382,13 @@ contains
                 end if
                 
             end do
-            
+             
             ! Store moved Nests in Output Analysis File
-            open(29,file=newdir//'/TopNest.txt',form='formatted',status='unknown',position='append')
-            write(29, *) 'Generation', (iii+1)
-            write(29,'(<NoTop>f17.10)') TopNest
-            close(29)
-            
+            open(39,file=newdir//'/TopNest.txt',form='formatted',status='unknown',position='append')
+            write(39, *) 'Generation', (iii+1)
+            write(39,'(<NoTop>f17.10)') TopNest
+            close(39)
+          
             ! Store moved Nests in Output Analysis File
             open(29,file=newdir//'/Neststemp.txt',form='formatted',status='unknown')
             write(29,'(<IV%NoNests>f17.10)') Nests
@@ -397,8 +398,9 @@ contains
                 !Generate Full Fidelity Solution of new TopNest      
                 call SubCFD((iii*IV%NoNests + 1), (iii*IV%NoNests + NoTop), TopNest, NoTop)
                 ! Check ALL new Nests
+                print *, 'Generation: ', iii
                 call PostSolverCheck(((iii + 1)*IV%NoNests), 1, Nests_Move, Nests)   
-
+ 
                 ! Evaluate Fitness of Full Fidelity Nest Solutions
                 print *, 'Extract Pressure of Generation', iii
                 call ExtractPressure((iii*IV%NoNests + 1), ((iii + 1)*IV%NoNests))
@@ -452,7 +454,7 @@ contains
                         ! Delete Errorfiles if Snapshot diverged      
                         call DetermineStrLen(istr, (IV%NoSnap + k))        
                         call DeleteErrorFiles(istr)
-                        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine           
+                        if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
                             call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
                         else
                             call system('chmod a+x ./FileCreateDir.scr')
@@ -600,8 +602,8 @@ contains
             end do
                 
             ! Calculate Pressure
-            !pressure(:,(i - Start + 1)) = rho_amb*(IV%gamma - 1.0)*rho*(Vamb**2)*(e - 0.5*(Vx**2 + Vy**2))
-            pressure(:,(i - Start + 1)) = (IV%gamma - 1.0)*rho*((e - 0.5*(Vx**2 + Vy**2))) ! Non-dimensional:  
+            !pressure(:,(i - Start + 1)) = rho_amb*(IV%gamma - 1.0)*rho*(Vamb**2)*(e - 0.5*(Vx**2 + Vy**2)) ! Dimensional
+            pressure(:,(i - Start + 1)) = (IV%gamma - 1.0)*rho*((e - 0.5*(Vx**2 + Vy**2))) ! Non-dimensional  
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) 
             
             close(11)
@@ -1415,7 +1417,11 @@ contains
         open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
-        LastLine = FileSize/176
+        if (IV%SystemType == 'W') then
+            LastLine = FileSize/107
+        else     
+            LastLine = FileSize/106
+        end if
             
         ! Read until last line
         do j = 1, (LastLine - 1)
@@ -1520,7 +1526,11 @@ contains
         open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
-        LastLine = FileSize/176
+        if (IV%SystemType == 'W') then
+            LastLine = FileSize/107
+        else     
+            LastLine = FileSize/106
+        end if
             
         ! Read until last line
         do j = 1, (LastLine - 1)

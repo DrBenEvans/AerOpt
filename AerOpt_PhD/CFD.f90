@@ -63,9 +63,11 @@ module CFD
     
         ! Body of PostSolverCheck
         ! ****Wait & Check for FLITE Solver Output**** !
-        call Sleep(NoFiles)
-    
-        if (IV%SystemType == 'W') then
+        if (IV%runOnCluster == 'Y') then
+            call Sleep(NoFiles)
+        end if
+        
+        if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y') then
             call TransferSolutionOutput()
         end if
     
@@ -97,17 +99,17 @@ module CFD
         
         if (IV%SystemType == 'W') then
              
-            allocate(character(len=29) :: strSystem)
-            strSystem = pathWin
+            allocate(character(len=100) :: strSystem)
+            strSystem = pathWinPrePro//' < '//newdir//'\PreprocessingInput.txt >nul 2>&1'
             
         else
             
             ! write command (for Linux)
             allocate(character(len=100) :: strSystem)
-            strSystem = pathLin_Prepro//' < '//newdir//'/PreprocessingInput.txt'//' > /dev/null'
+            strSystem = pathLin_Prepro//' < '//newdir//'/PreprocessingInput.txt > /dev/null'
             
         end if
-        print *, 'Preprocessing Snapshot', i
+        print *, 'Preprocessing Geometry', i
         print *, ' '
         call system(trim(strSystem))   ! System operating command called to activate fortran       
         deallocate (istr)
@@ -135,19 +137,25 @@ module CFD
         ! Is AerOpt executed from Linux or Windows?                
         if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
             
-            ! Transfer Files from Windows Machine onto Cluster
-            call transferFilesWin()            
-            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-            
             if (IV%runOnCluster == 'Y') then
+                ! Transfer Files from Windows Machine onto Cluster
+                call transferFilesWin()            
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
                 call Triggerfile()           ! Triggerfile for submission
+                ! Submits Batchfile via Putty
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Trigger.sh', 'putty')
             else
-                call TriggerFile2()  ! Triggerfile for submission
-            end if
-                    
-            ! Submits Batchfile via Putty
-            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Trigger.sh', 'putty')
-                
+                print *, 'Solving Geometry', i
+                allocate(character(len=200) :: strSystem)
+                strSystem = pathWinSolver//' < '//newdir//'\'//InFolder//'\SolverInput'//istr//'.sh >nul 2>&1'
+                call system(trim(strSystem))
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp"'
+                call system(trim(strSystem))
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+                call system(trim(strSystem))
+                deallocate (strSystem)
+            end if 
+              
         else    ! AerOpt is executed from a Linux machine
             
             if (IV%runOnCluster == 'Y') then
@@ -293,9 +301,9 @@ module CFD
                 call DetermineStrLen(istr, (NoFiles - IV%NoSnap + DivNestPos(ii)))
         
                 call DeleteErrorFiles(istr)
-                if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine           
+                if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
                     call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-                else
+                elseif (IV%SystemType /= 'W')                  
                     call system('chmod a+x ./FileCreateDir.scr')
                     call system('./FileCreateDir.scr')
                 end if
@@ -337,13 +345,17 @@ module CFD
             
         ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
         if (IV%SystemType == 'W') then
-            open(1, file=OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
+            open(1, file=newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
         else
             open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
         end if       
-        inquire(1, size = FileSize)           
-        LastLine = FileSize/176
-            
+        inquire(1, size = FileSize) 
+        if (IV%SystemType == 'W') then
+            LastLine = FileSize/107
+        else     
+            LastLine = FileSize/106
+        end if
+        
         ! Read until last line
         do j = 1, (LastLine - 1)
             read(1, *) Input

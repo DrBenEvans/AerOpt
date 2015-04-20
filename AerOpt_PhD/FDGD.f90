@@ -37,7 +37,7 @@ module FDGD
         ! Body of SubFDGD
         allocate(DelaunayCoord(size(DelaunayCoordBound, dim = 1), size(DelaunayCoordBound, dim = 2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
- 
+
         ! Relocate CN (Control Nodes)
         DelaunayCoord = DelaunayCoordBound
         if (IV%alpha == 0) then
@@ -48,23 +48,23 @@ module FDGD
         else           
             call AngleofAttack(NestDisp(4))
         end if
-               
+              
         ! Move Boundary Nodes
         allocate(DelaunayElem(size(DelaunayElemBound, dim = 1),size(DelaunayElemBound, dim = 2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD "
         DelaunayElem = DelaunayElemBound
         call RelocateMeshPoints(AreaCoeffBound, size(AreaCoeffBound, dim = 1))       
-        call CheckforIntersections()        
+        !call CheckforIntersections()        
         deallocate(DelaunayCoord)
         deallocate(DelaunayElem)
-      
+     
         ! Move Domain Nodes
         call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
         allocate(DelaunayElem(size(DelaunayElemDomain, dim = 1),size(DelaunayElemDomain, dim = 2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD "
         DelaunayElem = DelaunayElemDomain
         call RelocateMeshPoints(AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))
-        call CheckforIntersections()
+        !call CheckforIntersections()
         deallocate(DelaunayCoord)
         deallocate(DelaunayElem)
 
@@ -135,20 +135,28 @@ end if
         write(1,'(2f22.15)') transpose(DelaunayCoord)
         close(1)
     
-        ! Performt Delaunay Triangulation via external executable
+        ! Perform Delaunay Triangulation via external executable
         allocate(character(len=100) :: strSystem,stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         if (IV%systemType == 'B') then
             strSystem = '/home/'//trim(IV%UserName)//'/AerOpt/Delaunay/DelaunayTriangulation < Delaunay/DelaunayInput.txt > /dev/null'
-        else
+        elseif (IV%systemType == 'Q') then
             strSystem = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/Delaunay/DelaunayTriangulation < Delaunay/DelaunayInput.txt > /dev/null'
+        elseif (IV%systemType == 'W') then
+            strSystem = 'Executables\2D_Delaunay.exe < Executables\DelaunayInput.txt >nul 2>&1'
+        else
+            STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'
         end if
         call system(trim(strSystem))
         deallocate(strSystem)
-        
+       
         open(1, file= Filename//'_elements.txt', form='formatted',status='old')
         inquire(1, size = FileSize)
-        NoElem = FileSize/31
+        if (IV%SystemType == 'W') then          
+            NoElem = FileSize/32
+        else
+            NoElem = FileSize/31
+        end if
         allocate(DelaunayElem(NoElem,IV%NoDim + 1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in BruteForce "
         do i = 1, NoElem
@@ -268,7 +276,7 @@ end if
             yp = y1*AreaCoeff(i,3) + y2*AreaCoeff(i,4) + y3*AreaCoeff(i,5)
             RD%coord_temp(AreaCoeff(i,1),:) = (/xp, yp/)
         end do    
-   
+  
     end subroutine RelocateMeshPoints
     
     subroutine getDelaunayCoordDomain(Coord, dim1, dim2)
@@ -425,13 +433,13 @@ end if
             allocate(DelaunayCoordBound(IV%NoCP + IV%NoDelBP + overlap,IV%NoDim),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         end if
-        
-        overlap = overlap + 1                
+                       
         ! Integrate CN coordinates into Delaunay Coordinates required for Triangulation
         DelaunayCoordBound(1:IV%NoCP,:) = RD%Coord(InnerBound(CP_ind),:)
         ! Input overlapping nodes into Delaunay Coordinates
-        DelaunayCoordBound((IV%NoCP + 1):(IV%NoCP + overlap),:) = RD%Coord(nodesvec(1:overlap),:)
-        overlap = overlap - 1
+        if (overlap /= 0) then
+            DelaunayCoordBound((IV%NoCP + 1):(IV%NoCP + overlap),:) = RD%Coord(nodesvec(1:overlap),:)
+        end if
         deallocate(nodesvec)
         deallocate(nodesvec2)
     

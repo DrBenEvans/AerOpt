@@ -198,8 +198,8 @@ contains
         write(5,*) 'ivd%coarseGridDissipationFactor = 0.5,'
         write(5,*) 'ivd%turbulenceSmoothingFactor = 0.0,'
         write(5,*) 'ivd%numberOfRSSteps = 0,'
-        write(5,*) 'ivd%tripNodes(1) = 203,'                ! ?? very specific?
-        write(5,*) 'ivd%tripNodes(2) = 252,'                ! ?? very specific?
+        write(5,*) 'ivd%tripNodes(1) = 1,'                ! ?? very specific?
+        write(5,*) 'ivd%tripNodes(2) = 3,'                ! ?? very specific?
         write(5,*) 'ivd%residualSmoothingFactor = 0.0,'
         write(5,*) 'ivd%numberOfPSSteps = 0,'
         write(5,*) 'ivd%prolongationSmoothingFactor = 0.0,'
@@ -225,7 +225,7 @@ contains
             write(1,*) ''
             write(1,*) trim(IV%filename), istr, '.resp'  ! Result filename
             write(1,*) trim(IV%filename), istr, '.rsd'   ! Residual Filename
-        else
+        elseif (IV%SystemType == 'Q') then
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp'    ! Control Filename
             write(1,'(A)') trim(Output)
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol'    ! Control Filename
@@ -235,6 +235,12 @@ contains
             write(1,'(A)') trim(Output)
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd'    ! Control Filename
             write(1,'(A)') trim(Output)
+        elseif (IV%SystemType == 'W') then
+            write(1,*) newdir, '\', InFolder, '\', trim(IV%filename), istr, '.inp'    ! Control Filename
+            write(1,*) newdir, '\', InFolder, '\', trim(IV%filename), istr, '.sol'    ! Computation Filename
+            write(1,*) ''
+            write(1,*) newdir, '\', InFolder, '\', trim(IV%filename), istr, '.resp'  ! Result filename
+            write(1,*) newdir, '\', InFolder, '\', trim(IV%filename), istr, '.rsd'   ! Residual Filename
         end if
         close(1)
     
@@ -305,6 +311,28 @@ contains
         close(1)
     
     end subroutine createDirectoriesInit
+    
+    subroutine createDirectoriesWindows()
+    ! Objective: Create Directories in Windows
+    
+        ! Variables
+        implicit none
+        character(len=255) :: currentDir
+        character(len=:), allocatable :: Output
+        integer :: strOut
+        
+        ! Body of createDirectories
+        call getcwd(currentDir)
+        open(1, file='FileCreateDir.bat', form='formatted',status='unknown')
+        write(1,*) 'mkdir ', newdir
+        write(1,*) 'cd ', newdir
+        write(1,*) 'mkdir ', InFolder
+        write(1,*) 'mkdir ', OutFolder
+        write(1,*) 'cd ..'
+        write(1,*) 'cd ..'
+        close(1)
+    
+    end subroutine createDirectoriesWindows
     
     subroutine transferFilesWin()
     ! Objective: Create Directories from Windows in Linux

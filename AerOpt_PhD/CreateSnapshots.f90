@@ -35,7 +35,7 @@ module CreateSnapshots
             IV%zmax = 0
         end if
         
-        ! NoDim automatically defines the size of the Matrix
+        ! NoDim automatically defines the size of the Matrix     
         MxDisp(:,1) = (/IV%xmax*ones, IV%ymax*ones, IV%zmax*ones/)
         MxDisp(:,2) = (/IV%xmax*(-1)*ones, IV%ymax*(-1)*ones, IV%zmax*(-1)*ones/)
         

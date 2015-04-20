@@ -60,7 +60,8 @@ module InputData
     real :: waitTime                                            ! waiting time for Simulation Results
     integer :: jobcheck                                         ! Check Variable for Simulation 
     character(len=:), allocatable :: istr                       ! Number of I/O file
-    character(len=21) :: pathWin                                ! Path to Windows preprocessor file
+    character(len=29) :: pathWinPrePro                          ! Path to Windows preprocessor file
+    character(len=24) :: pathWinSolver                          ! Path to Windows solver file
     character(len=:), allocatable :: pathLin_Prepro             ! Path to Linux preprocessor file
     character(len=:), allocatable :: pathLin_Solver             ! Path to Linux Solver file
     character(len=:), allocatable :: strSystem                  ! System Command string for communication with FLITE Solver
@@ -160,7 +161,7 @@ contains
             allocate(character(len=56) :: pathLin_Prepro)
             pathLin_Prepro = '/home/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
         end if
-        pathWin = 'Flite2D\PreProcessing'   
+        pathWinPrePro = 'Executables\PreProcessing.exe' 
    
         ! Path for Solver
         if (IV%SystemType /= 'B') then
@@ -170,6 +171,7 @@ contains
             allocate(character(len=50) :: pathLin_Solver)
             pathLin_Solver = '/home/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
         end if
+        pathWinSolver = 'Executables\2DSolver.exe'
         
     end subroutine SubInputData
     

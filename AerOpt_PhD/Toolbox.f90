@@ -101,9 +101,9 @@
     ! Local Variables
     integer :: left, right
     real :: random
-    real :: pivot
+    double precision :: pivot
     integer :: marker
-    real :: temp
+    double precision :: temp
 
     if (nA > 1) then
 
@@ -160,9 +160,9 @@
     ! Local Variables
     integer :: left, right
     real :: random
-    real :: pivot
+    double precision :: pivot
     integer :: marker
-    real :: temp
+    double precision :: temp
 
     if (nA > 1) then
 

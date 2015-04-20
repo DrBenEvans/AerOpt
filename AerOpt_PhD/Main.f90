@@ -63,17 +63,26 @@ program AerOpt
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     print *, 'Create Directories'
     call createDirectoriesInit()
-    if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
-                             
+    if (IV%SystemType == 'W' .and. IV%RunOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine connected to a Linux machine
+        
+        call createDirectoriesInit()
         call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits create directory file
-            
-    else                        ! AerOpt is executed from a Linux machine
-                            
+     
+    elseif (IV%SystemType == 'W') then ! AerOpt is executed from a Windows machine alone
+        
+        call createDirectoriesWindows()
+        call system('FileCreateDir.bat')    ! Submits create directory file
+        
+    elseif (IV%SystemType == 'Q' .or. IV%SystemType == 'B') then     ! AerOpt is executed from a Linux machine
+        
+        call createDirectoriesInit()
         call system('chmod a+x ./FileCreateDir.scr')    
         call system('./FileCreateDir.scr')    ! Submits create directory file
             
-    end if
-
+    else       
+        STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'       
+    end if        
+    
     ! *****Create Initial Nests for the Snapshots****** ! 
     print *, 'Start LHS Sampling - Create Initial Nests'
     call SubCreateSnapshots()    
