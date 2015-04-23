@@ -7,18 +7,18 @@
 
     contains
     
-    subroutine SubMovemesh(CN_CoordinatesVector)
+    subroutine SubMovemesh(CN_CoordinatesMatrix)
     
         ! Variables
         implicit none
         integer :: size
-        double precision, dimension(maxDoF) :: CN_CoordinatesVector
+        double precision, dimension(maxDoF) :: CN_CoordinatesMatrix
 
         ! Body of SubMovemesh
         if (IV%MeshMovement == 1) then
-            call SubFDGD(CN_CoordinatesVector)
+            call SubFDGD(CN_CoordinatesMatrix)
         else if (IV%MeshMovement == 2) then
-            call SubRBF(CN_CoordinatesVector)
+            call SubRBF(CN_CoordinatesMatrix)
         end if
     
     end subroutine SubMovemesh
@@ -28,7 +28,7 @@
     ! Variables
     implicit none
     integer :: lb, i, k, j
-    double precision, dimension(IV%NoCP*IV%NoDim) :: NestDisp
+    double precision, dimension(maxDoF) :: NestDisp
     double precision, dimension(:), allocatable :: dCP2N, CP_ind, size_ib
     integer, dimension(:,:), allocatable :: IB
     double precision :: c, w, dis, x1, y1, x2, y2, x3, y3, xp, yp
@@ -36,17 +36,17 @@
     ! Body of RBF
     allocate(dCP2N(RD%nbf),stat=allocateStatus)
     if(allocateStatus/=0) STOP "ERROR: Not enough memory in RBF "
-    allocate(IB(RD%nbf, IV%NoCP),stat=allocateStatus)
+    allocate(IB(RD%nbf, IV%NoCN),stat=allocateStatus)
     if(allocateStatus/=0) STOP "ERROR: Not enough memory in RBF "
-    allocate(CP_ind(IV%NoCP),stat=allocateStatus)
+    allocate(CP_ind(IV%NoCN),stat=allocateStatus)
     if(allocateStatus/=0) STOP "ERROR: Not enough memory in RBF "
-    allocate(size_ib(IV%NoCP),stat=allocateStatus)
+    allocate(size_ib(IV%NoCN),stat=allocateStatus)
     if(allocateStatus/=0) STOP "ERROR: Not enough memory in RBF "
 
     ! Find Real Control Nodes based on Coordinates - !! on long terms redundant only required to run once           
     ! Also Identify boundary nodes within the influence box of each Control Point
     !!!! NOTE: Hardwired for a 2D problem!
-    do i = 1, IV%NoCP
+    do i = 1, IV%NoCN
         k = 0
         do j = 1, RD%nbf
             dCP2N(j) = DistP2P(IV%NoDim, RD%Coord_CP(i,1), RD%coord_temp(j,1), RD%Coord_CP(i, 2), RD%coord_temp(j,2))  ! Calculate Distances
@@ -72,12 +72,12 @@
     ! Relocating boundary nodes based on their distance to Control node and the Control Nodes Displacements (NestDisp)
     ! Method: Gaussian RBF function
     ! c = 1.9
-    do i = 1, IV%NoCp
+    do i = 1, IV%NoCN
         c = abs((RD%Rect(i,3) - RD%Rect(i,1)))/2.0
         do j = 1, size_ib(i)
             dis = RD%coord_temp(CP_ind(i),1) - RD%coord_temp(IB(j,i),1)   ! Distance of Control Node to a Node in the Influence Box         
             w = exp(-(dis**2)/(c**2))   ! Gaussian
-            RD%coord_temp(IB(j,i),:) = (/(RD%coord_temp(IB(j,i),1) + w*NestDisp(i)),(RD%coord_temp(IB(j,i),2) + w*NestDisp(IV%NoCP+i))/)   ! New coordinates
+            RD%coord_temp(IB(j,i),:) = (/(RD%coord_temp(IB(j,i),1) + w*NestDisp(i)),(RD%coord_temp(IB(j,i),2) + w*NestDisp(IV%NoCN+i))/)   ! New coordinates
         end do
     end do
 

@@ -4,9 +4,12 @@ module InputData
     type InputVariablesData
     
         real :: Ma                      ! Mach number
-        real :: xmax                    ! Maximum horizontal displacement of Control Nodes
-        real :: ymax                    ! Maximum vertical displacement of Control Nodes
-        real :: zmax                    ! Maximum lateral displacement of Control Nodes
+        real, dimension(100) :: xrange      ! Range of horizontal displacement of Control Nodes
+        real, dimension(100) :: yrange      ! Range of vertical displacement of Control Nodes 
+		real, dimension(100) :: zrange      ! Range of lateral displacement of Control Nodes
+        real, dimension(100) :: angle       ! Range of change in angle of Control Nodes
+        real, dimension(50) :: CNconnecttrans    ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
+        real, dimension(50) :: CNconnectangle    ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3       
         real :: gamma                   ! Ratio of specific heats
         real :: R                       ! specific gas constant
         real :: Re                      ! Reynoldsnumber
@@ -17,8 +20,9 @@ module InputData
         real :: Top2Low                 ! Fraction of Top to Low Nests
         integer :: NoNests              ! Number of Nests (Cuckoo Search)
         integer :: NoSnap               ! Number of initial Snapshots
-        integer :: NoCP                 ! Number of Control Points
+        integer :: NoCN                 ! Number of Control Nodes
         integer :: NoDim                ! Number of Dimensions
+        integer :: DoF                  ! Degrees of Freedom in the System        
         integer :: NoG                  ! Number of Generations
         integer :: NoPOMod              ! No of POD Modes considered
         integer :: NoLeviSteps          ! Number of Levy walks per movement
@@ -31,11 +35,11 @@ module InputData
         integer :: maxit                ! maximum Iterations for Solver File before stopping convergence try
         integer :: NoDelBP              ! Number of Points placed on boundars for Delaunay Triangulation
         real :: Aconst                  ! Levy Flight parameter (determined emperically)   
-        character(len=20) :: filename    ! I/O file of initial Meshes for FLITE solver
+        character(len=20) :: filename   ! I/O file of initial Meshes for FLITE solver
         character :: runOnCluster       ! Run On Cluster or Run on Engine?
         character :: SystemType         ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)    
-        character(len=20) :: UserName    ! Putty Username - Cluster: egnaumann
-        character(len=20) :: Password    ! Putty Password
+        character(len=20) :: UserName   ! Putty Username - Cluster: egnaumann
+        character(len=20) :: Password   ! Putty Password
         character(len=3) :: version
         integer :: MeshMovement
         integer :: ObjectiveFunction
@@ -43,19 +47,17 @@ module InputData
         logical :: Pol                  ! POD using Polynomial
         logical :: multiquadric         ! RBF type for POD
         logical :: POD
-        logical :: samemovement
-        logical :: meanP
-        real :: alpha
+		logical :: meanP
     
     end type InputVariablesData
     
     type(InputVariablesData) :: IV
     integer :: allocatestatus                                   ! Check Allocation Status for Large Arrays
-    character(len=10) :: InFolder = 'Input_Data'                ! Input Folder Name
-    character(len=11) :: OutFolder = 'Output_Data'              ! Output Folder Name
+    character(len=9) :: InFolder = 'Mesh_Data'                ! Input Folder Name
+    character(len=11) :: OutFolder = 'Solver_Data'              ! Output Folder Name
     integer :: IntSystem                                        ! Length of System command string; used for character variable allocation
     integer :: maxDoF                                           ! maximum Degrees of Freedom available
-    integer :: DoF                                              ! actual Degrees of Freedom in the System
+    integer :: DoFtransmotion                                   ! Degrees of Freedom in the System considering translatoric movements
     integer :: av                                               ! Allocater Variable
     real :: waitTime                                            ! waiting time for Simulation Results
     integer :: jobcheck                                         ! Check Variable for Simulation 
@@ -87,16 +89,20 @@ contains
         IV%R = 287                  	! specific gas constant
         IV%gamma = 1.4                  ! Ratio of specific heats
         IV%Re = 0.0						! Reynoldsnumber
-        IV%xmax = 0.00			        ! Maximum horizontal displacement of Control Nodes    
-        IV%ymax = 0.02			        ! Maximum vertical displacement of Control Nodes    
-        IV%zmax = 0.00			        ! Maximum lateral displacement of Control Nodes    
+        IV%xrange = 0.00                ! Maximum horizontal displacement of Control Nodes    
+        IV%yrange = 0.00                ! Maximum vertical displacement of Control Nodes    
+        IV%zrange = 0.00                ! Maximum lateral displacement of Control Nodes
+        IV%angle = 0.00                 ! For Aerofoil Angle of Attack Test
+        IV%CNconnecttrans = 0           ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
+        IV%CNconnectangle = 0           ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
         IV%engFMF = 1.0			        ! engines Front Mass Flow(Solver variable)
         IV%AlphaInflowDirection = 0.0   ! Angle/Direction of Flow within the Solver(0: Left to Right, 180: Right to Left)
         IV%turbulencemodel = 0          ! Turbulence Model applied in Solver
         IV%Top2Low = 0.75		        ! Fraction of Top to Low Cuckoo Nests
         IV%NoSnap = 1000                ! Number of initial Snapshots
-        IV%NoCP = 7			            ! Number of Control Points 
+        IV%NoCN = 7			            ! Number of Control Nodes
         IV%NoDim = 2			        ! Number of Dimensions in Space 
+        IV%DoF = 7                      ! Degrees of freedom in the system 
         IV%NoG = 100		            ! Number of Generations
         IV%NoPOMod = -1			        ! No of POD Modes considered 
         IV%NoLeviSteps = 100         	! Number of Levy walks per movement 
@@ -113,42 +119,29 @@ contains
         IV%Password = 'Fleur666'        ! Putty Password
         IV%version = '1.8'
         IV%NoDelBP = 8                  ! Number of Delaunay Boundary Points       
-        IV%alpha = 0.0                  ! For Aerofoil Angle of Attack Test
         IV%ObjectiveFunction = 1        ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - zero Lift Optimisation
-
         
         ! POD
-        IV%POD = .false.                 ! Activation of POD - TRUE is ACTIVE
-        IV%Pol = .false.                 ! Application of Polynomial?
+        IV%POD = .false.                ! Activation of POD - TRUE is ACTIVE
+        IV%Pol = .false.                ! Application of Polynomial?
         IV%multiquadric = .true.        ! using multiquadratic RBF function for POD 
         IV%AdaptSamp = .FALSE.          ! Adaptive Sampling - T: Active
         IV%meanP = .true.
-        IV%samemovement = .false.
         
         ! For Mesh Deformation
         IV%MeshMovement = 1
         IV%Meshtest = .true.
         
+		! Read User Input Parameters
         open(1,file = InFolder//'/AerOpt_InputParameters.txt',form='formatted',status='old')
         read(1,InputVariables)
         close(1)
         
-        ! Derive Degrees of Freedom
-        av = 0
-        if (IV%xmax /= 0.00) then
-            av = av + 1
-        end if
-        if (IV%ymax /= 0.00 .and. IV%NoDim > 1) then
-            av = av + 1
-        end if
-        if (IV%zmax /= 0.00 .and. IV%NoDim == 3) then
-            av = av + 1
-        end if
-        DoF = av*IV%NoCP
-        maxDoF = IV%Nodim*IV%NoCP
+        ! Derive maximum Degrees of Freedom
+        maxDoF = 4*IV%NoCN			! 3 dimensions & angular motion per node
         
         ! Number of Nests per Generation 
-        IV%NoNests = 10*DoF     
+        IV%NoNests = 10*IV%DoF     
         if (IV%NoNests > IV%NoSnap .or. IV%POD == .false.) then
             IV%NoNests = IV%NoSnap
         end if

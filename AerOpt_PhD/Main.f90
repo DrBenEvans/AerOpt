@@ -32,19 +32,10 @@ program AerOpt
     call SubInputData(IV)
     
     ! Check xmax, ymax, zmax & NoDim Input
-    ! 1D: only x considered, 2D: x & y considered, 3D: x, y & z considered
-    if (IV%NoDim == 1) then
-        if (IV%ymax /= 0 .or. IV%zmax /= 0) then
-            print *, 'ymax and/or zmax remain unconsidered in 1 Dimension'
-            print *, 'Input any and click enter to continue'
-            read(*, *)
-        end if
-    elseif (IV%NoDim == 2) then
-        if (IV%zmax /= 0) then
-            print *, 'zmax remains unconsidered in 2 Dimensions'
-            print *, 'Input any and click enter to continue'
-            read(*, *)
-        end if
+    ! 2D: x & y and  considered, 3D: x, y & z considered
+    if (IV%NoDim == 2) then
+        print *, 'zrange will be set to zero in 2 Dimensions'
+        IV%zrange = 0.0
     end if
     
     ! Automatically generates a random initial number based on time and date

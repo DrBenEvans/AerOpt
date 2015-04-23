@@ -31,7 +31,7 @@ module FDGD
         !**************************************************************************
 
         implicit none
-        double precision, dimension(IV%NoCP*IV%NoDim) :: NestDisp
+        double precision, dimension(maxDoF) :: NestDisp
         integer :: i
         
         ! Body of SubFDGD
@@ -40,14 +40,19 @@ module FDGD
 
         ! Relocate CN (Control Nodes)
         DelaunayCoord = DelaunayCoordBound
-        if (IV%alpha == 0) then
-            do i = 1, IV%NoCP
-                DelaunayCoord(i,1) = DelaunayCoord(i,1) + NestDisp(i)
-                DelaunayCoord(i,2) = DelaunayCoord(i,2) + NestDisp(i+IV%NoCP)
-            end do
-        else           
-            call AngleofAttack(NestDisp(4))
-        end if
+        do i = 1, IV%NoCN
+            DelaunayCoord(i,1) = DelaunayCoord(i,1) + NestDisp(i)
+            DelaunayCoord(i,2) = DelaunayCoord(i,2) + NestDisp(i+IV%NoCN)
+            ! DelaunayCoord(i,2) = DelaunayCoord(i,2) + NestDisp(i+2*IV%NoCN) for z
+            if (IV%angle(i) /= 0) then
+                DelaunayCoord(i,:) = AngleofAttack(NestDisp(i+3*IV%NoCN), i)
+            end if
+            if (IV%CNconnecttrans(i) /= 0) then
+                DelaunayCoord(i,1) = DelaunayCoord(i,1) + NestDisp(IV%CNconnecttrans(i))
+                DelaunayCoord(i,2) = DelaunayCoord(i,2) + NestDisp(IV%CNconnecttrans(i)+IV%NoCN)
+                ! DelaunayCoord(i,2) = DelaunayCoord(i,2) + NestDisp(IV%CNconnecttrans(i)+2*IV%NoCN) for z
+            end if
+        end do
               
         ! Move Boundary Nodes
         allocate(DelaunayElem(size(DelaunayElemBound, dim = 1),size(DelaunayElemBound, dim = 2)),stat=allocateStatus)
@@ -347,9 +352,9 @@ module FDGD
         ! Identify closest nodes to input CN coordinates in Mesh
         allocate(dist(nibp),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
-        allocate(CP_ind(IV%NoCP),stat=allocateStatus)
+        allocate(CP_ind(IV%NoCN),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "      
-        do i = 1, IV%NoCP
+        do i = 1, IV%NoCN
             do j = 1, nibp
                 dist(j) = DistP2P(IV%NoDim, RD%Coord_CP(i,1), RD%Coord(InnerBound(j),1), RD%Coord_CP(i, 2), RD%Coord(InnerBound(j),2))  ! Calculate Distances          
             end do
@@ -368,7 +373,7 @@ module FDGD
             allocate(MovingGeomIndex(nibp),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
             MovingGeomIndex = InnerBound
-            allocate(DelaunayCoordBound(IV%NoCP+IV%NoDelBP,IV%NoDim),stat=allocateStatus)
+            allocate(DelaunayCoordBound(IV%NoCN+IV%NoDelBP,IV%NoDim),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
  
         else    ! if only some parts of the boundary move
@@ -416,15 +421,15 @@ module FDGD
             end do
             deallocate(NonMovingGeomIndex)
             
-            allocate(DelaunayCoordBound(IV%NoCP + IV%NoDelBP + overlap,IV%NoDim),stat=allocateStatus)
+            allocate(DelaunayCoordBound(IV%NoCN + IV%NoDelBP + overlap,IV%NoDim),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         end if
                        
         ! Integrate CN coordinates into Delaunay Coordinates required for Triangulation
-        DelaunayCoordBound(1:IV%NoCP,:) = RD%Coord(InnerBound(CP_ind),:)
+        DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(InnerBound(CP_ind),:)
         ! Input overlapping nodes into Delaunay Coordinates
         if (overlap /= 0) then
-            DelaunayCoordBound((IV%NoCP + 1):(IV%NoCP + overlap),:) = RD%Coord(nodesvec(1:overlap),:)
+            DelaunayCoordBound((IV%NoCN + 1):(IV%NoCN + overlap),:) = RD%Coord(nodesvec(1:overlap),:)
         end if
         deallocate(nodesvec)
         deallocate(nodesvec2)
@@ -434,57 +439,53 @@ module FDGD
         miny = minval(RD%Coord(OuterBound,2))
         minx = minval(RD%Coord(OuterBound,1))
         maxx = maxval(RD%Coord(OuterBound,1))
+        testx = 0
         do i = 1, nobp
             if (RD%Coord(OuterBound(i),1) == minx) then
-                if (testx == 0) then
-                    testx = 1
-                else
-                    testx = 2
-                    EXIT
+                if (RD%Coord(OuterBound(i),2) == miny .or. RD%Coord(OuterBound(i),2) == maxy) then
+                    testx = testx + 1
+                end if
+            elseif (RD%Coord(OuterBound(i),1) == maxx) then
+                if (RD%Coord(OuterBound(i),2) == miny .or. RD%Coord(OuterBound(i),2) == maxy) then
+                    testx = testx + 1
                 end if
             end if
         end do
-        do i = 1, nobp
-            if (RD%Coord(OuterBound(i),1) == miny) then
-                if (testy == 0) then
-                    testy = 1
-                else
-                    testy = 2
-                    EXIT
-                end if
-            end if
-        end do
-        if (testx == 2 .and. testy == 2) then   ! it is rectangular
-            DelaunayCoordBound((IV%NoCP + overlap + 1),:) = (/minx, maxy/)
+        if (testx == 4) then   ! it is rectangular
+            DelaunayCoordBound((IV%NoCN + overlap + 1),:) = (/minx, maxy/)
             spacing = (maxx - minx)/(IV%NoDelBP/4)
             j = 0
             allocate(IdealCoord(IV%NoDelBP,IV%NoDim),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound"
+            IdealCoord = 0.0
             do i = 1, IV%NoDelBP
                 j = j + 1
                 IdealCoord(j,:) = (/(minx + i*spacing), maxy/)
-                if (IdealCoord(j,1) == maxx) then
+                if ((IdealCoord(j,1) - maxx) < 10e-8) then
                     EXit
                 end if
             end do
+            spacing = (maxy - miny)/(IV%NoDelBP/4)
             do i = 1, IV%NoDelBP
                 j = j + 1
                 IdealCoord(j,:) = (/maxx, (maxy - i*spacing)/)
-                if (IdealCoord(j,2) == miny) then
+                if ((IdealCoord(j,2) - miny) < 10e-8) then
                     EXit
                 end if
             end do
+            spacing = (maxx - minx)/(IV%NoDelBP/4)
             do i = 1, IV%NoDelBP
                 j = j + 1
                 IdealCoord(j,:) = (/(maxx - i*spacing), miny/)
-                if (IdealCoord(j,1) == minx) then
+                if ((IdealCoord(j,1) - minx) < 10e-8) then
                     EXit
                 end if
             end do
+            spacing = (maxy - miny)/(IV%NoDelBP/4)
             do i = 1, IV%NoDelBP
                 j = j + 1
                 IdealCoord(j,:) = (/minx, (miny + i*spacing)/)
-                if (IdealCoord(j,2) == maxy) then
+                if ((IdealCoord(j,2) - maxy) < 10e-8) then
                     EXit
                 end if
             end do
@@ -495,20 +496,20 @@ module FDGD
                 do j = 1, nobp
                     dist(j) = DistP2P(IV%NoDim, IdealCoord(i,1), RD%Coord(OuterBound(j),1), IdealCoord(i,2), RD%Coord(OuterBound(j),2))  ! Calculate Distances          
                 end do
-                DelaunayCoordBound((IV%NoCP + overlap + i + 1),:) = RD%Coord(OuterBound(minloc(dist,dim=1)),:)
+                DelaunayCoordBound((IV%NoCN + overlap + i + 1),:) = RD%Coord(OuterBound(minloc(dist,dim=1)),:)
             end do
             deallocate(dist)
         elseif (testx == 2) then  ! it is a halfcircle
-            DelaunayCoordBound((IV%NoCP + overlap + 1),:) = (/minx, maxy/)
+            DelaunayCoordBound((IV%NoCN + overlap + 1),:) = (/minx, maxy/)
             circ = nint(0.61*(IV%NoDelBP + 2))
             spacing = sqrt(((maxy-miny)**2)/2 - ((maxy-miny)**2)/2*cos(Pi/(circ - 1.0))) ! HalfCircle
             call DistributeDomainDelaunayCoord(spacing, OuterBound, nobp, overlap, 1, (circ - 2), dble((/ 1.0, 0.5/)))
-            DelaunayCoordBound((IV%NoCP + overlap + circ),:) = (/minx, miny/)
+            DelaunayCoordBound((IV%NoCN + overlap + circ),:) = (/minx, miny/)
             lin = (IV%NoDelBP + 2) - circ
             spacing = (maxy - miny)/((lin - 1) + 0.01)  ! Line       
             call DistributeDomainDelaunayCoord(spacing, OuterBound, nobp, overlap, circ, (IV%NoDelBP - 1), dble((/ -1.0, 0.5/)))
         else ! it is a circle and the starting point is arbitrary
-            DelaunayCoordBound((IV%NoCP + overlap + 1),:) = (/RD%Coord(OuterBound(maxloc(RD%Coord(OuterBound,2))),1), maxy /)
+            DelaunayCoordBound((IV%NoCN + overlap + 1),:) = (/RD%Coord(OuterBound(maxloc(RD%Coord(OuterBound,2))),1), maxy /)
             spacing = sqrt(((maxy-miny)**2)/2 - (maxy-miny)**2)*cos(real(360/IV%NoDelBP))
             call DistributeDomainDelaunayCoord(spacing, OuterBound, nobp,  overlap, 1, (IV%NoDelBP - 1), dble((/ 0.0, -1.0/)))
         end if
@@ -536,7 +537,7 @@ module FDGD
 
             distindex = (/ (j, j=1,nobp) /)            
             do j = 1, nobp
-                dist(j) = DistP2P(IV%NoDim, DelaunayCoordBound((IV%NoCP + overlap + i),1), RD%Coord(Outerbound(j), 1), DelaunayCoordBound((IV%NoCP + overlap + i),2), RD%Coord(Outerbound(j), 2))  ! Calculate Distances          
+                dist(j) = DistP2P(IV%NoDim, DelaunayCoordBound((IV%NoCN + overlap + i),1), RD%Coord(Outerbound(j), 1), DelaunayCoordBound((IV%NoCN + overlap + i),2), RD%Coord(Outerbound(j), 2))  ! Calculate Distances          
             end do
             call QSort(dist, size(dist), 'y', distindex)
             do j = 1, nobp
@@ -547,9 +548,9 @@ module FDGD
  
             if ( i == start) then ! right
                 vector = direction
-                !DelaunayCoordBound((IV%NoCP + overlap + i + 1),:) = RD%Coord(OuterBound(distindex(j)),:)
+                !DelaunayCoordBound((IV%NoCN + overlap + i + 1),:) = RD%Coord(OuterBound(distindex(j)),:)
             else
-                vector = (/DelaunayCoordBound((IV%NoCP + overlap + i),1) - DelaunayCoordBound((IV%NoCP + overlap + i - 1),1), DelaunayCoordBound((IV%NoCP + overlap + i),2) - DelaunayCoordBound((IV%NoCP + overlap + i - 1),2)/)
+                vector = (/DelaunayCoordBound((IV%NoCN + overlap + i),1) - DelaunayCoordBound((IV%NoCN + overlap + i - 1),1), DelaunayCoordBound((IV%NoCN + overlap + i),2) - DelaunayCoordBound((IV%NoCN + overlap + i - 1),2)/)
             end if
             
             ! Check, if direction is correct
@@ -558,12 +559,12 @@ module FDGD
             A(:,2) = vecNormal
             A = inv(A)
             do k = 1, (nobp - j)                 
-                b(:,1) = (/DelaunayCoordBound((IV%NoCP + overlap + i),1) - RD%Coord(OuterBound(distindex(j)),1), DelaunayCoordBound((IV%NoCP + overlap + i),2) - RD%Coord(OuterBound(distindex(j)),2)/)
+                b(:,1) = (/DelaunayCoordBound((IV%NoCN + overlap + i),1) - RD%Coord(OuterBound(distindex(j)),1), DelaunayCoordBound((IV%NoCN + overlap + i),2) - RD%Coord(OuterBound(distindex(j)),2)/)
                
                 ! x = A(-1)*b
                 x = matmul(A, b)
                 if (x(1,1) < 0) then
-                    DelaunayCoordBound((IV%NoCP + overlap + i + 1),:) = RD%Coord(OuterBound(distindex(j)),:)
+                    DelaunayCoordBound((IV%NoCN + overlap + i + 1),:) = RD%Coord(OuterBound(distindex(j)),:)
                     EXIT
                 else
                     j = j + 1
@@ -618,24 +619,29 @@ module FDGD
 
     end subroutine getDomainIndex
     
-    subroutine AngleofAttack(alpha)
+    function AngleofAttack(alpha, CNindex)
     
         ! Variables
         implicit none
+        integer :: CNindex
+        double precision, dimension(2) :: AngleofAttack
         double precision, dimension(2,2) :: T
         double precision, dimension(2) :: P1, P2, P21
         double precision :: alpha, ralpha
         real, PARAMETER :: Pi = 3.1415927
 
         ! Body of AngleofAttack
+        if (IV%CNconnectangle(CNindex) == 0) then
+            STOP "No Control Node connection is given for a specified angle input!"
+        end if
         ralpha = alpha*Pi/180
         T(1,:) = (/cos(ralpha), sin(ralpha)/)
         T(2,:) = (/-sin(ralpha), cos(ralpha)/)
-        P1 = (/DelaunayCoordBound(1,1), DelaunayCoordBound(1,2)/)
-        P2 = (/DelaunayCoordBound(2,1), DelaunayCoordBound(2,2)/)
+        P1 = DelaunayCoordBound(IV%CNconnectangle(CNindex),:)
+        P2 = DelaunayCoordBound(CNindex,:)
         P21 = P2 - P1
-        DelaunayCoord(2,:) = matmul( T, P21) + P1
+        AngleofAttack = matmul( T, P21) + P1
          
-    end subroutine AngleofAttack
+    end function AngleofAttack
     
 end module FDGD

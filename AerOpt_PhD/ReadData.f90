@@ -59,18 +59,18 @@ contains
     11  format(1I8)        
         close(1)
     
-        allocate(RD%Coord_CP(IV%NoCP,IV%NoDim),stat=allocateStatus)
+        allocate(RD%Coord_CP(IV%NoCN,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         open(2, file= InFolder//'/Control_Nodes.txt', form='formatted',status='old')
-        do i = 1, IV%NoCP
+        do i = 1, IV%NoCN
             read(2, *) RD%Coord_CP(i,:)
         end do
         close(2)
     
-        allocate(RD%Rect(IV%NoCP,IV%NoDim*4),stat=allocateStatus)
+        allocate(RD%Rect(IV%NoCN,IV%NoDim*4),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         open(3, file= InFolder//'/Rectangles.txt', form='formatted',status='old')
-        do i = 1, IV%NoCP
+        do i = 1, IV%NoCN
             read(3, *) RD%Rect(i,:)
         end do
         close(3)

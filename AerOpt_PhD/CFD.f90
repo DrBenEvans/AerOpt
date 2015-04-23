@@ -58,7 +58,7 @@ module CFD
         ! Variables
         implicit none
         integer :: NoFiles, i, InitConv
-        double precision, dimension(IV%NoNests,DoF), optional :: Nests_Move
+        double precision, dimension(IV%NoNests,IV%DoF), optional :: Nests_Move
         double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
     
         ! Body of PostSolverCheck
@@ -254,12 +254,12 @@ module CFD
         character(len=200) :: strCommand
         integer, dimension(:), allocatable :: DivNestPos, tempArray
         double precision, dimension(:), allocatable :: MidPoints       
-        double precision, dimension(IV%NoNests,DoF), optional :: Nests_Move
+        double precision, dimension(IV%NoNests,IV%DoF), optional :: Nests_Move
         double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
         
         allocate(DivNestPos(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckForConvergence "
-        allocate(MidPoints(IV%NoCP*IV%NoDim),stat=allocateStatus)
+        allocate(MidPoints(maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckforConvergence "
     
         ! Body of CheckforConvergence

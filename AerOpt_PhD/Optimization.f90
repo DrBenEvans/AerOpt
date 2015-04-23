@@ -35,15 +35,15 @@ contains
         !double precision, dimension(20, maxDOF) :: Nesting
         !double precision, dimension(RD%np) :: newpressure
 
-        allocate(NormFact(DoF),stat=allocateStatus)
+        allocate(NormFact(IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(tempNests_Move(DoF),stat=allocateStatus)
+        allocate(tempNests_Move(IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(dist(DoF),stat=allocateStatus)
+        allocate(dist(IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(Snapshots_Move(IV%NoSnap,DoF),stat=allocateStatus)
+        allocate(Snapshots_Move(IV%NoSnap,IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(Nests_Move(IV%NoNests,DoF),stat=allocateStatus)
+        allocate(Nests_Move(IV%NoNests,IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Nests(IV%NoNests,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
@@ -73,7 +73,7 @@ contains
         ! Initializing general parameters
         NoDiscard = nint(IV%Top2Low*IV%NoNests)
         NoTop = IV%NoNests - NoDiscard
-        IV%Aconst = (sqrt(real(DoF))/IV%NoLeviSteps)*IV%Aconst
+        IV%Aconst = (sqrt(real(IV%DoF))/IV%NoLeviSteps)*IV%Aconst
         tempNests = (/ (0, i=1,(maxDoF)) /)
         alpha = 1.0
         beta = 0.0
@@ -81,7 +81,7 @@ contains
         ! Specific Parameters required for Top Nest monitoring
         allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(TopNest_Move(NoTop,DoF),stat=allocateStatus)
+        allocate(TopNest_Move(NoTop,IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         
         ! Extract moving initial Nests
@@ -94,7 +94,7 @@ contains
         end do
                    
         ! Normalize Snapshots(move) between 0 and 1
-        do i = 1, DoF        
+        do i = 1, IV%DoF        
             NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
             Snapshots_Move(:,i) = Snapshots_Move(:,i)/NormFact(i) + 0.5
         end do
@@ -185,7 +185,7 @@ contains
             print *, 'Generation ', iii
             print *, '************************'
             print *, ''
-            print *, IV%Ma, IV%NoCP
+            print *, IV%Ma, IV%NoCN
             call timestamp()
             
             ! Re-order Fitness in ascending order
@@ -246,16 +246,11 @@ contains
                 call random_number(rn)
                 NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                 NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
-                tempNests_Move = Ac*LevyWalk(NoSteps, DoF) + Nests_Move(ii,:)
-                
-!EXTRA term for specfic 2 CN case, first node being fixed
-                if (IV%alpha /= 0) then
-                    tempNests_Move(1) = 0.5
-                end if
+                tempNests_Move = Ac*LevyWalk(NoSteps, IV%DoF) + Nests_Move(ii,:)
                
                 ! Check if out of bounds
                 if (IV%constrain == .true.) then                
-                    do k = 1, DoF
+                    do k = 1, IV%DoF
                         if (tempNests_Move(k) > 1) then
                             tempNests_Move(k) = 1
                         end if
@@ -307,7 +302,7 @@ contains
                     call random_number(rn)
                     NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                     NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
-                    tempNests_Move = Ac*LevyWalk(NoSteps, DoF) + Nests_Move(ii,:)
+                    tempNests_Move = Ac*LevyWalk(NoSteps, IV%DoF) + Nests_Move(ii,:)
                     
                 else    ! Different Nest
                     
@@ -335,15 +330,10 @@ contains
                     end if
                    
                 end if
-                
-!EXTRA term for specfic 2 CN case, first node being fixed
-                if (IV%alpha /= 0) then
-                    tempNests_Move(1) = 0.5
-                end if
                     
                 ! Check if out of bounds
                 if (IV%constrain == .true.) then                
-                    do k = 1, DoF
+                    do k = 1, IV%DoF
                         if (tempNests_Move(k) > 1) then
                             tempNests_Move(k) = 1
                         end if
@@ -1007,7 +997,7 @@ contains
             allocate(x(IV%NoSnap),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "      
         end if
-        allocate(NormFact(DoF),stat=allocateStatus)
+        allocate(NormFact(IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         
         ! Body of CoefficientInterpolation
@@ -1128,7 +1118,7 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in InterpolateCoefficients "
         allocate(newCoeff(IV%NoSnap,1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in InterpolateCoefficients "
-        allocate(NormFact(DoF),stat=allocateStatus)
+        allocate(NormFact(IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "     
         
         ! Body of InterpolateCoefficients
