@@ -67,6 +67,8 @@ program AerOpt
         
         call createDirectoriesInit()
         call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits create directory file
+        call createDirectoriesWindows()
+        call system('FileCreateDir.bat')    ! Submits create directory file
      
     elseif (IV%SystemType == 'W') then ! AerOpt is executed from a Windows machine alone
         
@@ -87,14 +89,6 @@ program AerOpt
     print *, 'Start LHS Sampling - Create Initial Nests'
     call SubCreateSnapshots()    
     ! Output: Initial Nests - Sampling Points for Snapshots
-  
-! Same movement: Hard coded for testing Mesh Distortion for Aerofoil case - Control Nodes move equally
-    if (IV%samemovement == .true.) then
-        Snapshots(:,1) = IV%xmax
-        Snapshots(:,2) = IV%xmax
-        Snapshots(:,3) = IV%ymax
-        Snapshots(:,4) = IV%ymax
-    end if
 
     allocate(character(len=3) :: istr)
     write(istr, '(1f3.1)') IV%Ma

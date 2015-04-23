@@ -225,7 +225,7 @@ contains
             write(1,*) ''
             write(1,*) trim(IV%filename), istr, '.resp'  ! Result filename
             write(1,*) trim(IV%filename), istr, '.rsd'   ! Residual Filename
-        elseif (IV%SystemType == 'Q') then
+        elseif (IV%SystemType == 'Q' .or. IV%RunOnCluster == 'Y') then
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp'    ! Control Filename
             write(1,'(A)') trim(Output)
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol'    ! Control Filename
@@ -236,11 +236,11 @@ contains
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd'    ! Control Filename
             write(1,'(A)') trim(Output)
         elseif (IV%SystemType == 'W') then
-            write(1,*) newdir, '\', InFolder, '\', trim(IV%filename), istr, '.inp'    ! Control Filename
-            write(1,*) newdir, '\', InFolder, '\', trim(IV%filename), istr, '.sol'    ! Computation Filename
+            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.inp'    ! Control Filename
+            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.sol'    ! Computation Filename
             write(1,*) ''
-            write(1,*) newdir, '\', InFolder, '\', trim(IV%filename), istr, '.resp'  ! Result filename
-            write(1,*) newdir, '\', InFolder, '\', trim(IV%filename), istr, '.rsd'   ! Residual Filename
+            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.resp'  ! Result filename
+            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.rsd'   ! Residual Filename
         end if
         close(1)
     
@@ -353,31 +353,25 @@ contains
         ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster
         strOut = len(trim(currentDir)) + 33
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/'//InFolder//'/SolverInput'//istr//'.txt"'
+        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh"'
         write(1, '(A)') Output       
         deallocate(Output)
                       
         strOut = len(trim(currentDir)) + 22
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.sol"'
-        write(1, '(A)') Output
-        deallocate(Output)
-        
-        strOut = len(trim(currentDir)) + 22
-        allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.dat"'
+        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol"'
         write(1, '(A)') Output
         deallocate(Output)
 
         strOut = len(trim(currentDir)) + 23
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp"'
+        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp"'
         write(1, '(A)') Output
         deallocate(Output)
         
         strOut = len(trim(currentDir)) + 25
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/'//InFolder//'/batchfile'//istr//'.sh"'
+        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/batchfile'//istr//'.sh"'
         write(1, '(A)') Output
         close(1)
     
@@ -471,7 +465,7 @@ contains
         ! Variables
         implicit none
         character(len=:), allocatable :: Output
-        integer :: strOut        
+        integer :: strOut      
     
         ! Body of TransferSolutionOutput
         open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
@@ -491,7 +485,7 @@ contains
         Output = 'get '//trim(IV%filename)//istr//'.rsd'
         write(1, '(A)') Output       
         deallocate(Output)
-    
+        
     end subroutine TransferSolutionOutput
     
     subroutine DeleteErrorFiles(i)

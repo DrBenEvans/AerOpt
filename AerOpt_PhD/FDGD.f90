@@ -88,14 +88,6 @@ module FDGD
         allocate(DelaunayElemBound(size(DelaunayElem, dim = 1), size(DelaunayElem, dim = 2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         DelaunayElemBound = DelaunayElem
-if (IV%ObjectiveFunction == 2 .and. IV%NoCP == 4) then
-    DelaunayElemBound(4,:) = (/3, 14, 4/)
-    DelaunayElemBound(5,:) = (/4, 14, 5/)
-    DelaunayElemBound(6,:) = (/4, 13, 3/)
-    DelaunayElemBound(8,:) = (/3, 13, 2/)
-    DelaunayElemBound(10,:) = (/2, 13, 1/)
-    DelaunayElem = DelaunayElemBound
-end if
         call getAreaCoefficients(MovingGeomIndex, size(MovingGeomIndex), AreaCoeffBound)
         deallocate(DelaunayCoord)
         deallocate(DelaunayElem)
@@ -107,12 +99,6 @@ end if
         allocate(DelaunayElemDomain(size(DelaunayElem, dim = 1), size(DelaunayElem, dim = 2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         DelaunayElemDomain = DelaunayElem
-if (IV%ObjectiveFunction == 2) then
-    DelaunayElemDomain(1859,:) = (/116, 117, 401/)
-    DelaunayElemDomain(2477,:) = (/117, 361, 401/)
-    DelaunayElemDomain(2481,:) = (/361, 362, 401/)
-    DelaunayElem = DelaunayElemDomain
-end if
         call getDomainIndex(DomainIndex)
         call getAreaCoefficients(DomainIndex, size(DomainIndex), AreaCoeffDomain)
         deallocate(DelaunayCoord)

@@ -57,7 +57,7 @@ module CFD
     
         ! Variables
         implicit none
-        integer :: NoFiles, ii, InitConv
+        integer :: NoFiles, i, InitConv
         double precision, dimension(IV%NoNests,DoF), optional :: Nests_Move
         double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
     
@@ -68,7 +68,18 @@ module CFD
         end if
         
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y') then
-            call TransferSolutionOutput()
+            allocate(character(len=200) :: strSystem)
+            do i = NoFiles, (NoFiles - IV%NoNests + 1), -1
+                call DetermineStrLen(istr, i)
+                call TransferSolutionOutput()
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
+                strSystem = 'move '//trim(IV%filename)//istr//'.resp "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp"'
+                call system(trim(strSystem))
+                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+                call system(trim(strSystem))                
+                deallocate(istr)
+            end do
+            deallocate (strSystem)
         end if
     
         ! ****Check Simulation Results**** !
@@ -77,8 +88,8 @@ module CFD
         print *, '***  Start Check for Convergence  ***'
         print *, '*************************************'
         print *, ''
-        ii = 0
-        call CheckforConvergence(ii, InitConv, NoFiles, Nests_Move, Nests)
+        i = 0
+        call CheckforConvergence(i, InitConv, NoFiles, Nests_Move, Nests)
         print*, 'All Solutions converged'
         
     end subroutine PostSolverCheck
@@ -303,7 +314,7 @@ module CFD
                 call DeleteErrorFiles(istr)
                 if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
                     call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-                elseif (IV%SystemType /= 'W')                  
+                elseif (IV%SystemType /= 'W')  then                
                     call system('chmod a+x ./FileCreateDir.scr')
                     call system('./FileCreateDir.scr')
                 end if
