@@ -6,74 +6,90 @@ module FDGD
     use CreateSnapshots
     
     double precision, dimension(:,:), allocatable :: AreaCoeffBound, AreaCoeffDomain
-    double precision, dimension(:,:), allocatable :: DelaunayElem, DelaunayCoord
-    double precision, dimension(:,:), allocatable :: DelaunayCoordBound, DelaunayElemBound, DelaunayElemDomain
+    double precision, dimension(:,:), allocatable :: DelaunayCoordBound, DelaunayCoordDomain
+    integer, dimension(:,:), allocatable :: DelaunayElem, DelaunayElemBound, DelaunayElemDomain
     integer, dimension(:), allocatable ::  InnerBound
     
     contains
     
-    subroutine SubFDGD(NestDisp)
+    recursive subroutine SubFDGD(NestDisp, NoMove)
     
         !**************************************************************************
         !***                    written by David Naumann                        ***
         !***                        Swansea University                          ***
         !**************************************************************************
         ! Objective:
-        ! Part A
+        ! Part A - PreMeshing
         ! 1. Create a Delaunay Triangulation with CN, interface points & domain boundary points.
-        ! 2. Identify correct Delaunay Element and calculate Area Coefficients 
-        !    of boundary points, that need to be moved.
-        ! Part B
-        ! 1. Move the mesh according to the CN movement
-        ! 2. Finally, Validity check of Delaunay Mesh:
-        !    Check for intersections of triangles after the movement
+        ! 2. Identify correct Delaunay Element and calculate Area Coefficients of each boundary node
+        ! 3. Create a Delaunay Triangulation with ALL boundary points (far field & geometry).
+        ! 4. Identify correct Delaunay Element and calculate Area Coefficients of each domain node
+        !
+        ! Part B - Perform FDGD motion
+        ! 1. Relocate Control Nodes according to new delta (change) given in Nests.
+        ! 2. Move the boundary nodes according to the CN movement
+        ! 3. Validity check of Delaunay Graph: Check for intersections of triangles
         !
         !**************************************************************************
 
         implicit none
         double precision, dimension(maxDoF) :: NestDisp
-        integer :: i
+        integer :: i, intersect, NoMove
         
-        ! Body of SubFDGD
-        allocate(DelaunayCoord(size(DelaunayCoordBound, dim = 1), size(DelaunayCoordBound, dim = 2)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
-
-        ! Relocate CN (Control Nodes)
-        DelaunayCoord = DelaunayCoordBound
-        do i = 1, IV%NoCN
-            DelaunayCoord(i,1) = DelaunayCoord(i,1) + NestDisp(i)
-            DelaunayCoord(i,2) = DelaunayCoord(i,2) + NestDisp(i+IV%NoCN)
-            ! DelaunayCoord(i,2) = DelaunayCoord(i,2) + NestDisp(i+2*IV%NoCN) for z
-            if (IV%angle(i) /= 0) then
-                DelaunayCoord(i,:) = AngleofAttack(NestDisp(i+3*IV%NoCN), i)
-            end if
-            if (IV%CNconnecttrans(i) /= 0) then
-                DelaunayCoord(i,1) = DelaunayCoord(i,1) + NestDisp(IV%CNconnecttrans(i))
-                DelaunayCoord(i,2) = DelaunayCoord(i,2) + NestDisp(IV%CNconnecttrans(i)+IV%NoCN)
-                ! DelaunayCoord(i,2) = DelaunayCoord(i,2) + NestDisp(IV%CNconnecttrans(i)+2*IV%NoCN) for z
-            end if
-        end do
+        ! Move Control Nodes
+        call RelocateCN(NestDisp, NoMove)
               
         ! Move Boundary Nodes
-        allocate(DelaunayElem(size(DelaunayElemBound, dim = 1),size(DelaunayElemBound, dim = 2)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD "
-        DelaunayElem = DelaunayElemBound
-        call RelocateMeshPoints(AreaCoeffBound, size(AreaCoeffBound, dim = 1))       
+        call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1))       
         !call CheckforIntersections()        
-        deallocate(DelaunayCoord)
-        deallocate(DelaunayElem)
-     
+        
+        ! Check for valid background mesh
+        call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))          
+        call CheckforIntersections(DelaunayCoordDomain, DelaunayElemDomain, intersect)
+        
         ! Move Domain Nodes
-        call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
-        allocate(DelaunayElem(size(DelaunayElemDomain, dim = 1),size(DelaunayElemDomain, dim = 2)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD "
-        DelaunayElem = DelaunayElemDomain
-        call RelocateMeshPoints(AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))
-        !call CheckforIntersections()
-        deallocate(DelaunayCoord)
-        deallocate(DelaunayElem)
+        if (intersect == 1) then
+            !if (NoMove > 1) then              
+            !    NoMove = NoMove - 1
+            !    call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))
+            !    call PreMeshing3()
+            !    call SubFDGD(NestDisp, NoMove)               
+            !else
+                call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))
+                NestDisp = NestDisp*(1.0/NoMove)
+            !end if
+        else
+            NoMove = NoMove*2
+            call SubFDGD(NestDisp, NoMove)
+        end if
 
     end subroutine SubFDGD
+    
+    subroutine RelocateCN(NestDisp, counter)
+    
+        ! Variables
+        implicit none
+        double precision, dimension(maxDoF) :: NestDisp
+        integer :: i
+        integer :: counter
+
+        ! Relocate CN (Control Nodes) applying rotative and translative motion
+        do i = 1, IV%NoCN
+            DelaunayCoordBound(i,1) = DelaunayCoordBound(i,1) + (1.0/counter)*NestDisp(i)
+            DelaunayCoordBound(i,2) = DelaunayCoordBound(i,2) + (1.0/counter)*NestDisp(i+IV%NoCN)
+            ! DelaunayCoord(i,2) = DelaunayCoordBound(i,2) + NestDisp(i+2*IV%NoCN) for z
+            if (IV%angle(i) /= 0) then
+                DelaunayCoordBound(i,:) = AngleofAttack((1.0/counter)*NestDisp(i+3*IV%NoCN), i)
+            end if
+            if (IV%CNconnecttrans(i) /= 0) then
+                DelaunayCoordBound(i,1) = DelaunayCoordBound(i,1) + (1.0/counter)*NestDisp(IV%CNconnecttrans(i))
+                DelaunayCoordBound(i,2) = DelaunayCoordBound(i,2) + (1.0/counter)*NestDisp(IV%CNconnecttrans(i)+IV%NoCN)
+                ! DelaunayCoord(i,2) = DelaunayCoordBound(i,2) + NestDisp(IV%CNconnecttrans(i)+2*IV%NoCN) for z
+            end if
+        end do
+        !DelaunayCoordcurrent = DelaunayCoord
+    
+    end subroutine RelocateCN
     
     subroutine PreMeshing()
     
@@ -86,33 +102,20 @@ module FDGD
     
         ! Preparation for Boundary Movement
         call getDelaunayCoordBound(MovingGeomIndex)
-        allocate(DelaunayCoord(size(DelaunayCoordBound, dim = 1), size(DelaunayCoordBound, dim = 2)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
-        DelaunayCoord = DelaunayCoordBound
-        call getDelaunayElem()
-        allocate(DelaunayElemBound(size(DelaunayElem, dim = 1), size(DelaunayElem, dim = 2)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
-        DelaunayElemBound = DelaunayElem
-        call getAreaCoefficients(MovingGeomIndex, size(MovingGeomIndex), AreaCoeffBound)
-        deallocate(DelaunayCoord)
-        deallocate(DelaunayElem)
+        call getDelaunayElem(DelaunayElemBound, DelaunayCoordBound)
+        call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, MovingGeomIndex, size(MovingGeomIndex), AreaCoeffBound)
 
         ! Preparation for Domain Movement
         print *, 'Get all Boundary Nodes for Delaunay Triangulation in FDGD'
         call getDelaunayCoordDomain(RD%Coord, size(RD%Coord, dim = 1), size(RD%Coord, dim = 2))
-        call getDelaunayElem()
-        allocate(DelaunayElemDomain(size(DelaunayElem, dim = 1), size(DelaunayElem, dim = 2)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
-        DelaunayElemDomain = DelaunayElem
+        call getDelaunayElem(DelaunayElemDomain, DelaunayCoordDomain)
         call getDomainIndex(DomainIndex)
-        call getAreaCoefficients(DomainIndex, size(DomainIndex), AreaCoeffDomain)
-        deallocate(DelaunayCoord)
-        deallocate(DelaunayElem)
+        call getAreaCoefficients(DelaunayCoordDomain, DelaunayElemDomain, DomainIndex, size(DomainIndex), AreaCoeffDomain)
 
     end subroutine PreMeshing
     
     
-    subroutine getDelaunayElem()
+    subroutine getDelaunayElem(DelaunayElem, DelaunayCoord)
     ! Objective: Do the Triangulation and get the Delaunay Element Matrix
     
         ! Variables
@@ -120,6 +123,8 @@ module FDGD
         integer :: i, FileSize, NoElem, temp
         double precision :: xa, ya, xb, yb, xc, yc, S
         character(len=8) :: Filename = 'Delaunay'
+        integer, dimension(:,:), allocatable :: DelaunayElem
+        double precision, dimension(:,:), allocatable :: DelaunayCoord
     
         ! Body of getDelaunayElem
         open(1, file= Filename//'_nodes.txt', form='formatted', status = 'unknown')
@@ -174,14 +179,16 @@ module FDGD
     end subroutine getDelaunayElem
     
     
-    subroutine getAreaCoefficients(RowIndex, NoP, AreaCoeff) 
+    subroutine getAreaCoefficients(DelaunayCoord, DelaunayElem, RowIndex, NoP, AreaCoeff) 
     
         ! Variables
         implicit none
         double precision :: xa, ya, xb, yb, xc, yc, xp, yp, S1, S2, S3, S, e1, e2, e3
-        integer :: NoNodesMove, i, j, NoP
+        integer :: NoNodesMove, i, j, NoP,a ,b, c, d
         integer, dimension(NoP) :: RowIndex
         double precision, dimension(:,:), allocatable :: AreaCoeff
+        double precision, intent(in), dimension(:, :) :: DelaunayCoord
+        integer, intent(in), dimension(:, :) :: DelaunayElem
         
         ! Body of getAreaCoefficients        
            
@@ -220,12 +227,14 @@ module FDGD
     end subroutine getAreaCoefficients
     
     
-    subroutine CheckforIntersections()
+    subroutine CheckforIntersections(DelaunayCoord, DelaunayElem, intersect)
     
         ! Variables
         implicit none
         double precision :: xa, ya, xb, yb, xc, yc, S
-        integer :: j, NoElem
+        integer :: j, NoElem, intersect
+        double precision, dimension(:,:) :: DelaunayCoord
+        integer, dimension(:,:) :: DelaunayElem
     
         ! Body of CheckforIntersections
         NoElem = size(DelaunayElem, dim = 1)
@@ -238,22 +247,23 @@ module FDGD
             yc = DelaunayCoord(DelaunayElem(j,3),2)
             S = 0.5*((xa*yb + ya*xc + xb*yc) - (xa*yc + ya*xb + yb*xc))
             if (S < 0) then  ! If Area negative, the order of the points has changed (DelaunayElement order) and hence an intersection of elements took place
-                print *, 'Intersection identified. Program paused.'
-                print *, NoElem
-                print *, j
-                pause
+                print *, 'Intersection identified. Movement will be reduced.'
+                intersect = 0
+                EXIT
             end if
         end do
     
     end subroutine CheckforIntersections
     
-    subroutine RelocateMeshPoints(AreaCoeff, NoP)
+    subroutine RelocateMeshPoints(DelaunayCoord, DelaunayElem, AreaCoeff, NoP)
     
         ! Variables
         implicit none
         integer :: i, NoP
         double precision :: x1, y1, x2, y2, x3, y3, xp, yp, inp
         double precision, dimension(NoP,5) :: AreaCoeff
+        double precision, dimension(:,:) :: DelaunayCoord
+        integer, dimension(:,:) :: DelaunayElem
 
         ! Body of RelocateMeshPoints        
         do i = 1, NoP
@@ -281,9 +291,7 @@ module FDGD
         ! Body of getDelaunayCoordDomain
         !Identify Boundary Indices
         call getBoundaryIndex(BoundIndex)
-        allocate(DelaunayCoord(size(BoundIndex),IV%NoDim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
-        DelaunayCoord = Coord(BoundIndex,:)
+        DelaunayCoordDomain = Coord(BoundIndex,:)
     
     end subroutine getDelaunayCoordDomain
     
@@ -297,20 +305,9 @@ module FDGD
         integer, dimension(:), allocatable ::  OuterBound, nodesvec, nodesvec2,nodesvec3, nodesvec4, NonMovingGeomIndex, distindex, MovingGeomIndex
         real, PARAMETER :: Pi = 3.1415927
         logical :: mp
-        integer :: LWMAX, LWORK, Info
-        parameter        ( LWMAX = 10000)
-        double precision, dimension(:), allocatable ::  WORK, Ipiv
         double precision, dimension(:,:), allocatable :: IdealCoord
     
         ! Body of getDelaunayCoordBound
-        ! LAPACK Parameters
-        allocate(Ipiv(IV%NoSnap),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
-        allocate(Work(LWMAX),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ComputeRBFWeights "
-        LWORK = -1
-        Ipiv = 0.0
-        Info = 0
         
         ! Number of Delaunay Boundary Points                       
         allocate(nodesvec(2*RD%nbf),stat=allocateStatus)
@@ -322,7 +319,7 @@ module FDGD
         k = 0
         l = 0
         do i = 1, RD%nbf
-            if (RD%boundf(i,3) == 3) then
+            if (RD%boundf(i,3) == 3 .or. RD%boundf(i,3) == 4) then
                 k = k + 1
                 nodesvec(k) = RD%boundf(i,1)
                 k = k + 1
@@ -351,9 +348,9 @@ module FDGD
 
         ! Identify closest nodes to input CN coordinates in Mesh
         allocate(dist(nibp),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound "
         allocate(CP_ind(IV%NoCN),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "      
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound "      
         do i = 1, IV%NoCN
             do j = 1, nibp
                 dist(j) = DistP2P(IV%NoDim, RD%Coord_CP(i,1), RD%Coord(InnerBound(j),1), RD%Coord_CP(i, 2), RD%Coord(InnerBound(j),2))  ! Calculate Distances          
@@ -371,10 +368,10 @@ module FDGD
         mp = .false.
         if (RD%NoParts == 0) then ! If all parts move
             allocate(MovingGeomIndex(nibp),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound "
             MovingGeomIndex = InnerBound
             allocate(DelaunayCoordBound(IV%NoCN+IV%NoDelBP,IV%NoDim),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound"
  
         else    ! if only some parts of the boundary move
             do i = 1, RD%nbf
@@ -398,9 +395,9 @@ module FDGD
                 end if
             end do
             allocate(nodesvec3(k),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound "
             allocate(nodesvec4(l),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound "
             nodesvec3 = nodesvec
             nodesvec4 = nodesvec2
             call QSortInt(nodesvec3, k, 'n') 
@@ -422,7 +419,7 @@ module FDGD
             deallocate(NonMovingGeomIndex)
             
             allocate(DelaunayCoordBound(IV%NoCN + IV%NoDelBP + overlap,IV%NoDim),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound"
         end if
                        
         ! Integrate CN coordinates into Delaunay Coordinates required for Triangulation
@@ -491,7 +488,7 @@ module FDGD
             end do
             ! Identify real nodes to ideal Delaunay Boundary coordinates in Mesh
             allocate(dist(nobp),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh " 
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound " 
             do i = 1, (IV%NoDelBP - 1)
                 do j = 1, nobp
                     dist(j) = DistP2P(IV%NoDim, IdealCoord(i,1), RD%Coord(OuterBound(j),1), IdealCoord(i,2), RD%Coord(OuterBound(j),2))  ! Calculate Distances          
@@ -513,6 +510,9 @@ module FDGD
             spacing = sqrt(((maxy-miny)**2)/2 - (maxy-miny)**2)*cos(real(360/IV%NoDelBP))
             call DistributeDomainDelaunayCoord(spacing, OuterBound, nobp,  overlap, 1, (IV%NoDelBP - 1), dble((/ 0.0, -1.0/)))
         end if
+
+		deallocate(DelaunayCoordBound)
+		
     end subroutine getDelaunayCoordBound
     
     subroutine DistributeDomainDelaunayCoord(spacing, OuterBound, nobp, overlap, start, ending, direction)

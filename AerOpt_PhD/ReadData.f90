@@ -5,13 +5,10 @@ module ReadData
     type ReadVariablesData
     
         integer :: ne, np, nbf, nbc, NoParts                                ! Number of elements, Nodes/Points & boundary faces
-        integer, dimension(:), allocatable :: MovingParts                   ! Connectivity Matrix of Coarse Mesh
-        integer, dimension(:,:), allocatable :: connecc                     ! Connectivity Matrix of Coarse Mesh    
+        integer, dimension(:), allocatable :: MovingParts                   ! Connectivity Matrix of Coarse Mesh    
         integer, dimension(:,:), allocatable :: connecf, boundf             ! Connectivity & Boundary Matrix of Fine Mesh    
         double precision, dimension(:,:), allocatable :: coord              ! Coordinates Matrix of Fine Mesh (includes coordinates of coarse mesh)
-        double precision, dimension(:,:), allocatable :: coarse             ! includes element allocation of nodes to coarse triangles and Area Coefficients of each node
         double precision, dimension(:,:), allocatable :: Coord_CP           ! desired Coordinates of the Control Points
-        double precision, dimension(:,:), allocatable :: Rect               ! Rectangle definition of 'Influence Box'
         double precision, dimension(:,:), allocatable :: coord_temp         ! Coordinates Matrix of Fine Mesh
         
     end type ReadVariablesData
@@ -29,7 +26,7 @@ contains
         integer :: i
     
         ! Body of ReadData
-        open(1, file= InFolder//'/Mesh_fine.txt', form='formatted',status='old')
+        open(1, file= DataFolder//'/Mesh_fine.txt', form='formatted',status='old')
         read(1, 11) RD%NoParts
         if (RD%NoParts /= 0) then
             allocate(RD%MovingParts(RD%NoParts),stat=allocateStatus)
@@ -61,33 +58,11 @@ contains
     
         allocate(RD%Coord_CP(IV%NoCN,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        open(2, file= InFolder//'/Control_Nodes.txt', form='formatted',status='old')
+        open(2, file= DataFolder//'/Control_Nodes.txt', form='formatted',status='old')
         do i = 1, IV%NoCN
             read(2, *) RD%Coord_CP(i,:)
         end do
         close(2)
-    
-        allocate(RD%Rect(IV%NoCN,IV%NoDim*4),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        open(3, file= InFolder//'/Rectangles.txt', form='formatted',status='old')
-        do i = 1, IV%NoCN
-            read(3, *) RD%Rect(i,:)
-        end do
-        close(3)
-    
-        open(4, file= InFolder//'/Mesh_coarse.txt', form='formatted',status='old')
-        read(4, *) RD%nbc
-        allocate(RD%connecc(RD%nbc,IV%NoDim+1),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        allocate(RD%coarse(RD%np-RD%nbf, IV%NoDim+2),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        do i = 1, (RD%np - RD%nbf)
-            read(4, *) RD%coarse(i,:)
-        end do
-        do i = 1, RD%nbc
-            read(4, *) RD%connecc(i,:)
-        end do
-        close(4)
     
     end subroutine SubReadData
     

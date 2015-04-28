@@ -15,18 +15,14 @@ module CreateSnapshots
     
         ! Variables
         implicit none
-        integer :: i, j
-        integer, dimension(IV%NoCN) :: ones                      ! Vector with Ones                                    
+        integer :: i, j, newscore, bestscore  
+        double precision, dimension(IV%NoSnap,maxDoF) :: Snaptemp
         allocate(MxDisp(maxDoF,2))
         allocate(cond(maxDoF))
         allocate(Snapshots(IV%NoSnap,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
         allocate(MxDisp_Move(IV%DoF,2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
-        
-        
-        !!****Body of SubCreateSnapshots****!!      
-        ones = (/ (1, i=1,IV%NoCN) /)
         
         ! Initialize min/max Motion Matrix    
         MxDisp(:,1) = (/IV%xrange(1:IV%NoCN), IV%yrange(1:IV%NoCN), IV%zrange(1:IV%NoCN), IV%angle(1:IV%NoCN)/) ! min
@@ -43,8 +39,19 @@ module CreateSnapshots
         end do               
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
-        call LHS(Snapshots, IV%NoSnap, IV%NoCN)     
-        !Output: Snapshots - an initial Sampling via LHS      
+        call LHS(Snapshots, IV%NoSnap, IV%NoCN)     ! Output: Snapshots - an initial Sampling via LHS        
+        bestscore = score(Snapshots)
+        do i = 1, 1000
+            call LHS(Snaptemp, IV%NoSnap, IV%NoCN)
+            
+            newscore = score(Snaptemp)
+            if (newscore > bestscore) then
+                Snapshots = Snaptemp
+                bestscore = newscore
+            end if
+        end do
+        
+        ! Include initial Geometry as Snapshot
         Snapshots(1,:) = 0.0
 
     end subroutine SubCreateSnapshots
@@ -53,109 +60,54 @@ module CreateSnapshots
     
         ! Variables
         implicit none
-        integer :: NoSampPoints, NoPerm
+        integer :: NoSampPoints, NoPerm, i, j
         double precision, dimension(NoSampPoints, maxDoF) :: Sampling
         double precision, dimension(:,:), allocatable :: Sampling_1D
+        double precision :: max, min
+        integer, dimension(NoSampPoints) :: rp
+        double precision, dimension(NoSampPoints) :: linSamp
         
         ! Body of LHS
-        !!*** Based on the degrees of freedom(xmax, ymax & zmax definition ****!!
-        !!*** & Dimension restriction) the LHS is performed 1,2 or 3 times. ***!!
-        !!**** The size of MxDisp_Move indicates the degrees of freedom ****!!
         Sampling = 0.0
-        allocate(Sampling_1D(NoSampPoints, NoPerm),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in LHS "
+        do j = 1, maxDoF
             
-        print *, 'x Dimension'
-        call LHS_1D(MxDisp(1:NoPerm,:), Sampling_1D, NoSampPoints, NoPerm) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-        Sampling(:,1:NoPerm) = Sampling_1D ! Write Data in x-Matrix section
+            max = MxDisp(j,1) - (MxDisp(j,1) - MxDisp(j,2))/(2*NoSampPoints)
+            min = MxDisp(j,2) + (MxDisp(j,1) - MxDisp(j,2))/(2*NoSampPoints)
+            linSamp = linSpacing(max, min, NoSampPoints) ! equal spacing of Design Space/Movement Domain in 1D
             
-        print *, 'y Dimension'
-        call LHS_1D(MxDisp((NoPerm+1):2*NoPerm,:), Sampling_1D, NoSampPoints, NoPerm) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-        Sampling(:,(NoPerm+1):2*NoPerm) = Sampling_1D ! Write Data in y-Matrix section
+            call randperm(NoSampPoints, rp) ! generates a vector of random integer values       
+            do i = 1, IV%NoSnap             
+                Sampling(i,j) = linSamp(rp(i)) ! Randomly permuted integers applied as indices (rp)                               
+            end do
             
-        print *, 'z Dimension'
-        call LHS_1D(MxDisp((2*NoPerm+1):3*NoPerm,:), Sampling_1D, NoSampPoints, NoPerm) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-        Sampling(:,(2*NoPerm+1):3*NoPerm) = Sampling_1D ! Write Data in z-Matrix section  
-
-        print *, 'angular Dimension'
-        call LHS_1D(MxDisp((3*NoPerm+1):4*NoPerm,:), Sampling_1D, NoSampPoints, NoPerm) ! Output: Initial_Nests_1D: Sampling Points for one Dimension
-        Sampling(:,(3*NoPerm+1):4*NoPerm) = Sampling_1D ! Write Data in z-Matrix section 
-        !Output: Sampling - an initial Sampling vis LHS
-        
+        end do
+         
     end subroutine LHS
     
-    subroutine LHS_1D(MD_Move, Sampling_1D, NoSampPoints, NoPerm)
+    function score(Sampling)
     
         ! Variables
         implicit none
-        integer :: NoSampPoints, NoPerm, i, j, k
-        double precision, dimension(NoSampPoints,NoPerm), intent(out) :: Sampling_1D
-        integer, dimension(NoSampPoints) :: rp
-        double precision, dimension(NoPerm,2) :: MD_Move 
-        double precision, dimension(NoSampPoints) :: linSamp, linSamp2
-        double precision :: max, min, first, last, dlS, ds, dlL1, dlL2, dL, dbound
-    
-        ! Body of LHS_1D
-        !!************** A complicated way of applying LHS for a 1D sampling. *************!!
-        !!********* The idea is to maximize the minimum distance between points. **********!!
-        !!****** However, that only plays a role in case of non-uniform distribution. *****!!
-        !! Here, a uniform distribution (linSpacing) by picking the Midpoints is selected. !!        
-        max = MD_Move(1,1)
-        min = MD_Move(1,2)
-        linSamp = linSpacing(max, min, NoSampPoints) ! linear splitting of Design Space/Movement Domain
+        integer :: a, i, j, k
+        double precision :: dist, score
+        double precision, dimension(:), allocatable :: SnapDist
+        double precision, dimension(IV%NoSnap, maxDoF) :: Sampling
         
-        !! Find maximum minimum distance between Points/Nests to redefine limits
-        dlS = linSamp(1) - linSamp(2)
-        ds = dlS/100000
-        do i = 1, 100000
-                
-            first = max - ds*i
-            last = min + ds*i
-            linSamp = linSpacing(first, last, NoSampPoints)
-                
-            dlL1 = max - linSamp(1)
-            dlL2 = (linSamp(2) - linSamp(1))/2
-            if ((dlL1 + dlL2) > 10**(-6)) then
-                dL = max - linSamp(1)
-                exit
-            end if
-                
+        ! Body of score
+        allocate(SnapDist(IV%NoSnap**2/2-(IV%NoSnap/2)),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
+        a = 0
+        do i = 1, IV%NoSnap
+            do j = i + 1, IV%NoSnap
+                do k = 1, IV%NoCN                   
+                    dist = dist + (Sampling(i,k) - Sampling(j,k))**2
+                end do
+                a = a + 1
+                SnapDist(a) = sqrt(dist)
+            end do
         end do
+        score = minval(SnapDist)
         
-        ! Calculate Spacing with new limits
-        first = max - dL
-        last = min + dL
-        linSamp = linSpacing(first, last, NoSampPoints)
-        
-        ! Simplified version: Redefine Limits(max/min) via Midpoint Calculation        
-        linSamp2 = linSpacing(max, min, (NoSampPoints + 1))
-        dbound = abs((linSamp2(1) - linSamp2(2))/2)
-        max = max - dbound
-        min = min + dbound
-        linSamp2 = linSpacing(max, min, NoSampPoints) ! Calculate Spacing with new limits
-        
-        ! Test simplified version vs complicated version
-        k = 0
-        do i = 1, NoSampPoints
-            if (abs(linSamp(i) - linSamp2(i)) < 1D-6) then
-                    k = k + 1                
-            end if
-        end do
-        if (k == NoSampPoints) then
-            print *, 'Simplified Version WORKS'
-        else
-            print *, 'Simplified Version FAILED'
-            print *, k
-        end if
-        
-        ! Execute Random Permutation of distributed Nests for each Control Point
-        do i = 1, NoPerm               
-            call randperm(NoSampPoints, rp) ! see Subroutine, Output are integers
-            do j = 1, NoSampPoints               
-                Sampling_1D(j,i) = linSamp(rp(j)) ! Randomly permuted integers applied as indices (rp)                               
-            end do                
-        end do        
-    
-    end subroutine LHS_1D
+    end function score
     
 end module CreateSnapshots

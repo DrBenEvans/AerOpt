@@ -72,6 +72,7 @@
     ! Objective: Print a Matrix
 
     ! Variables
+    implicit none
     character*(*) ::   DESC
     integer ::         M, N, LDA
     double precision :: A( LDA, * )
@@ -93,6 +94,7 @@
     ! Objective: Sort/Order an Array in ascending order
 
     ! Dummy Arguments
+    implicit none
     integer, intent(in) :: nA
     double precision, dimension(nA), intent(in out) :: A
     integer, dimension(nA), intent(in out), optional :: ind
@@ -152,6 +154,7 @@
     ! Objective: Sort/Order an Array in ascending order
 
     ! Dummy Arguments
+    implicit none
     integer, intent(in) :: nA
     integer, dimension(nA), intent(in out) :: A
     integer, dimension(nA), intent(in out), optional :: ind
@@ -210,7 +213,8 @@
     subroutine Unique(vector_in, sz, vector_out)
 
     ! Variables
-    integer :: sz
+    implicit none
+    integer :: sz, i, j
     double precision, dimension(sz), intent(in) :: vector_in
     double precision, dimension(:), allocatable, intent(out) :: vector_out
     integer, dimension(sz) :: marker
@@ -241,7 +245,8 @@
     subroutine UniqueInt(vector_in, sz, vector_out)
 
     ! Variables
-    integer :: sz
+    implicit none
+    integer :: sz, i, j
     integer, dimension(sz), intent(in) :: vector_in
     integer, dimension(:), allocatable, intent(out) :: vector_out
     integer, dimension(sz) :: marker
@@ -273,11 +278,11 @@
 
     !! Source: coding.derkeiler.com/Archive/Fortran/comp.lang.fortran/2006-03/msg00748.html
     !! Based on Knuth's algorithm
-
+    implicit none
     integer, intent(in) :: N
     integer, dimension(:), intent(out) :: p
-
-    integer :: temp
+    double precision :: rn
+    integer :: temp, j, k, i
 
     p = (/ (i, i=1,N) /)
 
@@ -381,6 +386,8 @@
     subroutine DetermineStrLen(istr, i)
 
     ! Variables
+    implicit none
+    integer :: i
     character(len=:), allocatable :: istr
 
     ! Body of DetermineStrLen     
@@ -403,6 +410,7 @@
     subroutine communicateWin2Lin(Username, Password, fname, channel)
 
     ! Variables
+    implicit none
     integer :: IntSystem
     character(len=*) :: Username, Password, fname, channel
     character(len=:), allocatable :: strSyst
@@ -451,9 +459,11 @@
     ! Objective: Performs the LU - Decomposition
 
     ! Variables
-    parameter (NMAX=100,TINY=1.5D-17)
+    implicit none
+    integer, parameter :: NMAX = 100
+    double precision, parameter :: TINY = 1.5D-17
     double precision ::  AMAX,DUM, SUM, A(N,N),VV(NMAX)
-    integer :: CODE, D, INDX(N)
+    integer :: CODE, D, INDX(N), I, J, K, IMAX, N
 
     ! Body of LU Decomposition
     D=1; CODE=0
@@ -519,6 +529,8 @@
     ! Returns the inverse of a matrix calculated by finding the LU
     ! decomposition.  Depends on LAPACK.
     function inv(A) result(Ainv)
+    
+      implicit none
       double precision, dimension(:,:), intent(in) :: A
       double precision, dimension(size(A,1),size(A,2)) :: Ainv
 
@@ -550,5 +562,19 @@
          stop 'Matrix inversion failed!'
       end if
     end function inv
-
+    
+    integer function fact(n)
+    
+        implicit none
+        integer, intent(in) :: n
+        integer :: i, a
+        
+        a = 1
+        do i = 1, n
+            a = a*i
+        end do
+        fact = a
+        
+    end function fact
+    
     end module Toolbox

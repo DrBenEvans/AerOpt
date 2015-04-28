@@ -53,6 +53,7 @@ module InputData
     
     type(InputVariablesData) :: IV
     integer :: allocatestatus                                   ! Check Allocation Status for Large Arrays
+    character(len=10) :: DataFolder = 'Input_Data'                ! Input Folder Name
     character(len=9) :: InFolder = 'Mesh_Data'                ! Input Folder Name
     character(len=11) :: OutFolder = 'Solver_Data'              ! Output Folder Name
     integer :: IntSystem                                        ! Length of System command string; used for character variable allocation
@@ -99,7 +100,7 @@ contains
         IV%AlphaInflowDirection = 0.0   ! Angle/Direction of Flow within the Solver(0: Left to Right, 180: Right to Left)
         IV%turbulencemodel = 0          ! Turbulence Model applied in Solver
         IV%Top2Low = 0.75		        ! Fraction of Top to Low Cuckoo Nests
-        IV%NoSnap = 1000                ! Number of initial Snapshots
+        IV%NoSnap = 100                 ! Number of initial Snapshots
         IV%NoCN = 7			            ! Number of Control Nodes
         IV%NoDim = 2			        ! Number of Dimensions in Space 
         IV%DoF = 7                      ! Degrees of freedom in the system 
@@ -133,7 +134,7 @@ contains
         IV%Meshtest = .true.
         
 		! Read User Input Parameters
-        open(1,file = InFolder//'/AerOpt_InputParameters.txt',form='formatted',status='old')
+        open(1,file = DataFolder//'/AerOpt_InputParameters.txt',form='formatted',status='old')
         read(1,InputVariables)
         close(1)
         

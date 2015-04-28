@@ -154,11 +154,11 @@ contains
         ! Change to Descending Order for Maximization Problem
         do j = 1, int(IV%NoSnap/2.0)
             temp = Fi_initial(j)
-            Fi_initial(j) = Fi_initial(IV%NoNests-j+1)
-            Fi_initial(IV%NoNests-j+1) = temp
+            Fi_initial(j) = Fi_initial(IV%NoSnap-j+1)
+            Fi_initial(IV%NoSnap-j+1) = temp
             temp = ind_Fi_initial(j)
-            ind_Fi_initial(j) = ind_Fi_initial(IV%NoNests-j+1)
-            ind_Fi_initial(IV%NoNests-j+1) = temp
+            ind_Fi_initial(j) = ind_Fi_initial(IV%NoSnap-j+1)
+            ind_Fi_initial(IV%NoSnap-j+1) = temp
         end do
         Fi = Fi_initial(1:IV%NoNests)
         Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
@@ -523,6 +523,8 @@ contains
         close(19)
         
         ! write final Nests in File
+        Nests_Move = Nests_Move(ind_Fi,:)
+        Nests = Nests(ind_Fi,:)
         open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
         write(29, *) 'Generation', iii
         write(29,'(<IV%NoNests>f17.10)') Nests
