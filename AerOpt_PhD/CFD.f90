@@ -73,9 +73,9 @@ module CFD
                 call DetermineStrLen(istr, i)
                 call TransferSolutionOutput()
                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
-                strSystem = 'move '//trim(IV%filename)//istr//'.resp "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp"'
+                strSystem = 'move '//trim(IV%filename)//istr//'.resp "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp"'
                 call system(trim(strSystem))
-                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
                 call system(trim(strSystem))                
                 deallocate(istr)
             end do
@@ -111,7 +111,7 @@ module CFD
         if (IV%SystemType == 'W') then
              
             allocate(character(len=100) :: strSystem)
-            strSystem = pathWinPrePro//' < '//newdir//'\PreprocessingInput.txt >nul 2>&1'
+            strSystem = pathWinPrePro//' < '//newdir//'/PreprocessingInput.txt >nul 2>&1'
             
         else
             
@@ -158,11 +158,11 @@ module CFD
             else
                 print *, 'Solving Geometry', i
                 allocate(character(len=200) :: strSystem)
-                strSystem = pathWinSolver//' < '//newdir//'\'//InFolder//'\SolverInput'//istr//'.sh >nul 2>&1'
+                strSystem = pathWinSolver//' < '//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh >nul 2>&1'
                 call system(trim(strSystem))
-                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp"'
+                strSystem = 'move '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.resp "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp"'
                 call system(trim(strSystem))
-                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+                strSystem = 'move '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
                 call system(trim(strSystem))
                 deallocate (strSystem)
             end if 
@@ -356,7 +356,7 @@ module CFD
             
         ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
         if (IV%SystemType == 'W') then
-            open(1, file=newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
+            open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
         else
             open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
         end if       

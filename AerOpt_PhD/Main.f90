@@ -49,7 +49,7 @@ program AerOpt
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
     print *, 'Start Read Data'
     call SubReadData()
-    ! Output: Boundf, Coord, Connecf, Coord_CP
+    ! Output: Boundf, Coord, Connec, Coord_CN
     
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     print *, 'Create Directories'

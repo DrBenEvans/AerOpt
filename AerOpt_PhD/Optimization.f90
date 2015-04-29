@@ -766,9 +766,9 @@ contains
         ! Body of getengineInlet
         j = 0
         do i = 1, RD%nbf
-            if (RD%boundf(i,3) == 8) then
+            if (RD%boundtype(i) == 8) then
                 j = j + 1
-                nodesall(j,:) = RD%boundf(i,1:2)           
+                nodesall(j,:) = RD%bound(i,:)           
             end if
         end do
         ! Outcome: A list of all nodes related to the engine Inlet, including possible doubling
@@ -1341,13 +1341,13 @@ contains
         tangentArray = 0.0
         lengthArray = 0.0
         do i = 1, RD%nbf
-            vec1 = RD%coord_temp(RD%boundf(i,1),:)
-            vec2 = RD%coord_temp(RD%boundf(i,2),:)
+            vec1 = RD%coord_temp(RD%bound(i,1),:)
+            vec2 = RD%coord_temp(RD%bound(i,2),:)
             tangent = vec2 - vec1
             dx = DistP2P(IV%NoDim, vec1(1), vec2(1), vec1(2), vec2(2))
             intexit = 0
             do j = 1, NoIB
-                if (RD%boundf(i,1) == Innerbound(j)) then
+                if (RD%bound(i,1) == Innerbound(j)) then
                     tangentArray(j,:) = tangentArray(j,:) + tangent
                     lengthArray(j) = lengthArray(j) + dx
                     intexit = intexit + 1
@@ -1355,7 +1355,7 @@ contains
                         EXIT
                     end if
                 end if
-                if (RD%boundf(i,2) == Innerbound(j)) then
+                if (RD%bound(i,2) == Innerbound(j)) then
                     tangentArray(j,:) = tangentArray(j,:) + tangent
                     lengthArray(j) = lengthArray(j) + dx
                     intexit = intexit + 1
@@ -1452,13 +1452,13 @@ contains
         tangentArray = 0.0
         lengthArray = 0.0
         do i = 1, RD%nbf
-            vec1 = RD%coord_temp(RD%boundf(i,1),:)
-            vec2 = RD%coord_temp(RD%boundf(i,2),:)
+            vec1 = RD%coord_temp(RD%bound(i,1),:)
+            vec2 = RD%coord_temp(RD%bound(i,2),:)
             tangent = vec2 - vec1
             dx = DistP2P(IV%NoDim, vec1(1), vec2(1), vec1(2), vec2(2))
             intexit = 0
             do j = 1, NoIB
-                if (RD%boundf(i,1) == Innerbound(j)) then
+                if (RD%bound(i,1) == Innerbound(j)) then
                     tangentArray(j,:) = tangentArray(j,:) + tangent
                     lengthArray(j) = lengthArray(j) + dx
                     intexit = intexit + 1
@@ -1466,7 +1466,7 @@ contains
                         EXIT
                     end if
                 end if
-                if (RD%boundf(i,2) == Innerbound(j)) then
+                if (RD%bound(i,2) == Innerbound(j)) then
                     tangentArray(j,:) = tangentArray(j,:) + tangent
                     lengthArray(j) = lengthArray(j) + dx
                     intexit = intexit + 1

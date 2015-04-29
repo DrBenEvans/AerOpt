@@ -4,12 +4,12 @@ module ReadData
     use Toolbox
     type ReadVariablesData
     
-        integer :: ne, np, nbf, nbc, NoParts                                ! Number of elements, Nodes/Points & boundary faces
-        integer, dimension(:), allocatable :: MovingParts                   ! Connectivity Matrix of Coarse Mesh    
-        integer, dimension(:,:), allocatable :: connecf, boundf             ! Connectivity & Boundary Matrix of Fine Mesh    
-        double precision, dimension(:,:), allocatable :: coord              ! Coordinates Matrix of Fine Mesh (includes coordinates of coarse mesh)
-        double precision, dimension(:,:), allocatable :: Coord_CP           ! desired Coordinates of the Control Points
-        double precision, dimension(:,:), allocatable :: coord_temp         ! Coordinates Matrix of Fine Mesh
+        integer :: ne, np, nbf, nbc, NoParts                                    ! Number of elements, Nodes/Points & boundary faces
+        integer, dimension(:), allocatable :: boundtype, boundpart, MovingParts ! Boundary Information of Mesh: Type, Part of boundary    
+        integer, dimension(:,:), allocatable :: connec, bound                   ! Connectivity & Boundary Matrix of Fine Mesh    
+        double precision, dimension(:,:), allocatable :: coord                  ! Coordinates Matrix of Mesh
+        double precision, dimension(:,:), allocatable :: Coord_CN               ! desired Coordinates of the Control Points
+        double precision, dimension(:,:), allocatable :: coord_temp             ! Coordinates Matrix of Mesh for temporary Mesh Movement
         
     end type ReadVariablesData
     
@@ -23,44 +23,96 @@ contains
     
         ! Variables
         implicit none
-        integer :: i
-    
+        integer :: i, NoHeadLines, clean, NoColumns1, NoColumns2
+        character(len=200) :: MeshFileName
+        character(len=5) :: container
+        double precision, dimension(:), allocatable :: Input
+        
         ! Body of ReadData
-        open(1, file= DataFolder//'/Mesh_fine.txt', form='formatted',status='old')
-        read(1, 11) RD%NoParts
+        NoColumns1 = 5
+        NoColumns2 = 5
+        clean = 4
+        !write(*,'(A)',advance="no") "Enter Mesh Filename: "
+        !read(*,'(A)') MeshFileName
+        MeshFileName = 'Mesh.dat'
+        open(1, file= DataFolder//'/'//trim(MeshFileName), form='formatted',status='old')
+        write(*,*) 'File '//trim(MeshFileName)//' opened...'
+        write(*,*) "" 
+        read(1,*) NoHeadLines
+        do i = 1, NoHeadLines
+            read(1,*) container
+            if (container == 'clean') then
+                NoColumns1 = IV%NoDim + 2
+                NoColumns2 = IV%NoDim + 1
+                clean = IV%NoDim + 1
+            end if
+        end do
+        
+        ! If only specified parts wish to be moved, include this back into the .dat file!
+        !read(1,'(1I8)') RD%NoParts
+        RD%NoParts = 0 ! Delete to specify parts
         if (RD%NoParts /= 0) then
             allocate(RD%MovingParts(RD%NoParts),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
             do i = 1, RD%NoParts
-                read(1, 11) RD%MovingParts(i)
+                read(1, *) RD%MovingParts(i)
             end do
         end if
-        read(1, 11) RD%ne
-        allocate(RD%connecf(RD%ne,IV%NoDim+1),stat=allocateStatus)
+        
+        ! Read in Header parameters and allocate arrays
+        read(1,*)        
+        read(1,*) RD%ne, RD%np, RD%nbf
+        allocate(RD%connec(RD%ne,IV%NoDim+1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        read(1, 11) RD%np
         allocate(RD%coord(RD%np,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        read(1, 11) RD%nbf
-        allocate(RD%boundf(RD%nbf,IV%NoDim + 2),stat=allocateStatus)
+        allocate(RD%bound(RD%nbf,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        allocate(RD%boundtype(RD%nbf),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        
+        ! Connectivities
+        allocate(Input(NoColumns1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        read(1,*) 
         do i = 1, RD%ne
-            read(1, *) RD%connecf(i,:)
+            read(1, *) Input
+            RD%connec(i,:) = Input(2:4)
         end do
+        deallocate(Input)
+        
+        ! Coordinates
+        allocate(Input(NoColumns2),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        read(1,*) 
         do i = 1, RD%np
-            read(1, *) RD%coord(i,:)
+            read(1, *) Input
+            RD%coord(i,:) = Input(2:3)          
         end do
+        
+        ! Trash
+        if (clean == 4) then
+            read(1,*) 
+            do i = 1, RD%np
+                read(1, *)
+            end do 
+        end if
+        
+        ! Boundary Faces
+        read(1,*) 
         do i = 1, RD%nbf
-            read(1, *) RD%boundf(i,:)
-        end do 
-    11  format(1I8)        
+            read(1, *) Input
+            RD%bound(i,:) = Input(1:2)
+            RD%boundtype(i) = Input(clean)
+            ! RD%boundpart
+        end do        
         close(1)
     
-        allocate(RD%Coord_CP(IV%NoCN,IV%NoDim),stat=allocateStatus)
+        allocate(RD%Coord_CN(IV%NoCN,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         open(2, file= DataFolder//'/Control_Nodes.txt', form='formatted',status='old')
         do i = 1, IV%NoCN
-            read(2, *) RD%Coord_CP(i,:)
+            read(2, *) RD%Coord_CN(i,:)
         end do
         close(2)
     
@@ -85,7 +137,7 @@ contains
         write(99,*) RD%ne, RD%np, RD%nbf
         write(99,*) 'Connectivities'
         do j = 1, RD%ne
-            write(99,*) j, RD%connecf(j,:)
+            write(99,*) j, RD%connec(j,:)
         end do
         write(99,*) 'Coordinates'
         do j = 1, RD%np
@@ -93,7 +145,7 @@ contains
         end do
         write(99,*) 'Boundary Faces'
         do j = 1, RD%nbf
-            write(99,*) RD%boundf(j,1:3)
+            write(99,*) RD%bound(j,:), RD%boundtype(j)
         end do
 10      format(2f12.7)        
         close(99)

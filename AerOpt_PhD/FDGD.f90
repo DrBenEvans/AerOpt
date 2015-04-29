@@ -6,6 +6,7 @@ module FDGD
     use CreateSnapshots
     
     double precision, dimension(:,:), allocatable :: AreaCoeffBound, AreaCoeffDomain
+    double precision, dimension(:), allocatable :: CN_ind
     double precision, dimension(:,:), allocatable :: DelaunayCoordBound, DelaunayCoordDomain
     integer, dimension(:,:), allocatable :: DelaunayElem, DelaunayElemBound, DelaunayElemDomain
     integer, dimension(:), allocatable ::  InnerBound
@@ -44,7 +45,7 @@ module FDGD
         !call CheckforIntersections()        
         
         ! Check for valid background mesh
-        call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))          
+        call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
         call CheckforIntersections(DelaunayCoordDomain, DelaunayElemDomain, intersect)
         
         ! Move Domain Nodes
@@ -75,16 +76,16 @@ module FDGD
 
         ! Relocate CN (Control Nodes) applying rotative and translative motion
         do i = 1, IV%NoCN
-            DelaunayCoordBound(i,1) = DelaunayCoordBound(i,1) + (1.0/counter)*NestDisp(i)
-            DelaunayCoordBound(i,2) = DelaunayCoordBound(i,2) + (1.0/counter)*NestDisp(i+IV%NoCN)
-            ! DelaunayCoord(i,2) = DelaunayCoordBound(i,2) + NestDisp(i+2*IV%NoCN) for z
+            DelaunayCoordBound(i,1) = RD%Coord(InnerBound(CN_ind(i)),1) + (1.0/counter)*NestDisp(i)
+            DelaunayCoordBound(i,2) = RD%Coord(InnerBound(CN_ind(i)),2) + (1.0/counter)*NestDisp(i+IV%NoCN)
+            ! DelaunayCoord(i,2) = RD%Coord(InnerBound(CN_ind(i)),3) + NestDisp(i+2*IV%NoCN) for z
             if (IV%angle(i) /= 0) then
                 DelaunayCoordBound(i,:) = AngleofAttack((1.0/counter)*NestDisp(i+3*IV%NoCN), i)
             end if
             if (IV%CNconnecttrans(i) /= 0) then
-                DelaunayCoordBound(i,1) = DelaunayCoordBound(i,1) + (1.0/counter)*NestDisp(IV%CNconnecttrans(i))
-                DelaunayCoordBound(i,2) = DelaunayCoordBound(i,2) + (1.0/counter)*NestDisp(IV%CNconnecttrans(i)+IV%NoCN)
-                ! DelaunayCoord(i,2) = DelaunayCoordBound(i,2) + NestDisp(IV%CNconnecttrans(i)+2*IV%NoCN) for z
+                DelaunayCoordBound(i,1) = RD%Coord(InnerBound(CN_ind(i)),1) + (1.0/counter)*NestDisp(IV%CNconnecttrans(i))
+                DelaunayCoordBound(i,2) = RD%Coord(InnerBound(CN_ind(i)),2) + (1.0/counter)*NestDisp(IV%CNconnecttrans(i)+IV%NoCN)
+                ! DelaunayCoord(i,2) = RD%Coord(InnerBound(CN_ind(i)),3) + NestDisp(IV%CNconnecttrans(i)+2*IV%NoCN) for z
             end if
         end do
         !DelaunayCoordcurrent = DelaunayCoord
@@ -107,6 +108,8 @@ module FDGD
 
         ! Preparation for Domain Movement
         print *, 'Get all Boundary Nodes for Delaunay Triangulation in FDGD'
+        allocate(DelaunayCoordDomain(RD%nbf,IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in BruteForce "
         call getDelaunayCoordDomain(RD%Coord, size(RD%Coord, dim = 1), size(RD%Coord, dim = 2))
         call getDelaunayElem(DelaunayElemDomain, DelaunayCoordDomain)
         call getDomainIndex(DomainIndex)
@@ -139,7 +142,7 @@ module FDGD
         elseif (IV%systemType == 'Q') then
             strSystem = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/Delaunay/DelaunayTriangulation < Delaunay/DelaunayInput.txt > /dev/null'
         elseif (IV%systemType == 'W') then
-            strSystem = 'Executables\2D_Delaunay.exe < Executables\DelaunayInput.txt >nul 2>&1'
+            strSystem = 'Executables\2D_Delaunay.exe < Executables/DelaunayInput.txt >nul 2>&1'
         else
             STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'
         end if
@@ -237,6 +240,7 @@ module FDGD
         integer, dimension(:,:) :: DelaunayElem
     
         ! Body of CheckforIntersections
+        intersect = 1
         NoElem = size(DelaunayElem, dim = 1)
         do j = 1, NoElem
             xa = DelaunayCoord(DelaunayElem(j,1),1)
@@ -301,7 +305,7 @@ module FDGD
         implicit none
         integer :: i, j, k, l, nbp, nibp, nobp, overlap, testx, testy, circ, lin
         double precision :: maxx, maxy, minx, miny, spacing
-        double precision, dimension(:), allocatable :: dist, CP_ind
+        double precision, dimension(:), allocatable :: dist
         integer, dimension(:), allocatable ::  OuterBound, nodesvec, nodesvec2,nodesvec3, nodesvec4, NonMovingGeomIndex, distindex, MovingGeomIndex
         real, PARAMETER :: Pi = 3.1415927
         logical :: mp
@@ -319,16 +323,16 @@ module FDGD
         k = 0
         l = 0
         do i = 1, RD%nbf
-            if (RD%boundf(i,3) == 3 .or. RD%boundf(i,3) == 4) then
+            if (RD%boundtype(i) == 3 .or. RD%boundtype(i) == 4) then
                 k = k + 1
-                nodesvec(k) = RD%boundf(i,1)
+                nodesvec(k) = RD%bound(i,1)
                 k = k + 1
-                nodesvec(k) = RD%boundf(i,2)
+                nodesvec(k) = RD%bound(i,2)
             else
                 l = l + 1
-                nodesvec2(l) = RD%boundf(i,1)
+                nodesvec2(l) = RD%bound(i,1)
                 l = l + 1
-                nodesvec2(l) = RD%boundf(i,2)
+                nodesvec2(l) = RD%bound(i,2)
             end if
         end do
         allocate(nodesvec3(k),stat=allocateStatus)
@@ -349,13 +353,13 @@ module FDGD
         ! Identify closest nodes to input CN coordinates in Mesh
         allocate(dist(nibp),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound "
-        allocate(CP_ind(IV%NoCN),stat=allocateStatus)
+        allocate(CN_ind(IV%NoCN),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound "      
         do i = 1, IV%NoCN
             do j = 1, nibp
-                dist(j) = DistP2P(IV%NoDim, RD%Coord_CP(i,1), RD%Coord(InnerBound(j),1), RD%Coord_CP(i, 2), RD%Coord(InnerBound(j),2))  ! Calculate Distances          
+                dist(j) = DistP2P(IV%NoDim, RD%Coord_CN(i,1), RD%Coord(InnerBound(j),1), RD%Coord_CN(i, 2), RD%Coord(InnerBound(j),2))  ! Calculate Distances          
             end do
-            CP_ind(i) = minloc(dist,dim=1) ! Returns the index(Position of Node in Coord Matrix) of the minimum Value
+            CN_ind(i) = minloc(dist,dim=1) ! Returns the index(Position of Node in Coord Matrix) of the minimum Value
         end do
         deallocate(dist)
        
@@ -376,20 +380,20 @@ module FDGD
         else    ! if only some parts of the boundary move
             do i = 1, RD%nbf
                 do j = 1, RD%NoParts
-                    if (RD%MovingParts(j) == RD%boundf(i,4)) then
+                    if (RD%MovingParts(j) == RD%boundpart(i)) then
                         k = k + 1
-                        nodesvec(k) = RD%boundf(i,1)
+                        nodesvec(k) = RD%bound(i,1)
                         k = k + 1
-                        nodesvec(k) = RD%boundf(i,2)
+                        nodesvec(k) = RD%bound(i,2)
                         mp = .true.
                         EXIT
                     end if                  
                 end do
                 if (mp == .false.) then
                     l = l + 1
-                    nodesvec2(l) = RD%boundf(i,1)
+                    nodesvec2(l) = RD%bound(i,1)
                     l = l + 1
-                    nodesvec2(l) = RD%boundf(i,2)
+                    nodesvec2(l) = RD%bound(i,2)
                 else
                     mp = .false.
                 end if
@@ -423,7 +427,7 @@ module FDGD
         end if
                        
         ! Integrate CN coordinates into Delaunay Coordinates required for Triangulation
-        DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(InnerBound(CP_ind),:)
+        DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(InnerBound(CN_ind),:)
         ! Input overlapping nodes into Delaunay Coordinates
         if (overlap /= 0) then
             DelaunayCoordBound((IV%NoCN + 1):(IV%NoCN + overlap),:) = RD%Coord(nodesvec(1:overlap),:)
@@ -510,8 +514,6 @@ module FDGD
             spacing = sqrt(((maxy-miny)**2)/2 - (maxy-miny)**2)*cos(real(360/IV%NoDelBP))
             call DistributeDomainDelaunayCoord(spacing, OuterBound, nobp,  overlap, 1, (IV%NoDelBP - 1), dble((/ 0.0, -1.0/)))
         end if
-
-		deallocate(DelaunayCoordBound)
 		
     end subroutine getDelaunayCoordBound
     
@@ -586,7 +588,7 @@ module FDGD
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
         allocate(nodesvec2(2*RD%nbf),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
-        nodesvec = (/RD%boundf(:,1), RD%boundf(:,2)/)
+        nodesvec = (/RD%bound(:,1), RD%bound(:,2)/)
         call QSortInt(nodesvec, size(nodesvec), 'n') 
         call UniqueInt(nodesvec, size(nodesvec), BoundIndex)
     
@@ -637,8 +639,8 @@ module FDGD
         ralpha = alpha*Pi/180
         T(1,:) = (/cos(ralpha), sin(ralpha)/)
         T(2,:) = (/-sin(ralpha), cos(ralpha)/)
-        P1 = DelaunayCoordBound(IV%CNconnectangle(CNindex),:)
-        P2 = DelaunayCoordBound(CNindex,:)
+        P1 = RD%Coord(InnerBound(CN_ind(IV%CNconnectangle(CNindex))),2)
+        P2 = RD%Coord(InnerBound(CN_ind(CNindex)),2)
         P21 = P2 - P1
         AngleofAttack = matmul( T, P21) + P1
          
