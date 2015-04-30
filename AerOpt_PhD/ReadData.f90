@@ -118,6 +118,43 @@ contains
     
     end subroutine SubReadData
     
+    subroutine SubCreateFolderStructure()
+    
+        ! Variables
+        implicit none
+    
+        ! Body of SubCreateFolderStructure
+        call createDirectoriesInit()
+        if (IV%SystemType == 'W' .and. IV%RunOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine connected to a Linux machine
+        
+            call createDirectoriesInit()
+            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits create directory file
+            call createDirectoriesWindows()
+            call system('FileCreateDir.bat')    ! Submits create directory file
+     
+        elseif (IV%SystemType == 'W') then ! AerOpt is executed from a Windows machine alone
+        
+            call createDirectoriesWindows()
+            call system('FileCreateDir.bat')    ! Submits create directory file
+        
+        elseif (IV%SystemType == 'L') then ! AerOpt is executed from a Windows machine alone
+        
+            call createDirectoriesWindows()
+            call system('chmod a+x ./FileCreateDir.bat')  
+            call system('./FileCreateDir.bat')    ! Submits create directory file
+        
+        elseif (IV%SystemType == 'Q' .or. IV%SystemType == 'B') then     ! AerOpt is executed from a Linux machine
+        
+            call createDirectoriesInit()
+            call system('chmod a+x ./FileCreateDir.scr')    
+            call system('./FileCreateDir.scr')    ! Submits create directory file
+            
+        else       
+            STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'       
+        end if  
+    
+    end subroutine SubCreateFolderStructure
+    
     subroutine writeDatFile(ii)
     !Objective: Create Outputfile of each Snapshot as Input for the Pre Processor
     
@@ -131,9 +168,10 @@ contains
         call DetermineStrLen(istr, ii) 
         
         open(99, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
-        write(99,*) 1
+        write(99,*) 2
+        write(99,*) 'clean'
         write(99,*) 'David Naumann'
-        write(99,*) 'NoTrgElem NoNodes NoBound'        
+        write(99,*) 'NoElem NoNodes NoBound'        
         write(99,*) RD%ne, RD%np, RD%nbf
         write(99,*) 'Connectivities'
         do j = 1, RD%ne
@@ -190,7 +228,7 @@ contains
         ! Body of WriteSolverInpFile
         fileLength = len(IV%filename) + len(istr) + 15
         allocate(character(len=fileLength) :: fname)
-        fname = newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp'
+        fname = newdir//'/'//InFolder//'/'//trim(IV%filename)//'.inp'
         write( strEFMF, '(F7.3)' )  IV%engFMF
         write( strMa, '(F7.3)' )  IV%Ma
         write( strNI, '(I2)' )  IV%NoIter
@@ -245,15 +283,15 @@ contains
         close(5)
         
         ! Create Read File for Solver
-        open(1, file=newdir//'/'//InFolder//'/SolverInput'//istr//'.sh', form='formatted',status='unknown')
+        open(1, file=newdir//'/'//InFolder//'/SolverInput.sh', form='formatted',status='unknown')
         if (IV%SystemType == 'B') then
-            write(1,*) trim(IV%filename), istr, '.inp'    ! Control Filename
+            write(1,*) trim(IV%filename), '.inp'    ! Control Filename
             write(1,*) trim(IV%filename), istr, '.sol'    ! Computation Filename
             write(1,*) ''
             write(1,*) trim(IV%filename), istr, '.resp'  ! Result filename
             write(1,*) trim(IV%filename), istr, '.rsd'   ! Residual Filename
         elseif (IV%SystemType == 'Q' .or. IV%RunOnCluster == 'Y') then
-            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp'    ! Control Filename
+            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//'.inp'    ! Control Filename
             write(1,'(A)') trim(Output)
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol'    ! Control Filename
             write(1,'(A)') trim(Output)
@@ -262,8 +300,8 @@ contains
             write(1,'(A)') trim(Output)
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd'    ! Control Filename
             write(1,'(A)') trim(Output)
-        elseif (IV%SystemType == 'W') then
-            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.inp'    ! Control Filename
+        elseif (IV%SystemType == 'W' .or. IV%SystemType == 'L') then
+            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), '.inp'    ! Control Filename
             write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.sol'    ! Computation Filename
             write(1,*) ''
             write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.resp'  ! Result filename
@@ -280,7 +318,7 @@ contains
         character(len=255) :: Output
     
         ! Body of writeBatchFile
-        open(1, file= newdir//'/'//InFolder//'/batchfile'//istr//'.sh', form='formatted',status='unknown')  
+        open(1, file= newdir//'/'//InFolder//'/batchfile.sh', form='formatted',status='unknown')  
         if (IV%SystemType /= 'B') then
             write(1,*) '#PBS -N ' ,trim(IV%filename), istr
             write(1,*) '#PBS -q oh'
@@ -289,7 +327,7 @@ contains
             write(1,*) '#PBS -l mem=1gb'
             write(1,*) '#PBS -m bea'
             write(1,*) '#PBS -M 717761@swansea.ac.uk'
-            Output = pathLin_Solver//' < /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh'
+            Output = pathSolver//' < /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput.sh'
             write(1,'(A)') trim(Output)
         else
             write(1,*) '#BSUB -J ' ,trim(IV%filename), istr
@@ -298,7 +336,7 @@ contains
             !write(1,*) '#BSUB -q <enter a queue>'
             write(1,*) '#BSUB -n 1'
             write(1,*) '#BSUB -W 24:00'
-            Output = pathLin_Solver//' < /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh'
+            Output = pathSolver//' < /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput.sh'
             write(1,'(A)') trim(Output)
             write(1,*) 'cd ..'
             write(1,*) 'mv ', InFolder, '/', trim(IV%filename), istr, '.rsd ', OutFolder, '/', trim(IV%filename), istr, '.rsd'
@@ -332,6 +370,7 @@ contains
         write(1,*) 'cd ', newdir
         write(1,*) 'mkdir ', InFolder
         write(1,*) 'mkdir ', OutFolder
+        write(1,*) 'mkdir ', TopFolder
         write(1,*) 'cd ..'
         write(1,*) 'cd ..'
         write(1,*) 'chmod 711 AerOpt'
@@ -355,6 +394,7 @@ contains
         write(1,*) 'cd ', newdir
         write(1,*) 'mkdir ', InFolder
         write(1,*) 'mkdir ', OutFolder
+        write(1,*) 'mkdir ', TopFolder
         write(1,*) 'cd ..'
         write(1,*) 'cd ..'
         close(1)
@@ -380,7 +420,7 @@ contains
         ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster
         strOut = len(trim(currentDir)) + 33
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh"'
+        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/SolverInput.sh"'
         write(1, '(A)') Output       
         deallocate(Output)
                       
@@ -392,13 +432,13 @@ contains
 
         strOut = len(trim(currentDir)) + 23
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.inp"'
+        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//'.inp"'
         write(1, '(A)') Output
         deallocate(Output)
         
         strOut = len(trim(currentDir)) + 25
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/batchfile'//istr//'.sh"'
+        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/batchfile.sh"'
         write(1, '(A)') Output
         close(1)
     
@@ -418,9 +458,9 @@ contains
         write(1,*) 'cd ', trim(IV%UserName), '/AerOpt/', newdir, '/', InFolder
         
         if (IV%SystemType /= 'B') then
-            write(1,*) 'qsub batchfile', istr, '.sh'
+            write(1,*) 'qsub batchfile.sh'
         else
-            write(1,*) 'bsub < batchfile', istr, '.sh'
+            write(1,*) 'bsub < batchfile.sh'
         end if
         close(1)
                         
@@ -438,7 +478,7 @@ contains
         write(1,*) 'cd ..'
         write(1,*) 'cd ..'
         write(1,*) 'cd ..'
-        write(1,*) pathLin_Solver
+        write(1,*) pathSolver
         close(1)
                         
     end subroutine TriggerFile2
@@ -531,5 +571,66 @@ contains
         close(1)
     
     end subroutine DeleteErrorFiles
+    
+       
+    subroutine moveTopNestFilesLin(i, NoGen)
+
+        ! Variables
+        implicit none
+        integer :: i, NoGen
+        character(len=255) :: Output
+        character(len=:), allocatable :: NoGenstr
+        
+        ! Body of moveTopNestFiles
+        call DetermineStrLen(istr, i)
+        call DetermineStrLen(NoGenstr, NoGen)
+        open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
+        !strSystem = 'move '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.resp"'
+        !call system(trim(strSystem))
+        !strSystem = 'move '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
+        !call system(trim(strSystem))
+        !strSystem = 'move '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.dat"'
+        !call system(trim(strSystem))
+        Output = 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+        write(1, '(A)') trim(Output)
+        Output = 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+        write(1, '(A)') trim(Output)
+        Output = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+        write(1, '(A)') trim(Output)
+        close(1)
+        deallocate(istr)
+        deallocate(NoGenstr)
+        
+    end subroutine moveTopNestFilesLin
+    
+    subroutine moveTopNestFilesWin(i, NoGen)
+
+        ! Variables
+        implicit none
+        integer :: i, NoGen
+        character(len=255) :: Output
+        character(len=:), allocatable :: NoGenstr
+        
+        ! Body of moveTopNestFiles
+        call DetermineStrLen(istr, i)
+        call DetermineStrLen(NoGenstr, NoGen)
+        open(1, file='FileCreateDir.bat', form='formatted',status='unknown')
+        !strSystem = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.resp"'
+        !call system(trim(strSystem))
+        !strSystem = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+        !call system(trim(strSystem))
+        !strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.dat "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.dat"'
+        !call system(trim(strSystem))
+        Output = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+        write(1, '(A)') trim(Output)
+        Output = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+        write(1, '(A)') trim(Output)
+        Output = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.dat "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+        write(1, '(A)') trim(Output)
+        close(1)
+        deallocate(istr)
+        deallocate(NoGenstr)
+        
+    end subroutine moveTopNestFilesWin
     
 end module ReadData

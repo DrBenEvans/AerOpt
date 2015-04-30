@@ -26,7 +26,7 @@ contains
         ! Variables
         implicit none
         double precision :: Ac, Ftemp, Fopt, temp
-        integer :: i,j, k, l, ii, iii, NoSteps, NoTop, NoDiscard, randomNest, NoConv, NoTest
+        integer :: i,j, k, l, ii, iii, NoSteps, NoTop, NoDiscard, randomNest, NoConv, NoTest, store
         double precision, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
         double precision, dimension(:,:), allocatable :: Snapshots_Move, tempSnapshots, newSnapshots, NestsTest, TopNest, TopNest_Move, tempNestA
         integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial, ConvA
@@ -142,7 +142,7 @@ contains
          
         ! Determine Objective Function
         do ii = 1, IV%NoSnap 
-            call getObjectiveFunction(.false., Ftemp, Snapshots(ii,:), NoSnapshot=ii, NoGen=0)
+            call getObjectiveFunction(.false., Ftemp, Snapshots(ii,:), NoSnapshot=ii)
             Fi_initial(ii) = Ftemp
         end do
         deallocate(pressure)
@@ -163,6 +163,23 @@ contains
         Fi = Fi_initial(1:IV%NoNests)
         Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
         Nests = Snapshots(ind_Fi_initial(1:IV%NoNests),:)
+        
+        ! Store Files of Top 5 % fraction of Nests in TopFolder
+        !if (nint(IV%NoNests*0.05) > 1) then
+        !    store = nint(IV%NoNests*0.05)
+        !else
+            store = 1
+        !end if
+        do j = 1, store                    
+            if (IV%SystemType == 'W') then
+                call moveTopNestFilesWin(ind_Fi_initial(j), 1)
+                call system('FileCreateDir.bat')    ! Submits create directory file
+            else
+                call moveTopNestFilesLin(ind_Fi_initial(j), 1)
+                call system('./FileCreateDir.scr')    ! Submits Move file
+            end if
+        end do
+        
         deallocate(Fi_initial)
         deallocate(ind_Fi_initial)
         
@@ -172,14 +189,18 @@ contains
         open(29,file=newdir//'/Nests'//istr//'.txt', form='formatted',status='unknown')   
         write(29, *) 'Snapshots'
         write(29,'(<IV%NoSnap>f17.10)') Snapshots
+        write(29, *) 'Generation    1'
+        write(29,'(<IV%NoNests>f17.10)') Nests
         close(29)
         open(19,file=newdir//'/Fitness'//istr//'.txt', form='formatted',status='unknown')
         write(19,*) 'Fitness'
+        write(19,'(1I1)',advance="no") 1
+        write(19,'(<IV%NoNests>f17.10)') Fi
         close(19)
         deallocate(istr)
        
         !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
-        do iii = 1, (IV%NoG - 1)
+        do iii = 2, IV%NoG
             print *, ''
             print *, '************************'
             print *, 'Generation ', iii
@@ -187,41 +208,9 @@ contains
             print *, ''
             print *, IV%Ma, IV%NoCN
             call timestamp()
-            
-            ! Re-order Fitness in ascending order
-            ind_Fi = (/ (i, i=1,IV%NoNests) /)
-            call QSort(Fi,size(Fi), 'y', ind_Fi)
-            ! Change to Descending Order for Maximization Problem
-            do j = 1, int(IV%NoNests/2.0)
-                temp = Fi(j)
-                Fi(j) = Fi(IV%NoNests-j+1)
-                Fi(IV%NoNests-j+1) = temp
-                temp = ind_Fi(j)
-                ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
-                ind_Fi(IV%NoNests-j+1) = temp
-            end do
-            
-            ! Re-order Nests for next Generation
-            Nests_Move = Nests_Move(ind_Fi,:)
-            Nests = Nests(ind_Fi,:)
-            
-            ! Store Fitness values
-            allocate(character(len=3) :: istr)
-            write(istr, '(1f3.1)') IV%Ma
-            print *, 'Current best solutions:' , Fi(1:6)
-            open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
-            write(19,'(<IV%NoNests>f17.10)') Fi
-            close(19) 
-                    
-            ! Store moved Nests in Output Analysis File
-            open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
-            write(29, *) 'Generation', iii
-            write(29,'(<IV%NoNests>f17.10)') Nests
-            close(29)
-            deallocate(istr)
           
             !!****** Adaptive Sampling - Start New Jobs (first and last Fitness) *******!!
-            if (iii > 1 .and. iii < (IV%NoG - 1) .and. IV%AdaptSamp == .true.) then
+            if (iii > 2 .and. iii < IV%NoG .and. IV%AdaptSamp == .true.) then
                 
                 print *, 'Adaptive Sampling - Start Part 1 / 2'
                 ! Extract First and Last Nest
@@ -237,12 +226,12 @@ contains
             
             !!*** Loop over Discarded Nests ***!!
             print *, ''
-            print *, 'Modify Discarded Cuckoos for Generation', (iii+1)
+            print *, 'Modify Discarded Cuckoos for Generation', iii
             print *, ''
             do ii = IV%NoNests, (NoTop + 1), -1
                 
                 ! Perform Random Walk using Levy Flight with a Cauchy Distribution
-                Ac = IV%Aconst/((iii+1)**(1.0/2.0))
+                Ac = IV%Aconst/(iii**(1.0/2.0))
                 call random_number(rn)
                 NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                 NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
@@ -283,12 +272,12 @@ contains
 
             ! Full Fidelity Solutions passed on to Solver
             if (IV%POD == .false.) then        
-                call SubCFD((iii*IV%NoNests + NoTop + 1), ((iii + 1)*IV%NoNests), Nests((NoTop + 1):IV%NoNests,:), NoDiscard)             
+                call SubCFD((NoTop + 1), IV%NoNests, Nests((NoTop + 1):IV%NoNests,:), NoDiscard)             
             end if            
             
             !!*** Loop over Top Nests ***!!
             print *, ''
-            print *, 'Modify Top Cuckoos for Generation', (iii+1)
+            print *, 'Modify Top Cuckoos for Generation', iii
             print *, ''
             do ii = 1, NoTop
            
@@ -298,7 +287,7 @@ contains
                 if (randomNest == ii) then  ! Same Nest
                 
                     ! Perform Random Walk instead                   
-                    Ac = IV%Aconst/((iii+1)**2.0)
+                    Ac = IV%Aconst/(iii**2.0)
                     call random_number(rn)
                     NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                     NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
@@ -375,7 +364,7 @@ contains
              
             ! Store moved Nests in Output Analysis File
             open(39,file=newdir//'/TopNest.txt',form='formatted',status='unknown',position='append')
-            write(39, *) 'Generation', (iii+1)
+            write(39, *) 'Generation', iii
             write(39,'(<NoTop>f17.10)') TopNest
             close(39)
           
@@ -386,16 +375,16 @@ contains
             
             if (IV%POD == .false.) then                
                 !Generate Full Fidelity Solution of new TopNest      
-                call SubCFD((iii*IV%NoNests + 1), (iii*IV%NoNests + NoTop), TopNest, NoTop)
+                call SubCFD(1, NoTop, TopNest, NoTop)
                 ! Check ALL new Nests
                 print *, 'Generation: ', iii
-                call PostSolverCheck(((iii + 1)*IV%NoNests), 1, Nests_Move, Nests)   
+                call PostSolverCheck(IV%NoNests, 1, Nests_Move, Nests)   
  
                 ! Evaluate Fitness of Full Fidelity Nest Solutions
                 print *, 'Extract Pressure of Generation', iii
-                call ExtractPressure((iii*IV%NoNests + 1), ((iii + 1)*IV%NoNests))
+                call ExtractPressure(1, IV%NoNests)
                 do ii = 1, NoTop
-                    call getObjectiveFunction(.false., Ftemp, NoSnapshot=ii, NoGen=iii)
+                    call getObjectiveFunction(.false., Ftemp, NoSnapshot=ii)
               
                     ! Check if new Fitness is better than a Random Top Nest, If yes replace values
                     call random_number(rn)
@@ -408,13 +397,57 @@ contains
                 end do
 
                 do ii = (NoTop + 1), IV%NoNests
-                    call getObjectiveFunction(.false., Fi(ii), NoSnapshot=ii, NoGen=iii)
+                    call getObjectiveFunction(.false., Fi(ii), NoSnapshot=ii)
                 end do
                 deallocate(pressure)
             end if
-
+            
+            ! Re-order Fitness in ascending order
+            ind_Fi = (/ (i, i=1,IV%NoNests) /)
+            call QSort(Fi,size(Fi), 'y', ind_Fi)
+            ! Change to Descending Order for Maximization Problem
+            do j = 1, int(IV%NoNests/2.0)
+                temp = Fi(j)
+                Fi(j) = Fi(IV%NoNests-j+1)
+                Fi(IV%NoNests-j+1) = temp
+                temp = ind_Fi(j)
+                ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
+                ind_Fi(IV%NoNests-j+1) = temp
+            end do
+            
+            ! Re-order Nests for next Generation
+            Nests_Move = Nests_Move(ind_Fi,:)
+            Nests = Nests(ind_Fi,:)
+            
+            ! Store Fitness values
+            allocate(character(len=3) :: istr)
+            write(istr, '(1f3.1)') IV%Ma
+            print *, 'Current best solutions:' , Fi(1:6)
+            open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
+            write(19,'(1I3)',advance="no") iii
+            write(19,'(<IV%NoNests>f17.10)') Fi
+            close(19) 
+                    
+            ! Store moved Nests in Output Analysis File
+            open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
+            write(29, *) 'Generation', iii
+            write(29,'(<IV%NoNests>f17.10)') Nests
+            close(29)
+            deallocate(istr)
+            
+            ! Store Files of Top 5 % fraction of Nests in TopFolder
+            do j = 1, store                    
+                if (IV%SystemType == 'W') then
+                    call moveTopNestFilesWin(ind_Fi(j), iii)
+                    call system('FileCreateDir.bat')    ! Submits create directory file
+                else
+                    call moveTopNestFilesLin(ind_Fi(j), iii)
+                    call system('./FileCreateDir.scr')    ! Submits Move file
+                end if
+            end do
+        
             !!*** Adaptive Sampling - Finish and Integrate New Jobs (first and last Fitness) ***!!
-            if (iii > 1 .and. iii < (IV%NoG - 1) .and. IV%AdaptSamp == .true.) then
+            if (iii > 2 .and. iii < IV%NoG .and. IV%AdaptSamp == .true.) then
                 print *, 'Adaptive Sampling - Start Part 2 / 2'
                 
                 ! Store Snapshots in temporary Container
@@ -460,7 +493,7 @@ contains
                 write(istr, '(1f3.1)') IV%Ma
                 open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
                 if (ConvA(1) == 1) then ! If converged check fitness
-                    call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 1), NoGen=0)
+                    call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 1))
                     write(19,'(1I3, 1f17.10)',advance="no") 0, Ftemp
                     print *, 'Real Fitness best: ', Ftemp
                     do k = 1, NoTop
@@ -474,7 +507,7 @@ contains
                 end if
  
                 if (ConvA(2) == 1) then ! If converged check fitness
-                    call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 2), NoGen=0)
+                    call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 2))
                     write(19,'(1I3, 1f17.10)',advance="no") 1, Ftemp
                     print *, 'Comparison POD/Real Fitness worst: ', Fcompare(2), '/', Ftemp 
                 end if
@@ -500,48 +533,18 @@ contains
             write(19,*) ''
         
         end do
-        print *, 'Finished Cuckoo Search'   
         
-        ! Write Results in File
-        allocate(character(len=3) :: istr)
-        write(istr, '(1f3.1)') IV%Ma
-        open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
-        call QSort(Fi,size(Fi, dim = 1), 'y', ind_Fi)
-
-        ! Change to Descending Order for Maximization Problem
-        do j = 1, int(IV%NoNests/2.0)
-            temp = Fi(j)
-            Fi(j) = Fi(IV%NoNests-j+1)
-            Fi(IV%NoNests-j+1) = temp
-            temp = ind_Fi(j)
-            ind_Fi(j) = ind_Fi(IV%NoNests-j+1)
-            ind_Fi(IV%NoNests-j+1) = temp
-        end do
-
-        Fopt = Fi(1)
-        write(19,'(<IV%NoNests>f17.10)') Fi
-        close(19)
-        
-        ! write final Nests in File
-        Nests_Move = Nests_Move(ind_Fi,:)
-        Nests = Nests(ind_Fi,:)
-        open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
-        write(29, *) 'Generation', iii
-        write(29,'(<IV%NoNests>f17.10)') Nests
-        close(29)
-        deallocate(istr)
-        
-        NestOpt = Nests(ind_Fi(1),:)
+        print *, 'Finished Cuckoo Search'                  
         print *, ''
         print *, '************************'
         print *, 'Last Generation'
         print *, '************************'
         print *, ''
-        print *, 'Optimum Fitness found:', Fopt
+        print *, 'Optimum Fitness found:', Fi(1)
         print *, ''
         print *, 'Optimum Geometry:'
         print *, ''
-        print *, NestOpt
+        print *, Nests(ind_Fi(1),:)
         
     end subroutine SubOptimization
     
@@ -1281,12 +1284,12 @@ contains
     
     end subroutine AllocateModesCoeff
     
-    subroutine getObjectiveFunction(PODevaluation, Fi, tempNests, NoSnapshot, NoGen)
+    subroutine getObjectiveFunction(PODevaluation, Fi, tempNests, NoSnapshot)
     
         ! Variables
         implicit none
         double precision, dimension(maxDoF), optional :: tempNests
-        integer, optional :: NoSnapshot, NoGen
+        integer, optional :: NoSnapshot
         double precision :: Fi
         logical :: PODevaluation
     
@@ -1308,9 +1311,9 @@ contains
             if (IV%ObjectiveFunction == 2) then
                 call getDistortion(Fi, NoSnapshot)
             elseif (IV%ObjectiveFunction == 1) then
-                call getLiftandDrag(Fi, (NoGen*IV%NoNests + NoSnapshot))
+                call getLiftandDrag(Fi, NoSnapshot)
             elseif (IV%ObjectiveFunction == 3) then
-                call getzeroLift(Fi, (NoGen*IV%NoNests + NoSnapshot))
+                call getzeroLift(Fi, NoSnapshot)
             end if
         end if
     

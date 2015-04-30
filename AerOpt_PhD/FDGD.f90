@@ -143,6 +143,8 @@ module FDGD
             strSystem = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/Delaunay/DelaunayTriangulation < Delaunay/DelaunayInput.txt > /dev/null'
         elseif (IV%systemType == 'W') then
             strSystem = 'Executables\2D_Delaunay.exe < Executables/DelaunayInput.txt >nul 2>&1'
+        elseif (IV%systemType == 'L') then
+            strSystem = 'Executables/2D_Delaunay.exe < Executables/DelaunayInput.txt >nul 2>&1'
         else
             STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'
         end if
@@ -639,8 +641,8 @@ module FDGD
         ralpha = alpha*Pi/180
         T(1,:) = (/cos(ralpha), sin(ralpha)/)
         T(2,:) = (/-sin(ralpha), cos(ralpha)/)
-        P1 = RD%Coord(InnerBound(CN_ind(IV%CNconnectangle(CNindex))),2)
-        P2 = RD%Coord(InnerBound(CN_ind(CNindex)),2)
+        P1 = RD%Coord(InnerBound(CN_ind(IV%CNconnectangle(CNindex))),:)
+        P2 = RD%Coord(InnerBound(CN_ind(CNindex)),:)
         P21 = P2 - P1
         AngleofAttack = matmul( T, P21) + P1
          

@@ -111,13 +111,13 @@ module CFD
         if (IV%SystemType == 'W') then
              
             allocate(character(len=100) :: strSystem)
-            strSystem = pathWinPrePro//' < '//newdir//'/PreprocessingInput.txt >nul 2>&1'
+            strSystem = pathPrePro//' < '//newdir//'/PreprocessingInput.txt >nul 2>&1'
             
         else
             
             ! write command (for Linux)
             allocate(character(len=100) :: strSystem)
-            strSystem = pathLin_Prepro//' < '//newdir//'/PreprocessingInput.txt > /dev/null'
+            strSystem = pathPrepro//' < '//newdir//'/PreprocessingInput.txt > /dev/null'
             
         end if
         print *, 'Preprocessing Geometry', i
@@ -158,16 +158,27 @@ module CFD
             else
                 print *, 'Solving Geometry', i
                 allocate(character(len=200) :: strSystem)
-                strSystem = pathWinSolver//' < '//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh >nul 2>&1'
+                strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/SolverInput.sh >nul 2>&1'
                 call system(trim(strSystem))
-                strSystem = 'move '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.resp "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp"'
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp"'
                 call system(trim(strSystem))
-                strSystem = 'move '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
                 call system(trim(strSystem))
                 deallocate (strSystem)
             end if 
               
-        else    ! AerOpt is executed from a Linux machine
+        elseif (IV%SystemType == 'L')   then    ! AerOpt is executed on a Linux machine
+            
+            allocate(character(len=200) :: strSystem)
+            strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/SolverInput.sh >nul 2>&1'
+            call system(trim(strSystem))
+            strSystem = 'mv '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp"'
+            call system(trim(strSystem))
+            strSystem = 'mv '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+            call system(trim(strSystem))
+            deallocate (strSystem)
+            
+        else    ! AerOpt is executed on a Linux cluster
             
             if (IV%runOnCluster == 'Y') then
                 call Triggerfile()     ! Triggerfile for submission
@@ -355,11 +366,7 @@ module CFD
         call DetermineStrLen(istr, NoFile)
             
         ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
-        if (IV%SystemType == 'W') then
-            open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
-        else
-            open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")
-        end if       
+        open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")     
         inquire(1, size = FileSize) 
         if (IV%SystemType == 'W') then
             LastLine = FileSize/107

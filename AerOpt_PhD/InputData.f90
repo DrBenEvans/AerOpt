@@ -53,9 +53,10 @@ module InputData
     
     type(InputVariablesData) :: IV
     integer :: allocatestatus                                   ! Check Allocation Status for Large Arrays
-    character(len=10) :: DataFolder = 'Input_Data'                ! Input Folder Name
-    character(len=9) :: InFolder = 'Mesh_Data'                ! Input Folder Name
-    character(len=11) :: OutFolder = 'Solver_Data'              ! Output Folder Name
+    character(len=10) :: DataFolder = 'Input_Data'              ! Input Folder Name
+    character(len=9) :: InFolder = 'Mesh_Data'                  ! Input Folder Name
+    character(len=11) :: OutFolder = 'Solver_Data'              ! Solver Data Folder Name
+    character(len=11) :: TopFolder = 'Output_Data'              ! Top Data Folder Name
     integer :: IntSystem                                        ! Length of System command string; used for character variable allocation
     integer :: maxDoF                                           ! maximum Degrees of Freedom available
     integer :: DoFtransmotion                                   ! Degrees of Freedom in the System considering translatoric movements
@@ -63,10 +64,8 @@ module InputData
     real :: waitTime                                            ! waiting time for Simulation Results
     integer :: jobcheck                                         ! Check Variable for Simulation 
     character(len=:), allocatable :: istr                       ! Number of I/O file
-    character(len=29) :: pathWinPrePro                          ! Path to Windows preprocessor file
-    character(len=24) :: pathWinSolver                          ! Path to Windows solver file
-    character(len=:), allocatable :: pathLin_Prepro             ! Path to Linux preprocessor file
-    character(len=:), allocatable :: pathLin_Solver             ! Path to Linux Solver file
+    character(len=:), allocatable :: pathPrepro                 ! Path to preprocessor file
+    character(len=:), allocatable :: pathSolver                 ! Path to Solver file
     character(len=:), allocatable :: strSystem                  ! System Command string for communication with FLITE Solver
     character(len=8) :: date                                    ! Container for current date
     character(len=10) :: time                                   ! Container for current time
@@ -149,23 +148,37 @@ contains
         
         ! Path for PreProcessor
         if (IV%SystemType == 'Q') then
-            allocate(character(len=61) :: pathLin_Prepro)
-            pathLin_Prepro = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
+            allocate(character(len=61) :: pathPrepro)
+            pathPrepro = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
+        elseif (IV%SystemType == 'B') then
+            allocate(character(len=56) :: pathPrepro)
+            pathPrepro = '/home/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
+        elseif (IV%SystemType == 'W') then
+            allocate(character(len=29) :: pathPrepro)
+            pathPrepro = 'Executables\PreProcessing.exe'
+        elseif (IV%SystemType == 'L') then
+            allocate(character(len=31) :: pathPrepro)
+            pathPrepro = './Executables/PreProcessing.exe'
         else
-            allocate(character(len=56) :: pathLin_Prepro)
-            pathLin_Prepro = '/home/'//trim(IV%UserName)//'/AerOpt/PrePro/2DPreProcessorLin'
+            STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'           
         end if
-        pathWinPrePro = 'Executables\PreProcessing.exe' 
    
         ! Path for Solver
-        if (IV%SystemType /= 'B') then
-            allocate(character(len=55) :: pathLin_Solver)
-            pathLin_Solver = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
+        if (IV%SystemType == 'Q') then
+            allocate(character(len=55) :: pathSolver)
+            pathSolver = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
+        elseif (IV%SystemType == 'B') then
+            allocate(character(len=50) :: pathSolver)
+            pathSolver = '/home/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
+        elseif (IV%SystemType == 'W') then
+            allocate(character(len=24) :: pathSolver)
+            pathSolver = 'Executables\2DSolver.exe'
+        elseif (IV%SystemType == 'L') then
+            allocate(character(len=26) :: pathSolver)
+            pathSolver = './Executables/2DSolver.exe'
         else
-            allocate(character(len=50) :: pathLin_Solver)
-            pathLin_Solver = '/home/'//trim(IV%UserName)//'/AerOpt/Solver/2DSolverLin'
+            STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'           
         end if
-        pathWinSolver = 'Executables\2DSolver.exe'
         
     end subroutine SubInputData
     
