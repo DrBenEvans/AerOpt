@@ -17,8 +17,10 @@ module CreateSnapshots
         implicit none
         integer :: i, j, newscore, bestscore  
         double precision, dimension(IV%NoSnap,maxDoF) :: Snaptemp
-        allocate(MxDisp(maxDoF,2))
-        allocate(cond(maxDoF))
+        allocate(MxDisp(maxDoF,2),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
+        allocate(cond(maxDoF),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
         allocate(Snapshots(IV%NoSnap,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
         allocate(MxDisp_Move(IV%DoF,2),stat=allocateStatus)

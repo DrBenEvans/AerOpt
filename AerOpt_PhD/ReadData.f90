@@ -118,12 +118,12 @@ contains
     
     end subroutine SubReadData
     
-    subroutine SubCreateFolderStructure()
+    subroutine CreateFolderStructure()
     
         ! Variables
         implicit none
     
-        ! Body of SubCreateFolderStructure
+        ! Body of CreateFolderStructure
         call createDirectoriesInit()
         if (IV%SystemType == 'W' .and. IV%RunOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine connected to a Linux machine
         
@@ -153,7 +153,7 @@ contains
             STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'       
         end if  
     
-    end subroutine SubCreateFolderStructure
+    end subroutine CreateFolderStructure
     
     subroutine writeDatFile(ii)
     !Objective: Create Outputfile of each Snapshot as Input for the Pre Processor
@@ -198,7 +198,7 @@ contains
         implicit none
     
         ! Body of PreProInpFile
-        open(11, file=newdir//'/PreprocessingInput.txt', form='formatted',status='unknown')        
+        open(11, file=newdir//'/'//InFolder//'/PreprocessingInput.txt', form='formatted',status='unknown')        
         write(11,*) newdir//'/'//InFolder, '/', trim(IV%filename), istr, '.dat'  ! Name of Input file
         write(11,*) 'f'                                     ! Hybrid Mesh?
         write(11,*) 1                                       ! Number of Grids
@@ -283,29 +283,30 @@ contains
         close(5)
         
         ! Create Read File for Solver
-        open(1, file=newdir//'/'//InFolder//'/SolverInput.sh', form='formatted',status='unknown')
+        open(1, file=newdir//'/'//InFolder//'/SolverInput'//istr//'.sh', form='formatted',status='unknown')
         if (IV%SystemType == 'B') then
-            write(1,*) trim(IV%filename), '.inp'    ! Control Filename
-            write(1,*) trim(IV%filename), istr, '.sol'    ! Computation Filename
-            write(1,*) ''
-            write(1,*) trim(IV%filename), istr, '.resp'  ! Result filename
-            write(1,*) trim(IV%filename), istr, '.rsd'   ! Residual Filename
+            write(1,*) trim(IV%filename), '.inp'            ! Control Filename
+            write(1,*) trim(IV%filename), istr, '.sol'      ! Computation Filename
+            write(1,*) '' !trim(IV%filename), istr, '.resp'     ! Start-up File = previous Result File
+            write(1,*) trim(IV%filename), istr, '.resp'     ! Result filename
+            write(1,*) trim(IV%filename), istr, '.rsd'      ! Residual Filename
         elseif (IV%SystemType == 'Q' .or. IV%RunOnCluster == 'Y') then
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//'.inp'    ! Control Filename
             write(1,'(A)') trim(Output)
             Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol'    ! Control Filename
             write(1,'(A)') trim(Output)
-            write(1,*) ''
-            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp'    ! Control Filename
+            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp'    ! Start-up File = previous Result File
+            write(1,'(A)') '' !trim(Output) 
+            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp'    ! Result filename
             write(1,'(A)') trim(Output)
-            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd'    ! Control Filename
+            Output = '/eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd'    ! Residual Filename
             write(1,'(A)') trim(Output)
         elseif (IV%SystemType == 'W' .or. IV%SystemType == 'L') then
-            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), '.inp'    ! Control Filename
-            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.sol'    ! Computation Filename
-            write(1,*) ''
-            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.resp'  ! Result filename
-            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.rsd'   ! Residual Filename
+            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), '.inp'            ! Control Filename
+            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.sol'      ! Computation Filename
+            write(1,*) '' !newdir, '/', InFolder, '/', trim(IV%filename), istr, '.resp'     ! Start-up File = previous Result File
+            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.resp'     ! Result filename
+            write(1,*) newdir, '/', InFolder, '/', trim(IV%filename), istr, '.rsd'      ! Residual Filename
         end if
         close(1)
     
@@ -327,7 +328,7 @@ contains
             write(1,*) '#PBS -l mem=1gb'
             write(1,*) '#PBS -m bea'
             write(1,*) '#PBS -M 717761@swansea.ac.uk'
-            Output = pathSolver//' < /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput.sh'
+            Output = pathSolver//' < /eng/cvcluster/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh'
             write(1,'(A)') trim(Output)
         else
             write(1,*) '#BSUB -J ' ,trim(IV%filename), istr
@@ -336,7 +337,7 @@ contains
             !write(1,*) '#BSUB -q <enter a queue>'
             write(1,*) '#BSUB -n 1'
             write(1,*) '#BSUB -W 24:00'
-            Output = pathSolver//' < /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput.sh'
+            Output = pathSolver//' < /home/'//trim(IV%UserName)//'/AerOpt/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh'
             write(1,'(A)') trim(Output)
             write(1,*) 'cd ..'
             write(1,*) 'mv ', InFolder, '/', trim(IV%filename), istr, '.rsd ', OutFolder, '/', trim(IV%filename), istr, '.rsd'
@@ -420,7 +421,7 @@ contains
         ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster
         strOut = len(trim(currentDir)) + 33
         allocate(character(len=strOut) :: Output)
-        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/SolverInput.sh"'
+        Output = 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh"'
         write(1, '(A)') Output       
         deallocate(Output)
                       
@@ -585,18 +586,21 @@ contains
         call DetermineStrLen(istr, i)
         call DetermineStrLen(NoGenstr, NoGen)
         open(1, file='FileCreateDir.scr', form='formatted',status='unknown')
-        !strSystem = 'move '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.resp"'
-        !call system(trim(strSystem))
-        !strSystem = 'move '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
-        !call system(trim(strSystem))
-        !strSystem = 'move '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.dat"'
-        !call system(trim(strSystem))
-        Output = 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+        
+		Output = 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.resp"'
         write(1, '(A)') trim(Output)
-        Output = 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+        Output = 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
         write(1, '(A)') trim(Output)
-        Output = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+        Output = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.dat"'
         write(1, '(A)') trim(Output)
+        
+		!Output = 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+  !      write(1, '(A)') trim(Output)
+  !      Output = 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+  !      write(1, '(A)') trim(Output)
+  !      Output = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.dat "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+  !      write(1, '(A)') trim(Output)
+        
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
@@ -615,18 +619,21 @@ contains
         call DetermineStrLen(istr, i)
         call DetermineStrLen(NoGenstr, NoGen)
         open(1, file='FileCreateDir.bat', form='formatted',status='unknown')
-        !strSystem = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.resp"'
-        !call system(trim(strSystem))
-        !strSystem = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.rsd"'
-        !call system(trim(strSystem))
-        !strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.dat "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.dat"'
-        !call system(trim(strSystem))
-        Output = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+        
+        Output = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.resp"'
         write(1, '(A)') trim(Output)
-        Output = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+        Output = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.rsd"'
         write(1, '(A)') trim(Output)
-        Output = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.dat "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+        Output = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.dat "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.dat"'
         write(1, '(A)') trim(Output)
+        
+        !Output = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+        !write(1, '(A)') trim(Output)
+        !Output = 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+        !write(1, '(A)') trim(Output)
+        !Output = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.dat "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+        !write(1, '(A)') trim(Output)
+        
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)

@@ -26,10 +26,10 @@ contains
         ! Variables
         implicit none
         double precision :: Ac, Ftemp, Fopt, temp
-        integer :: i,j, k, l, ii, iii, NoSteps, NoTop, NoDiscard, randomNest, NoConv, NoTest, store
+        integer :: i, j, k, l, ii, Gen, NoSteps, NoTop, NoDiscard, randomNest, store
         double precision, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
-        double precision, dimension(:,:), allocatable :: Snapshots_Move, tempSnapshots, newSnapshots, NestsTest, TopNest, TopNest_Move, tempNestA
-        integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial, ConvA
+        double precision, dimension(:,:), allocatable :: Snapshots_Move, newSnapshots, TopNest, TopNest_Move
+        integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial
         logical :: Converge
         character(len=5) :: strNoSnap
         !double precision, dimension(20, maxDOF) :: Nesting
@@ -50,14 +50,12 @@ contains
         allocate(tempNests(maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(NestOpt(maxDoF),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "     
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         ! Specific for Adaptive Sampling
         allocate(newSnapshots(2,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fcompare(2),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(ConvA(2),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "      
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "    
         
         ! Body of SubOptimization
         print *, ''
@@ -176,6 +174,7 @@ contains
                 call system('FileCreateDir.bat')    ! Submits create directory file
             else
                 call moveTopNestFilesLin(ind_Fi_initial(j), 1)
+                call system('chmod a+x FileCreateDir.scr')
                 call system('./FileCreateDir.scr')    ! Submits Move file
             end if
         end do
@@ -193,6 +192,7 @@ contains
         write(29,'(<IV%NoNests>f17.10)') Nests
         close(29)
         open(19,file=newdir//'/Fitness'//istr//'.txt', form='formatted',status='unknown')
+        !open(19,file=TopFolder//'/Fitness'//istr//'.txt', form='formatted',status='unknown')
         write(19,*) 'Fitness'
         write(19,'(1I1)',advance="no") 1
         write(19,'(<IV%NoNests>f17.10)') Fi
@@ -200,17 +200,17 @@ contains
         deallocate(istr)
        
         !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
-        do iii = 2, IV%NoG
+        do Gen = 2, IV%NoG
             print *, ''
             print *, '************************'
-            print *, 'Generation ', iii
+            print *, 'Generation ', Gen
             print *, '************************'
             print *, ''
             print *, IV%Ma, IV%NoCN
             call timestamp()
           
             !!****** Adaptive Sampling - Start New Jobs (first and last Fitness) *******!!
-            if (iii > 2 .and. iii < IV%NoG .and. IV%AdaptSamp == .true.) then
+            if (Gen > 2 .and. Gen < IV%NoG .and. IV%AdaptSamp == .true.) then
                 
                 print *, 'Adaptive Sampling - Start Part 1 / 2'
                 ! Extract First and Last Nest
@@ -226,12 +226,12 @@ contains
             
             !!*** Loop over Discarded Nests ***!!
             print *, ''
-            print *, 'Modify Discarded Cuckoos for Generation', iii
+            print *, 'Modify Discarded Cuckoos for Generation', Gen
             print *, ''
             do ii = IV%NoNests, (NoTop + 1), -1
                 
                 ! Perform Random Walk using Levy Flight with a Cauchy Distribution
-                Ac = IV%Aconst/(iii**(1.0/2.0))
+                Ac = IV%Aconst/(Gen**(1.0/2.0))
                 call random_number(rn)
                 NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                 NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
@@ -277,7 +277,7 @@ contains
             
             !!*** Loop over Top Nests ***!!
             print *, ''
-            print *, 'Modify Top Cuckoos for Generation', iii
+            print *, 'Modify Top Cuckoos for Generation', Gen
             print *, ''
             do ii = 1, NoTop
            
@@ -287,7 +287,7 @@ contains
                 if (randomNest == ii) then  ! Same Nest
                 
                     ! Perform Random Walk instead                   
-                    Ac = IV%Aconst/(iii**2.0)
+                    Ac = IV%Aconst/(Gen**2.0)
                     call random_number(rn)
                     NoSteps = nint(log(rn)*(-IV%NoLeviSteps))
                     NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
@@ -364,7 +364,7 @@ contains
              
             ! Store moved Nests in Output Analysis File
             open(39,file=newdir//'/TopNest.txt',form='formatted',status='unknown',position='append')
-            write(39, *) 'Generation', iii
+            write(39, *) 'Generation', Gen
             write(39,'(<NoTop>f17.10)') TopNest
             close(39)
           
@@ -377,11 +377,11 @@ contains
                 !Generate Full Fidelity Solution of new TopNest      
                 call SubCFD(1, NoTop, TopNest, NoTop)
                 ! Check ALL new Nests
-                print *, 'Generation: ', iii
+                print *, 'Generation: ', Gen
                 call PostSolverCheck(IV%NoNests, 1, Nests_Move, Nests)   
  
                 ! Evaluate Fitness of Full Fidelity Nest Solutions
-                print *, 'Extract Pressure of Generation', iii
+                print *, 'Extract Pressure of Generation', Gen
                 call ExtractPressure(1, IV%NoNests)
                 do ii = 1, NoTop
                     call getObjectiveFunction(.false., Ftemp, NoSnapshot=ii)
@@ -400,6 +400,11 @@ contains
                     call getObjectiveFunction(.false., Fi(ii), NoSnapshot=ii)
                 end do
                 deallocate(pressure)
+            end if
+            
+            !!*** Adaptive Sampling - Finish and Integrate New Jobs (first and last Fitness) ***!!
+            if (Gen > 2 .and. Gen < IV%NoG .and. IV%AdaptSamp == .true.) then
+                call AdaptiveSampling(Gen, newSnapshots, Fcompare, NoTop)
             end if
             
             ! Re-order Fitness in ascending order
@@ -424,13 +429,14 @@ contains
             write(istr, '(1f3.1)') IV%Ma
             print *, 'Current best solutions:' , Fi(1:6)
             open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
-            write(19,'(1I3)',advance="no") iii
+            !open(19,file=TopFolder//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
+            write(19,'(1I3)',advance="no") Gen
             write(19,'(<IV%NoNests>f17.10)') Fi
             close(19) 
                     
             ! Store moved Nests in Output Analysis File
             open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
-            write(29, *) 'Generation', iii
+            write(29, *) 'Generation', Gen
             write(29,'(<IV%NoNests>f17.10)') Nests
             close(29)
             deallocate(istr)
@@ -438,99 +444,14 @@ contains
             ! Store Files of Top 5 % fraction of Nests in TopFolder
             do j = 1, store                    
                 if (IV%SystemType == 'W') then
-                    call moveTopNestFilesWin(ind_Fi(j), iii)
+                    call moveTopNestFilesWin(ind_Fi(j), Gen)
                     call system('FileCreateDir.bat')    ! Submits create directory file
                 else
-                    call moveTopNestFilesLin(ind_Fi(j), iii)
+                    call moveTopNestFilesLin(ind_Fi(j), Gen)
+                    call system('chmod a+x FileCreateDir.scr')
                     call system('./FileCreateDir.scr')    ! Submits Move file
                 end if
             end do
-        
-            !!*** Adaptive Sampling - Finish and Integrate New Jobs (first and last Fitness) ***!!
-            if (iii > 2 .and. iii < IV%NoG .and. IV%AdaptSamp == .true.) then
-                print *, 'Adaptive Sampling - Start Part 2 / 2'
-                
-                ! Store Snapshots in temporary Container
-                allocate(tempSnapshots((IV%NoSnap + 2*IV%NoG),maxDoF),stat=allocateStatus)
-                if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-                tempSnapshots(1:IV%NoSnap,:) = Snapshots
-                deallocate(Snapshots)
-                
-                ! Check if Jobs for new Snapshots are ready
-                call Sleep(IV%NoSnap + 2)
-                
-                ! Convergence Check
-                NoConv = 0
-                ConvA = 0
-                do k = 1, 2
-                    Converge = .true.
-                    call FileCheckConvergence(Converge, (IV%NoSnap + k))
-                    if (Converge == .true.) then ! If Converged
-                        
-                        ! Include new Snapshot
-                        NoConv = NoConv + 1
-                        tempSnapshots((IV%NoSnap + NoConv),:) = newSnapshots(k,:)
-                        ConvA(k) = 1
-                        
-                    else
-                        
-                        ! Delete Errorfiles if Snapshot diverged      
-                        call DetermineStrLen(istr, (IV%NoSnap + k))        
-                        call DeleteErrorFiles(istr)
-                        if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
-                            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-                        else
-                            call system('chmod a+x ./FileCreateDir.scr')
-                            call system('./FileCreateDir.scr')
-                        end if                
-                        deallocate(istr)
-                  
-                    end if
-                end do
-                print *, 'NoConv:', NoConv
-                
-                allocate(character(len=3) :: istr)
-                write(istr, '(1f3.1)') IV%Ma
-                open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
-                if (ConvA(1) == 1) then ! If converged check fitness
-                    call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 1))
-                    write(19,'(1I3, 1f17.10)',advance="no") 0, Ftemp
-                    print *, 'Real Fitness best: ', Ftemp
-                    do k = 1, NoTop
-                        if (Fcompare(1) == Fi(k)) then  ! Replace POD fitness with real fitness if still the same value                       
-                            print *, 'Comparison POD/Real Fitness best: ', Fi(k), '/', Ftemp
-                            Fi(k) = Ftemp
-                        end if
-                    end do
-                else ! Not converged set fitness to worst fitness to exclude solution
-                    Fi(1) = Fi(IV%NoNests)
-                end if
- 
-                if (ConvA(2) == 1) then ! If converged check fitness
-                    call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 2))
-                    write(19,'(1I3, 1f17.10)',advance="no") 1, Ftemp
-                    print *, 'Comparison POD/Real Fitness worst: ', Fcompare(2), '/', Ftemp 
-                end if
-                close(19)
-                deallocate(pressure)
-                deallocate(istr)
-                               
-                ! Resize Snapshots Array to include new Snapshots
-                IV%NoSnap = IV%NoSnap + NoConv
-                allocate(Snapshots(IV%NoSnap,maxDoF),stat=allocateStatus)
-                if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "              
-                Snapshots = tempSnapshots(1:IV%NoSnap,:)
-                deallocate(tempSnapshots)
-                
-                ! Re-Do POD including new Snapshots
-                deallocate(modes)
-                deallocate(coeff)
-                call AllocateModesCoeff()
-                call POD()
-                print *, 'Adaptive Sampling - Finish Part 2 / 2'
-                
-            end if
-            write(19,*) ''
         
         end do
         
@@ -1537,5 +1458,93 @@ contains
         Fi = abs(Lift)*(-1)
         
     end subroutine getzeroLift
+    
+    subroutine AdaptiveSampling(Gen, newSnapshots, Fcompare, NoTop)
+    
+        ! Variables
+        implicit none
+        logical :: Converge
+        integer :: Gen, NoConv, k, NoTop
+        double precision :: Ftemp
+        double precision, dimension(:), allocatable :: Fcompare
+        double precision, dimension(:,:), allocatable :: tempSnapshots, newSnapshots
+        integer, dimension(:), allocatable :: ConvA
+    
+        allocate(ConvA(2),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
+        allocate(tempSnapshots((IV%NoSnap + 2*(Gen-2)),maxDoF),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        
+        ! Body of AdaptiveSampling
+        print *, 'Adaptive Sampling - Start Part 2 / 2'
+                
+        ! Store Snapshots in temporary Container       
+        tempSnapshots(1:IV%NoSnap,:) = Snapshots
+        deallocate(Snapshots)
+                
+        ! Check if Jobs for new Snapshots are ready
+        call Sleep(IV%NoSnap + 2)
+                
+        ! Convergence Check
+        NoConv = 0
+        ConvA = 0
+        do k = 1, 2
+            Converge = .true.
+            call FileCheckConvergence(Converge, (IV%NoSnap + k))
+            if (Converge == .true.) then ! If Converged
+                        
+                ! Include new Snapshot
+                NoConv = NoConv + 1
+                tempSnapshots((IV%NoSnap + NoConv),:) = newSnapshots(k,:)
+                ConvA(k) = 1
+                        
+            else
+                ! Diverging Snapshot
+            end if
+        end do
+        print *, 'NoConv:', NoConv
+                
+        allocate(character(len=3) :: istr)
+        write(istr, '(1f3.1)') IV%Ma
+        open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
+        if (ConvA(1) == 1) then ! If converged check fitness
+            call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 1))
+            write(19,'(1I3, 1f17.10)',advance="no") 0, Ftemp
+            print *, 'Real Fitness best: ', Ftemp
+            do k = 1, NoTop
+                if (Fcompare(1) == Fi(k)) then  ! Replace POD fitness with real fitness if still the same value                       
+                    print *, 'Comparison POD/Real Fitness best: ', Fi(k), '/', Ftemp
+                    Fi(k) = Ftemp
+                end if
+            end do
+        else ! Not converged set fitness to worst fitness to exclude solution
+            Fi(1) = Fi(IV%NoNests)
+        end if
+ 
+        if (ConvA(2) == 1) then ! If converged check fitness
+            call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 2))
+            write(19,'(1I3, 1f17.10)',advance="no") 1, Ftemp
+            print *, 'Comparison POD/Real Fitness worst: ', Fcompare(2), '/', Ftemp 
+        end if
+        write(19,*) ' '
+        close(19)
+        deallocate(pressure)
+        deallocate(istr)
+                               
+        ! Resize Snapshots Array to include new Snapshots
+        IV%NoSnap = IV%NoSnap + NoConv
+        allocate(Snapshots(IV%NoSnap,maxDoF),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "              
+        Snapshots = tempSnapshots(1:IV%NoSnap,:)
+        deallocate(tempSnapshots)
+                
+        ! Re-Do POD including new Snapshots
+        deallocate(modes)
+        deallocate(coeff)
+        call AllocateModesCoeff()
+        call POD()
+        print *, 'Adaptive Sampling - Finish Part 2 / 2'
+    
+    end subroutine AdaptiveSampling
         
 end module Optimization

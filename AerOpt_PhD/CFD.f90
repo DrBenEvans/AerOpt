@@ -59,8 +59,7 @@ module CFD
         implicit none
         integer :: NoFiles, i, InitConv
         double precision, dimension(IV%NoNests,IV%DoF), optional :: Nests_Move
-        double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
-!! NOte: IV%NoNests needs to be replaced and should be function input    
+        double precision, dimension(IV%NoNests,maxDoF), optional :: Nests   
         ! Body of PostSolverCheck
         ! ****Wait & Check for FLITE Solver Output**** !
         if (IV%runOnCluster == 'Y') then
@@ -69,7 +68,7 @@ module CFD
         
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y') then
             allocate(character(len=200) :: strSystem)
-            do i = NoFiles, (NoFiles - IV%NoNests + 1), -1
+            do i = 1, NoFiles
                 call DetermineStrLen(istr, i)
                 call TransferSolutionOutput()
                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
@@ -92,6 +91,11 @@ module CFD
         call CheckforConvergence(i, InitConv, NoFiles, Nests_Move, Nests)
         print*, 'All Solutions converged'
         
+        ! Delete the Error files to allow sleep check in next generation
+        do i = 1, NoFiles
+            call SubDeleteErrorFiles(i)
+        end do
+        
     end subroutine PostSolverCheck
     
     subroutine PreProcessing(i)
@@ -111,13 +115,13 @@ module CFD
         if (IV%SystemType == 'W') then
              
             allocate(character(len=100) :: strSystem)
-            strSystem = pathPrePro//' < '//newdir//'/PreprocessingInput.txt >nul 2>&1'
+            strSystem = pathPrePro//' < '//newdir//'\'//InFolder//'/PreprocessingInput.txt >nul 2>&1'
             
         else
             
             ! write command (for Linux)
             allocate(character(len=100) :: strSystem)
-            strSystem = pathPrepro//' < '//newdir//'/PreprocessingInput.txt > /dev/null'
+            strSystem = pathPrepro//' < '//newdir//'/'//InFolder//'/PreprocessingInput.txt > /dev/null'
             
         end if
         print *, 'Preprocessing Geometry', i
@@ -158,7 +162,7 @@ module CFD
             else
                 print *, 'Solving Geometry', i
                 allocate(character(len=200) :: strSystem)
-                strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/SolverInput.sh >nul 2>&1'
+                strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh >nul 2>&1'
                 call system(trim(strSystem))
                 strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp"'
                 call system(trim(strSystem))
@@ -169,12 +173,13 @@ module CFD
               
         elseif (IV%SystemType == 'L')   then    ! AerOpt is executed on a Linux machine
             
+		    print *, 'Solving Geometry', i
             allocate(character(len=200) :: strSystem)
-            strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/SolverInput.sh >nul 2>&1'
+            strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh > /dev/null'
             call system(trim(strSystem))
-            strSystem = 'mv '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp"'
+            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.resp "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp"'
             call system(trim(strSystem))
-            strSystem = 'mv '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
             call system(trim(strSystem))
             deallocate (strSystem)
             
@@ -217,7 +222,7 @@ module CFD
         
             ! Check Status of Simulation by checking the existence of all error files
 
-            do i = NoFiles, (NoFiles - IV%NoSnap + 1), -1
+            do i = 1, NoFiles
 
                 ! Determine correct String      
                 call DetermineStrLen(istr, i)
@@ -277,13 +282,13 @@ module CFD
         print *, 'Iteration', (Iter + 1)
         Converge = .true.
         NoConv = 0 
-        do i = 1, IV%NoSnap
+        do i = 1, NoFiles
 
-            call FileCheckConvergence(Converge, NoFiles - IV%NoSnap + i)  
+            call FileCheckConvergence(Converge, i)  
           
             ! All diverged Snapshots are pulled halfway to midpoint(no movement center)
             if (Converge == .false.) then              
-                    print *, 'File', (NoFiles - IV%NoSnap + i), 'failed to converge and will be resimulated'
+                    print *, 'File', i, 'failed to converge and will be resimulated'
                     NoConv = NoConv + 1
                     DivNestPos(NoConv) = i
                     MidPoints = MxDisp(:,1) - (MxDisp(:,1) - MxDisp(:,2))/2.0  ! Midpoint calculation
@@ -314,23 +319,13 @@ module CFD
             do ii = 1, NoConv
                 
                 if (InitConv == 0) then
-                    call SubCFD((NoFiles - IV%NoSnap + DivNestPos(ii)), (NoFiles - IV%NoSnap + DivNestPos(ii)), Snapshots(DivNestPos(ii),:), 1)
+                    call SubCFD(DivNestPos(ii), DivNestPos(ii), Snapshots(DivNestPos(ii),:), 1)
                 else
-                    call SubCFD((NoFiles - IV%NoSnap + DivNestPos(ii)), (NoFiles - IV%NoSnap + DivNestPos(ii)), Nests(DivNestPos(ii),:), 1)    
+                    call SubCFD(DivNestPos(ii), DivNestPos(ii), Nests(DivNestPos(ii),:), 1)    
                 end if
                 
-                ! Determine correct String      
-                call DetermineStrLen(istr, (NoFiles - IV%NoSnap + DivNestPos(ii)))
-        
-                call DeleteErrorFiles(istr)
-                if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
-                elseif (IV%SystemType /= 'W')  then                
-                    call system('chmod a+x ./FileCreateDir.scr')
-                    call system('./FileCreateDir.scr')
-                end if
-                
-                deallocate(istr)
+                ! Delete the Error files to allow sleep check
+                call SubDeleteErrorFiles(NoFiles - IV%NoSnap + DivNestPos(ii))
                 
             end do
             
@@ -392,5 +387,26 @@ module CFD
         deallocate(istr)
             
     end subroutine FileCheckConvergence
+    
+    subroutine SubDeleteErrorFiles(i)
+    
+        ! Variables
+        integer :: i
+        
+        ! Body of SubDeleteErrorFiles
+        ! Determine correct String      
+        call DetermineStrLen(istr, i)
+        
+        call DeleteErrorFiles(istr)
+        if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
+            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
+        elseif (IV%SystemType /= 'W')  then                
+            call system('chmod a+x ./FileCreateDir.scr')
+            call system('./FileCreateDir.scr')
+        end if
+                
+        deallocate(istr)
+    
+    end subroutine SubDeleteErrorFiles
     
 end module CFD

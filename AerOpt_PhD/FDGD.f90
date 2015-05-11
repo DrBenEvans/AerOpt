@@ -144,7 +144,7 @@ module FDGD
         elseif (IV%systemType == 'W') then
             strSystem = 'Executables\2D_Delaunay.exe < Executables/DelaunayInput.txt >nul 2>&1'
         elseif (IV%systemType == 'L') then
-            strSystem = 'Executables/2D_Delaunay.exe < Executables/DelaunayInput.txt >nul 2>&1'
+            strSystem = 'Executables/2D_Delaunay.exe < Executables/DelaunayInput.txt > /dev/null'
         else
             STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'
         end if
