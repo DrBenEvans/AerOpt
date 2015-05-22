@@ -8,13 +8,14 @@ module ReadData
         integer, dimension(:), allocatable :: boundtype, boundpart, MovingParts ! Boundary Information of Mesh: Type, Part of boundary    
         integer, dimension(:,:), allocatable :: connec, bound                   ! Connectivity & Boundary Matrix of Fine Mesh    
         double precision, dimension(:,:), allocatable :: coord                  ! Coordinates Matrix of Mesh
-        double precision, dimension(:,:), allocatable :: Coord_CN               ! desired Coordinates of the Control Points
+        double precision, dimension(:,:), allocatable :: Coord_CN               ! desired Coordinates of the Control Nodes
         double precision, dimension(:,:), allocatable :: coord_temp             ! Coordinates Matrix of Mesh for temporary Mesh Movement
         
     end type ReadVariablesData
     
     type(ReadVariablesData) :: RD
     double precision, dimension(:,:), allocatable :: ArrayTemp
+    integer, dimension(:), allocatable :: orderedBoundaryIndex   ! Vector conatining the Index of boundary points in the correct order
     
 contains
       
@@ -137,7 +138,7 @@ contains
             call createDirectoriesWindows()
             call system('FileCreateDir.bat')    ! Submits create directory file
         
-        elseif (IV%SystemType == 'L') then ! AerOpt is executed from a Windows machine alone
+        elseif (IV%SystemType == 'L') then ! AerOpt is executed from a Linux machine alone
         
             call createDirectoriesWindows()
             call system('chmod a+x ./FileCreateDir.bat')  

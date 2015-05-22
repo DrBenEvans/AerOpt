@@ -7,6 +7,7 @@ module Optimization
     use GenerateMesh
     use CFD
     use FDGD
+    use Smoothing
     
     double precision, dimension(:,:), allocatable :: modes, coeff       ! Modes and Coefficient derived by the POD method
     double precision, dimension(:), allocatable :: meanpressure         ! Mean Pressure excluded of Snapshots in POD
@@ -25,11 +26,11 @@ contains
     
         ! Variables
         implicit none
-        double precision :: Ac, Ftemp, Fopt, temp
+        double precision :: Ac, Ftemp, Fopt, temp, Fibefore
         integer :: i, j, k, l, ii, Gen, NoSteps, NoTop, NoDiscard, randomNest, store
         double precision, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
         double precision, dimension(:,:), allocatable :: Snapshots_Move, newSnapshots, TopNest, TopNest_Move
-        integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial
+        integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial, ind_Fitrack
         logical :: Converge
         character(len=5) :: strNoSnap
         !double precision, dimension(20, maxDOF) :: Nesting
@@ -133,6 +134,8 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ind_Fi(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        allocate(ind_Fitrack(IV%NoNests),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fi(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fi_initial(IV%NoSnap),stat=allocateStatus)
@@ -178,6 +181,7 @@ contains
                 call system('./FileCreateDir.scr')    ! Submits Move file
             end if
         end do
+        Fibefore = Fi(1)
         
         deallocate(Fi_initial)
         deallocate(ind_Fi_initial)
@@ -382,6 +386,7 @@ contains
  
                 ! Evaluate Fitness of Full Fidelity Nest Solutions
                 print *, 'Extract Pressure of Generation', Gen
+                ind_Fitrack = (/ (i, i=1,IV%NoNests) /)
                 call ExtractPressure(1, IV%NoNests)
                 do ii = 1, NoTop
                     call getObjectiveFunction(.false., Ftemp, NoSnapshot=ii)
@@ -393,6 +398,7 @@ contains
                         Nests_Move(randomNest,:) = TopNest_Move(ii,:)
                         Nests(randomNest,:) = TopNest(ii,:)
                         Fi(randomNest) = Ftemp
+                        ind_Fitrack(randomNest) = ii
                     end if
                 end do
 
@@ -442,17 +448,20 @@ contains
             deallocate(istr)
             
             ! Store Files of Top 5 % fraction of Nests in TopFolder
-            do j = 1, store                    
-                if (IV%SystemType == 'W') then
-                    call moveTopNestFilesWin(ind_Fi(j), Gen)
-                    call system('FileCreateDir.bat')    ! Submits create directory file
-                else
-                    call moveTopNestFilesLin(ind_Fi(j), Gen)
-                    call system('chmod a+x FileCreateDir.scr')
-                    call system('./FileCreateDir.scr')    ! Submits Move file
-                end if
-            end do
-        
+            if (Fibefore /= Fi(1)) then
+                do j = 1, store                    
+                    if (IV%SystemType == 'W') then
+                        call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)), Gen)
+                        call system('FileCreateDir.bat')    ! Submits create directory file
+                    else
+                        call moveTopNestFilesLin(ind_Fitrack(ind_Fi(j)), Gen)
+                        call system('chmod a+x FileCreateDir.scr')
+                        call system('./FileCreateDir.scr')    ! Submits Move file
+                    end if
+                end do
+            end if
+            Fibefore = Fi(1)
+            
         end do
         
         print *, 'Finished Cuckoo Search'                  
@@ -1226,7 +1235,12 @@ contains
                 call getLiftandDragPOD(tempNests, Fi)
                 deallocate(RD%coord_temp)
             elseif (IV%ObjectiveFunction == 3) then
+                allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
+                if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
+                RD%coord_temp = RD%coord 
+                call SubMovemesh(tempNests)
                 call getzeroLiftPOD(tempNests, Fi)
+                deallocate(RD%coord_temp)
             end if
         else
             if (IV%ObjectiveFunction == 2) then

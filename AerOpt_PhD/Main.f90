@@ -8,7 +8,6 @@ program AerOpt
     use ReadData
     use InputData
     use CFD
-    use FDGD
     
     implicit none
 
@@ -71,11 +70,9 @@ program AerOpt
 !!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
 
     ! ****Generate Full Fidelity Solutions of Snapshots**** !
-    if (IV%MeshMovement == 1) then
-        print *, 'Start PreMeshing'
-        call PreMeshing()
-        print *, 'End PreMeshing - All Area Coefficients calculated'
-    end if
+    print *, 'Start PreMeshing'
+    call PreMeshing()
+    print *, 'End PreMeshing - All Area Coefficients calculated'
     print *, ''
     call SubCFD(1, IV%NoSnap, Snapshots, IV%NoSnap)
     call PostSolverCheck(IV%NoSnap, 0)

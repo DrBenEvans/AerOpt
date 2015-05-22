@@ -41,7 +41,7 @@ module InputData
         character(len=20) :: UserName   ! Putty Username - Cluster: egnaumann
         character(len=20) :: Password   ! Putty Password
         character(len=3) :: version
-        integer :: MeshMovement
+        integer :: MeshMovement         ! Type of Mesh Movement - choices: 1 - 'Linear with Smoothing' , 2 - 'FDGD with Smoothing' , 3 - 'RBF' , 4 - 'FDGD'
         integer :: ObjectiveFunction
         logical :: Meshtest
         logical :: Pol                  ! POD using Polynomial
@@ -129,7 +129,7 @@ contains
         IV%meanP = .true.
         
         ! For Mesh Deformation
-        IV%MeshMovement = 1
+        IV%MeshMovement = 1             ! Type of Mesh Movement - choices: 1 - 'Linear with Smoothing' , 2 - 'FDGD with Smoothing' , 3 - 'RBF' , 4 - 'FDGD'
         IV%Meshtest = .true.
         
 		! Read User Input Parameters
@@ -158,7 +158,7 @@ contains
             pathPrepro = 'Executables\PreProcessing.exe'
         elseif (IV%SystemType == 'L') then
             allocate(character(len=31) :: pathPrepro)
-            pathPrepro = './Executables/PreProcessing.exe'
+            pathPrepro = './Executables/PreProcessing'
         else
             STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'           
         end if
@@ -175,7 +175,7 @@ contains
             pathSolver = 'Executables\2DSolver.exe'
         elseif (IV%SystemType == 'L') then
             allocate(character(len=26) :: pathSolver)
-            pathSolver = './Executables/2DSolver.exe'
+            pathSolver = './Executables/2DSolver'
         else
             STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'           
         end if

@@ -9,7 +9,8 @@ module FDGD
     double precision, dimension(:), allocatable :: CN_ind
     double precision, dimension(:,:), allocatable :: DelaunayCoordBound, DelaunayCoordDomain
     integer, dimension(:,:), allocatable :: DelaunayElem, DelaunayElemBound, DelaunayElemDomain
-    integer, dimension(:), allocatable ::  InnerBound
+    integer, dimension(:), allocatable ::  MovingGeomIndex, InnerBound ! Currently the same, but sort out in future
+    integer :: overlap
     
     contains
     
@@ -97,12 +98,11 @@ module FDGD
         ! Variables
         implicit none
         integer, dimension(:), allocatable ::  DomainIndex
-        integer, dimension(:), allocatable :: MovingGeomIndex
     
         ! Body of PreMeshing
     
         ! Preparation for Boundary Movement
-        call getDelaunayCoordBound(MovingGeomIndex)
+        call getDelaunayCoordBound()
         call getDelaunayElem(DelaunayElemBound, DelaunayCoordBound)
         call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, MovingGeomIndex, size(MovingGeomIndex), AreaCoeffBound)
 
@@ -114,8 +114,27 @@ module FDGD
         call getDelaunayElem(DelaunayElemDomain, DelaunayCoordDomain)
         call getDomainIndex(DomainIndex)
         call getAreaCoefficients(DelaunayCoordDomain, DelaunayElemDomain, DomainIndex, size(DomainIndex), AreaCoeffDomain)
+        
+        ! Further preparation work
+        call OrderBoundary()
 
     end subroutine PreMeshing
+    
+    subroutine PreMeshingBoundary()
+    
+        ! Variables
+        implicit none
+    
+        ! Body of PreMeshing
+        DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord_temp(InnerBound(CN_ind),:)
+        deallocate(DelaunayElemBound,stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
+        deallocate(AreaCoeffBound,stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
+        call getDelaunayElem(DelaunayElemBound, DelaunayCoordBound)
+        call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, MovingGeomIndex, size(MovingGeomIndex), AreaCoeffBound)
+
+    end subroutine PreMeshingBoundary
     
     
     subroutine getDelaunayElem(DelaunayElem, DelaunayCoord)
@@ -144,7 +163,7 @@ module FDGD
         elseif (IV%systemType == 'W') then
             strSystem = 'Executables\2D_Delaunay.exe < Executables/DelaunayInput.txt >nul 2>&1'
         elseif (IV%systemType == 'L') then
-            strSystem = 'Executables/2D_Delaunay.exe < Executables/DelaunayInput.txt > /dev/null'
+            strSystem = 'Executables/2D_Delaunay < Executables/DelaunayInput.txt > /dev/null'
         else
             STOP 'INPUT ERROR: System Type selected does not exist! Program stopped.'
         end if
@@ -301,14 +320,14 @@ module FDGD
     
     end subroutine getDelaunayCoordDomain
     
-    subroutine getDelaunayCoordBound(MovingGeomIndex)
+    subroutine getDelaunayCoordBound()
     
         ! Variables
         implicit none
-        integer :: i, j, k, l, nbp, nibp, nobp, overlap, testx, testy, circ, lin
+        integer :: i, j, k, l, nbp, nobp, testx, testy, circ, lin, nibp
         double precision :: maxx, maxy, minx, miny, spacing
         double precision, dimension(:), allocatable :: dist
-        integer, dimension(:), allocatable ::  OuterBound, nodesvec, nodesvec2,nodesvec3, nodesvec4, NonMovingGeomIndex, distindex, MovingGeomIndex
+        integer, dimension(:), allocatable ::  OuterBound, nodesvec, nodesvec2,nodesvec3, nodesvec4, NonMovingGeomIndex, distindex
         real, PARAMETER :: Pi = 3.1415927
         logical :: mp
         double precision, dimension(:,:), allocatable :: IdealCoord
@@ -376,9 +395,9 @@ module FDGD
             allocate(MovingGeomIndex(nibp),stat=allocateStatus)
             if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound "
             MovingGeomIndex = InnerBound
-            allocate(DelaunayCoordBound(IV%NoCN+IV%NoDelBP,IV%NoDim),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound"
- 
+            allocate(NoNMovingGeomIndex(nobp),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound "
+            NoNMovingGeomIndex = OuterBound 
         else    ! if only some parts of the boundary move
             do i = 1, RD%nbf
                 do j = 1, RD%NoParts
@@ -412,21 +431,22 @@ module FDGD
             call UniqueInt(nodesvec4, l, NonMovingGeomIndex)
             deallocate(nodesvec3)
             deallocate(nodesvec4)
-
-            ! Identify overlapping nodes between moving and non-moving parts to input into Delaunay Coordinates (to ensure smooth interfaces)
-            do i = 1, size(MovingGeomIndex)
-                do j = 1, size(NonMovingGeomIndex)
-                    if (MovingGeomIndex(i) == NonMovingGeomIndex(j)) then
-                        overlap = overlap + 1
-                        nodesvec(overlap) = MovingGeomIndex(i)
-                    end if
-                end do        
-            end do
-            deallocate(NonMovingGeomIndex)
-            
-            allocate(DelaunayCoordBound(IV%NoCN + IV%NoDelBP + overlap,IV%NoDim),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound"
         end if
+        
+        ! Identify overlapping nodes between moving and non-moving parts to input into Delaunay Coordinates (to ensure smooth interfaces)
+        do i = 1, size(MovingGeomIndex)
+            do j = 1, size(NonMovingGeomIndex)
+                if (MovingGeomIndex(i) == NonMovingGeomIndex(j)) then
+                    overlap = overlap + 1
+                    nodesvec(overlap) = MovingGeomIndex(i)
+                end if
+            end do        
+        end do
+        deallocate(NonMovingGeomIndex)
+            
+        allocate(DelaunayCoordBound(IV%NoCN + IV%NoDelBP + overlap,IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDelaunayCoordBound"
+        
                        
         ! Integrate CN coordinates into Delaunay Coordinates required for Triangulation
         DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(InnerBound(CN_ind),:)
@@ -647,5 +667,61 @@ module FDGD
         AngleofAttack = matmul( T, P21) + P1
          
     end function AngleofAttack
+    
+    subroutine OrderBoundary()
+    
+        ! Variables
+        implicit none
+        integer :: indOrder, indjump, i, nmbf
+        double precision, dimension(10,2) :: jumped
+    
+        ! Body of OrderBoundary
+        nmbf = size(MovingGeomIndex)
+        allocate(orderedBoundaryIndex(nmbf),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        orderedBoundaryIndex(1) = RD%bound(1,1)
+        orderedBoundaryIndex(2) = RD%bound(1,2) 
+        indOrder = 2
+        indjump = 0
+        do i = 2, nmbf
+            call RecOrderBoundary(i, indOrder, jumped, indjump, orderedBoundaryIndex)
+        end do
+
+    end subroutine OrderBoundary
+    
+    recursive subroutine RecOrderBoundary(i, indOrder, jumped, indjump, oBI)
+    
+        ! Variables
+        implicit none
+        integer :: indOrder, indjump, i, j
+        logical :: match
+        double precision, dimension(10,2) :: jumped
+        integer, dimension(*) :: oBI
+    
+        ! Body of RecOrderBoundary
+        if (oBI(indOrder) == RD%bound(i,1)) then
+            indOrder = indOrder + 1    
+            oBI(indOrder) = RD%bound(i,2)
+        else
+            match = .false.
+            do j = 1, indjump
+                if (oBI(indOrder) == jumped(j,1)) then
+                    indOrder = indOrder + 1  
+                    oBI(indOrder) = jumped(j,2)
+                    jumped(j,:) = jumped(indjump,:)
+                    indjump = indjump - 1
+                    match = .true.
+                    exit
+                end if
+            end do
+            if (match == .false.) then
+                indjump = indjump + 1
+                jumped(indjump,:) = RD%bound(i,:)
+            else
+                call RecOrderBoundary(i, indOrder, jumped, indjump, oBI)    
+            end if
+        end if
+            
+    end subroutine RecOrderBoundary
     
 end module FDGD
