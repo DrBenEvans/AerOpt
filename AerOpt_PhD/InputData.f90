@@ -7,6 +7,7 @@ module InputData
         real, dimension(100) :: xrange      ! Range of horizontal displacement of Control Nodes
         real, dimension(100) :: yrange      ! Range of vertical displacement of Control Nodes 
 		real, dimension(100) :: zrange      ! Range of lateral displacement of Control Nodes
+        double precision, dimension(100) :: smoothfactor ! Level of smoothing at each CN
         real, dimension(100) :: angle       ! Range of change in angle of Control Nodes
         real, dimension(50) :: CNconnecttrans    ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
         real, dimension(50) :: CNconnectangle    ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3       
@@ -42,7 +43,7 @@ module InputData
         character(len=20) :: Password   ! Putty Password
         character(len=3) :: version
         integer :: MeshMovement         ! Type of Mesh Movement - choices: 1 - 'Linear with Smoothing' , 2 - 'FDGD with Smoothing' , 3 - 'RBF' , 4 - 'FDGD'
-        integer :: ObjectiveFunction
+        integer :: ObjectiveFunction    ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - max Lift, 4 - min Drag, 5 - max Downforce, 6 - min Lift
         logical :: Meshtest
         logical :: Pol                  ! POD using Polynomial
         logical :: multiquadric         ! RBF type for POD
@@ -93,6 +94,7 @@ contains
         IV%yrange = 0.00                ! Maximum vertical displacement of Control Nodes    
         IV%zrange = 0.00                ! Maximum lateral displacement of Control Nodes
         IV%angle = 0.00                 ! For Aerofoil Angle of Attack Test
+        IV%smoothfactor = 0.0           ! Level of smoothing for each CN
         IV%CNconnecttrans = 0           ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
         IV%CNconnectangle = 0           ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
         IV%engFMF = 1.0			        ! engines Front Mass Flow(Solver variable)
@@ -119,7 +121,7 @@ contains
         IV%Password = 'Fleur666'        ! Putty Password
         IV%version = '1.8'
         IV%NoDelBP = 8                  ! Number of Delaunay Boundary Points       
-        IV%ObjectiveFunction = 1        ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - zero Lift Optimisation
+        IV%ObjectiveFunction = 1        ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - max Lift, 4 - min Drag, 5 - max Downforce, 6 - min Lift
         
         ! POD
         IV%POD = .false.                ! Activation of POD - TRUE is ACTIVE

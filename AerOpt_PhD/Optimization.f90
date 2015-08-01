@@ -148,7 +148,16 @@ contains
         end do
         deallocate(pressure)
         ! Output: Distortion of all Snapshots as the Fitness (Fi)
-      
+         
+        allocate(character(len=3) :: istr)
+        write(istr, '(1f3.1)') IV%Ma
+        open(19,file=newdir//'/Fitness_0.txt', form='formatted',status='unknown')
+        !open(19,file=TopFolder//'/Fitness_0.txt', form='formatted',status='unknown')
+        write(19,'(1I1)',advance="no") 0
+        write(19,'(1f17.10)') Fi_initial(1)
+        close(19)
+        deallocate(istr)
+        
         ! Pass on Top Snapshot parameters to Nests
         ind_Fi_initial = (/ (i, i=1,IV%NoSnap) /)
         call QSort(Fi_initial,size(Fi_initial), 'y', ind_Fi_initial) ! Result in Ascending order
@@ -195,8 +204,8 @@ contains
         write(29, *) 'Generation    1'
         write(29,'(<IV%NoNests>f17.10)') Nests
         close(29)
-        open(19,file=newdir//'/Fitness'//istr//'.txt', form='formatted',status='unknown')
-        !open(19,file=TopFolder//'/Fitness'//istr//'.txt', form='formatted',status='unknown')
+        open(19,file=newdir//'/Fitness'//istr//'.txt', form='formatted',status='unknown')       
+        !open(19,file=TopFolder//'/Fitness_1.txt', form='formatted',status='unknown')
         write(19,*) 'Fitness'
         write(19,'(1I1)',advance="no") 1
         write(19,'(<IV%NoNests>f17.10)') Fi
@@ -433,14 +442,18 @@ contains
             ! Store Fitness values
             allocate(character(len=3) :: istr)
             write(istr, '(1f3.1)') IV%Ma
+            !call DetermineStrLen(istr, Gen)
             print *, 'Current best solutions:' , Fi(1:6)
             open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
-            !open(19,file=TopFolder//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
+            !open(19,file=TopFolder//'/Fitness_'//istr//'.txt',form='formatted',status='new')
             write(19,'(1I3)',advance="no") Gen
             write(19,'(<IV%NoNests>f17.10)') Fi
             close(19) 
-                    
+            deallocate(istr)
+            
             ! Store moved Nests in Output Analysis File
+            allocate(character(len=3) :: istr)
+            write(istr, '(1f3.1)') IV%Ma
             open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
             write(29, *) 'Generation', Gen
             write(29,'(<IV%NoNests>f17.10)') Nests
@@ -459,6 +472,15 @@ contains
                         call system('./FileCreateDir.scr')    ! Submits Move file
                     end if
                 end do
+            else
+                if (IV%SystemType == 'W') then
+                    call copyTopNestFilesWin(Gen)
+                    call system('FileCreateDir.bat')    ! Submits create directory file
+                else
+                    call copyTopNestFilesLin(Gen)
+                    call system('chmod a+x FileCreateDir.scr')
+                    call system('./FileCreateDir.scr')    ! Submits Move file
+                end if
             end if
             Fibefore = Fi(1)
             
@@ -1248,6 +1270,12 @@ contains
             elseif (IV%ObjectiveFunction == 1) then
                 call getLiftandDrag(Fi, NoSnapshot)
             elseif (IV%ObjectiveFunction == 3) then
+                call getmaxLift(Fi, NoSnapshot)
+            elseif (IV%ObjectiveFunction == 4) then
+                call getminDrag(Fi, NoSnapshot)
+            elseif (IV%ObjectiveFunction == 5) then
+                call getDownForce(Fi, NoSnapshot)
+            elseif (IV%ObjectiveFunction == 6) then
                 call getzeroLift(Fi, NoSnapshot)
             end if
         end if
@@ -1472,6 +1500,97 @@ contains
         Fi = abs(Lift)*(-1)
         
     end subroutine getzeroLift
+    
+    subroutine getDownForce(Fi, NoSnapshot)
+    
+        ! Variables
+        implicit none
+        integer :: FileSize, LastLine, NoSnapshot, j
+        double precision, dimension(8) :: Input      
+        double precision :: Lift, Fi
+       
+        ! Body of getLiftandDrag
+        call DetermineStrLen(istr, NoSnapshot)
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        deallocate(istr)
+        inquire(11, size = FileSize)           
+        if (IV%SystemType == 'W') then
+            LastLine = FileSize/107
+        else     
+            LastLine = FileSize/106
+        end if
+            
+        ! Read until last line
+        do j = 1, (LastLine - 1)
+            read(11, *) Input
+        end do
+        read(11, *) Input
+        close(11)
+        Lift = Input(3)
+        
+        Fi = -Lift       
+        
+    end subroutine getDownForce
+    
+    subroutine getmaxLift(Fi, NoSnapshot)
+    
+        ! Variables
+        implicit none
+        integer :: FileSize, LastLine, NoSnapshot, j
+        double precision, dimension(8) :: Input      
+        double precision :: Lift, Fi
+       
+        ! Body of getzeroLift
+        call DetermineStrLen(istr, NoSnapshot)
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        deallocate(istr)
+        inquire(11, size = FileSize)           
+        if (IV%SystemType == 'W') then
+            LastLine = FileSize/107
+        else     
+            LastLine = FileSize/106
+        end if
+            
+        ! Read until last line
+        do j = 1, (LastLine - 1)
+            read(11, *) Input
+        end do
+        read(11, *) Input
+        close(11)
+        Lift = Input(3)
+        Fi = Lift
+        
+    end subroutine getmaxLift
+    
+    subroutine getminDrag(Fi, NoSnapshot)
+    
+        ! Variables
+        implicit none
+        integer :: FileSize, LastLine, NoSnapshot, j
+        double precision, dimension(8) :: Input      
+        double precision :: Drag, Fi
+       
+        ! Body of getzeroLift
+        call DetermineStrLen(istr, NoSnapshot)
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        deallocate(istr)
+        inquire(11, size = FileSize)           
+        if (IV%SystemType == 'W') then
+            LastLine = FileSize/107
+        else     
+            LastLine = FileSize/106
+        end if
+            
+        ! Read until last line
+        do j = 1, (LastLine - 1)
+            read(11, *) Input
+        end do
+        read(11, *) Input
+        close(11)
+        Drag = Input(4)
+        Fi = -Drag
+        
+    end subroutine getminDrag
     
     subroutine AdaptiveSampling(Gen, newSnapshots, Fcompare, NoTop)
     

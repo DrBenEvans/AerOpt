@@ -4,6 +4,7 @@
     use InputData
     use CreateSnapshots
     use FDGD
+    use Smoothing
 
     contains
     
@@ -11,15 +12,20 @@
     
         ! Variables
         implicit none
-        integer :: size, ii
+        integer :: size, ii, iii
         double precision, dimension(maxDoF) :: CN_CoordinatesMatrix
 
         ! Body of SubMovemesh
-		ii = 1
+        ii = 1
+        iii = 1
         if (IV%MeshMovement == 1) then
-            call SubFDGD(CN_CoordinatesMatrix, ii)
+            call SmoothingLinear(CN_CoordinatesMatrix)
         else if (IV%MeshMovement == 2) then
+            call SmoothingFDGD(CN_CoordinatesMatrix, ii)
+        else if (IV%MeshMovement == 3) then
             call SubRBF(CN_CoordinatesMatrix)
+        else if (IV%MeshMovement == 4) then            
+            call SubFDGD(CN_CoordinatesMatrix, ii, iii)
         end if
     
     end subroutine SubMovemesh

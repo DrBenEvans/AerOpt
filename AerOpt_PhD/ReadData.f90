@@ -641,4 +641,72 @@ contains
         
     end subroutine moveTopNestFilesWin
     
+    subroutine copyTopNestFilesLin(i)
+
+        ! Variables
+        implicit none
+        integer :: i, NoGen
+        character(len=255) :: Output
+        character(len=:), allocatable :: NoGenstr
+        
+        ! Body of moveTopNestFiles
+        call DetermineStrLen(istr, i-1)
+        call DetermineStrLen(NoGenstr, i)
+        
+  !      open(1, file='FileCreateDir.scr', form='formatted',status='unknown')        
+		!Output = 'cp '//TopFolder//'/'//trim(IV%filename)//'_'//istr//'.resp "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+  !      write(1, '(A)') trim(Output)
+  !      Output = 'cp '//TopFolder//'/'//trim(IV%filename)//'_'//istr//'.rsd "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+  !      write(1, '(A)') trim(Output)
+  !      Output = 'cp '//TopFolder//'/'//trim(IV%filename)//'_'//istr//'.dat "'//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+  !      write(1, '(A)') trim(Output)
+        
+        open(1, file='FileCreateDir.scr', form='formatted',status='unknown')        
+		Output = 'cp '//newdir//TopFolder//'/'//trim(IV%filename)//'_'//istr//'.resp "'//newdir//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+        write(1, '(A)') trim(Output)
+        Output = 'cp '//newdir//TopFolder//'/'//trim(IV%filename)//'_'//istr//'.rsd "'//newdir//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+        write(1, '(A)') trim(Output)
+        Output = 'cp '//newdir//TopFolder//'/'//trim(IV%filename)//'_'//istr//'.dat "'//newdir//TopFolder//'/'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+        write(1, '(A)') trim(Output)
+        
+        close(1)
+        deallocate(istr)
+        deallocate(NoGenstr)
+        
+    end subroutine copyTopNestFilesLin
+    
+    subroutine copyTopNestFilesWin(i)
+
+        ! Variables
+        implicit none
+        integer :: i, NoGen
+        character(len=255) :: Output
+        character(len=:), allocatable :: NoGenstr
+        
+        ! Body of moveTopNestFiles
+        call DetermineStrLen(istr, i-1)
+        call DetermineStrLen(NoGenstr, i)
+        
+  !      open(1, file='FileCreateDir.bat', form='formatted',status='unknown')        
+		!Output = 'copy '//TopFolder//'\'//trim(IV%filename)//'_'//istr//'.resp "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+  !      write(1, '(A)') trim(Output)
+  !      Output = 'copy '//TopFolder//'\'//trim(IV%filename)//'_'//istr//'.rsd "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+  !      write(1, '(A)') trim(Output)
+  !      Output = 'copy '//TopFolder//'\'//trim(IV%filename)//'_'//istr//'.dat "'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+  !      write(1, '(A)') trim(Output)
+        
+        open(1, file='FileCreateDir.bat', form='formatted',status='unknown')        
+		Output = 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//'_'//istr//'.resp "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.resp"'
+        write(1, '(A)') trim(Output)
+        Output = 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//'_'//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.rsd"'
+        write(1, '(A)') trim(Output)
+        Output = 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//'_'//istr//'.dat "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//'_'//NoGenstr//'.dat"'
+        write(1, '(A)') trim(Output)
+        
+        close(1)
+        deallocate(istr)
+        deallocate(NoGenstr)
+        
+    end subroutine copyTopNestFilesWin
+    
 end module ReadData
