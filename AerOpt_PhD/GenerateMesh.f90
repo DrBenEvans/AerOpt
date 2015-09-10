@@ -18,14 +18,27 @@
         ! Body of SubMovemesh
         ii = 1
         iii = 1
-        if (IV%MeshMovement == 1) then
-            call SmoothingLinear(CN_CoordinatesMatrix)
-        else if (IV%MeshMovement == 2) then
-            call SmoothingFDGD(CN_CoordinatesMatrix, ii)
-        else if (IV%MeshMovement == 3) then
-            call SubRBF(CN_CoordinatesMatrix)
-        else if (IV%MeshMovement == 4) then            
-            call SubFDGD(CN_CoordinatesMatrix, ii, iii)
+        if (IV%NoDim == 2) then
+! Add new features
+            if (IV%MeshMovement == 1) then
+                call SmoothingLinear(CN_CoordinatesMatrix)
+            else if (IV%MeshMovement == 2) then
+                call SmoothingFDGD(CN_CoordinatesMatrix, ii)
+            else if (IV%MeshMovement == 3) then
+                call SubRBF(CN_CoordinatesMatrix)
+            else if (IV%MeshMovement == 4) then            
+                call SubFDGD(CN_CoordinatesMatrix, ii, iii)
+            end if
+        elseif (IV%NoDim == 3) then
+            if (IV%MeshMovement == 1) then
+                call SmoothingLinear(CN_CoordinatesMatrix)
+            else if (IV%MeshMovement == 2) then
+                call SmoothingFDGD(CN_CoordinatesMatrix, ii)
+            else if (IV%MeshMovement == 3) then
+                call SubRBF(CN_CoordinatesMatrix)
+            else if (IV%MeshMovement == 4) then            
+                call SubFDGD_3D(CN_CoordinatesMatrix, ii, iii)
+            end if
         end if
     
     end subroutine SubMovemesh
@@ -52,9 +65,9 @@
 
     ! Relocating boundary nodes based on their distance to Control node and the Control Nodes Displacements (NestDisp)
     ! Method: Gaussian RBF function
-    c = 1.9
+    !c = 1.9
     do i = 1, IV%NoCN
-        !c = abs((RD%Rect(i,3) - RD%Rect(i,1)))/2.0
+        !c = DistP2P(IV%NoDim, IV%xrange(i), IV%xrange(IV%NoCN+i), IV%yrange(i), IV%yrange(IV%NoCN+i), IV%zrange(i), IV%zrange(IV%NoCN+i))/2.0
         do j = 1, size_ib(i)
             dis = RD%coord_temp(CP_ind(i),1) - RD%coord_temp(IB(j,i),1)   ! Distance of Control Node to a Node in the Influence Box         
             w = exp(-(dis**2)/(c**2))   ! Gaussian

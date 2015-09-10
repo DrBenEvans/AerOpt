@@ -70,7 +70,7 @@ contains
         print *, ''
         
         ! Initializing general parameters
-        NoDiscard = nint(IV%Top2Low*IV%NoNests)
+        NoDiscard = nint(IV%Low2Top*IV%NoNests)
         NoTop = IV%NoNests - NoDiscard
         IV%Aconst = (sqrt(real(IV%DoF))/IV%NoLeviSteps)*IV%Aconst
         tempNests = (/ (0, i=1,(maxDoF)) /)
@@ -108,7 +108,11 @@ contains
             call ComputeRBFWeights()
             ! Output: Weights for RBF interpolation
         else
-            call ExtractPressure(1, IV%NoSnap)
+            if (IV%NoDim == 2) then
+                call ExtractPressure(1, IV%NoSnap)
+            elseif (IV%NoDim == 3) then
+                call ExtractPressure_3D(1, IV%NoSnap)
+            end if
         end if             
         call timestamp()         
         if (IV%ObjectiveFunction == 2) then
@@ -183,15 +187,18 @@ contains
         do j = 1, store                    
             if (IV%SystemType == 'W') then
                 call moveTopNestFilesWin(ind_Fi_initial(j), 1)
-                call system('FileCreateDir.bat')    ! Submits create directory file
+                call generateEnSightFileWin(ind_Fi_initial(j), 1)
             else
                 call moveTopNestFilesLin(ind_Fi_initial(j), 1)
-                call system('chmod a+x FileCreateDir.scr')
-                call system('./FileCreateDir.scr')    ! Submits Move file
+                if (IV%NoDim == 2) then
+                    call generateEnSightFileLin(ind_Fi_initial(j), 1)
+                else
+                    call generateEnSightFileLin3D(ind_Fi_initial(j), 1)
+                end if
             end if
         end do
         Fibefore = Fi(1)
-        
+            
         deallocate(Fi_initial)
         deallocate(ind_Fi_initial)
         
@@ -396,7 +403,11 @@ contains
                 ! Evaluate Fitness of Full Fidelity Nest Solutions
                 print *, 'Extract Pressure of Generation', Gen
                 ind_Fitrack = (/ (i, i=1,IV%NoNests) /)
-                call ExtractPressure(1, IV%NoNests)
+                if (IV%NoDim == 2) then
+                    call ExtractPressure(1, IV%NoNests)
+                elseif (IV%NoDim == 3) then
+                    call ExtractPressure_3D(1, IV%NoNests)
+                end if
                 do ii = 1, NoTop
                     call getObjectiveFunction(.false., Ftemp, NoSnapshot=ii)
               
@@ -443,7 +454,7 @@ contains
             allocate(character(len=3) :: istr)
             write(istr, '(1f3.1)') IV%Ma
             !call DetermineStrLen(istr, Gen)
-            print *, 'Current best solutions:' , Fi(1:6)
+            print *, 'Current best solutions:' , Fi(1:nint(IV%NoNests*IV%Low2Top))
             open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
             !open(19,file=TopFolder//'/Fitness_'//istr//'.txt',form='formatted',status='new')
             write(19,'(1I3)',advance="no") Gen
@@ -465,21 +476,23 @@ contains
                 do j = 1, store                    
                     if (IV%SystemType == 'W') then
                         call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)), Gen)
-                        call system('FileCreateDir.bat')    ! Submits create directory file
+                        call generateEnSightFileWin(ind_Fitrack(ind_Fi(j)), Gen)
                     else
                         call moveTopNestFilesLin(ind_Fitrack(ind_Fi(j)), Gen)
-                        call system('chmod a+x FileCreateDir.scr')
-                        call system('./FileCreateDir.scr')    ! Submits Move file
+                        if (IV%NoDim == 2) then
+                            call generateEnSightFileLin(ind_Fitrack(ind_Fi(j)), Gen)
+                        else
+                            call generateEnSightFileLin3D(ind_Fitrack(ind_Fi(j)), Gen)
+                        end if
                     end if
                 end do
             else
                 if (IV%SystemType == 'W') then
                     call copyTopNestFilesWin(Gen)
-                    call system('FileCreateDir.bat')    ! Submits create directory file
+                    call generateEnSightFileWin(Gen, Gen)
                 else
                     call copyTopNestFilesLin(Gen)
-                    call system('chmod a+x FileCreateDir.scr')
-                    call system('./FileCreateDir.scr')    ! Submits Move file
+                    call generateEnSightFileLin(Gen, Gen)
                 end if
             end if
             Fibefore = Fi(1)
@@ -535,7 +548,7 @@ contains
             ! Determine correct String number
             call DetermineStrLen(istr, i)
            
-            open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp', form='formatted',status='old')     
+            open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='formatted',status='old')     
             read(11, *) Output  ! index, rho, Vx, Vy, Vz, e
             
             k = 0
@@ -557,7 +570,7 @@ contains
             deallocate(istr)
                 
         end do
-        print *,'Pressure of .resp files extracted'
+        print *,'Pressure of .unk files extracted'
         deallocate(Output)
         deallocate(Vx)
         deallocate(Vy)
@@ -566,6 +579,69 @@ contains
 
     end subroutine ExtractPressure
     
+    subroutine ExtractPressure_3D(Start, Ending)
+        
+        ! Variables
+        implicit none
+        integer :: Start, Ending, Length, i, k, j, nop
+        double precision :: Vamb, rho_amb, Rspec, gamma
+        double precision, dimension(:), allocatable :: Vx, Vy, Vz, rho, e
+        character(len=:), allocatable :: istr
+
+        ! Body of Extract Pressure
+        Length = Ending - Start + 1
+        allocate(rho(RD%np),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        allocate(e(RD%np),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        allocate(Vx(RD%np),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        allocate(Vy(RD%np),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        allocate(Vz(RD%np),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        allocate(pressure(RD%np, Length),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        
+        ! Precalculate ambient Parameters
+        print *, 'Start Pressure Extraction'
+        Vamb = IV%Ma*sqrt(IV%gamma*IV%R*IV%Tamb)          ! ambient velocity
+        rho_amb = (IV%Pamb)/(IV%Tamb*IV%R)             ! ambient Density
+            
+        !Extract pressure of Snapshot Output file      
+        do i = Start, Ending
+           
+            ! Determine correct String number
+            call DetermineStrLen(istr, i)
+           
+            open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='unformatted',status='old')     
+            read(11) nop
+            if (RD%np /= nop) then
+                STOP 'ERROR: .unk file does not correspond with .plt file. Check file transfer'
+            end if
+            read(11) rho, Vx, Vy, Vz, e
+                
+            ! Calculate Pressure
+            !pressure(:,(i - Start + 1)) = (IV%gamma - 1.0)*rho*(e - 0.5*(Vx**2 + Vy**2 + Vz**2))*rho_amb*(Vamb**2) ! Dimensional
+            pressure(:,(i - Start + 1)) =  (IV%gamma - 1.0)*rho*(e - 0.5*(Vx**2 + Vy**2 + Vz**2)) ! Non-dimensional  
+            ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy + Vz*Vz) 
+            
+            close(11)
+                open(11, file=newdir//'/'//OutFolder//'/pressure'//istr//'.txt', form='formatted',status='unknown')
+                write(11,'(1F25.15)') pressure(:,i)
+                close(11)
+            deallocate(istr)
+                
+        end do
+        print *,'Pressure of .unk files extracted'
+        deallocate(Vx)
+        deallocate(Vy)
+        deallocate(Vz)
+        deallocate(e)
+        deallocate(rho)
+
+    end subroutine ExtractPressure_3D
+        
     subroutine POD()
         
         ! Variables
@@ -579,7 +655,11 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
         
         ! Extract pressure of Snapshot Output file           
-        call ExtractPressure(1, IV%NoSnap)
+        if (IV%NoDim == 2) then
+            call ExtractPressure(1, IV%NoSnap)
+        elseif (IV%NoDim == 3) then
+            call ExtractPressure_3D(1, IV%NoSnap)
+        end if
 
         ! Exclude mean pressure from POD       
         if (IV%meanP == .true.) then
@@ -728,8 +808,13 @@ contains
         end do
         ! Outcome: A list of all nodes related to the engine Inlet, including possible doubling
     
-        allocate(nodesvec(2*j))
-        nodesvec = (/nodesall(1:j,1), nodesall(1:j,2)/)
+        if (IV%NoDim == 2) then
+            allocate(nodesvec(2*j))
+            nodesvec = (/nodesall(1:j,1), nodesall(1:j,2)/)
+        elseif (IV%NoDim == 3) then
+            allocate(nodesvec(3*j))
+            nodesvec = (/nodesall(1:j,1), nodesall(1:j,2), nodesall(1:j,3)/)
+        end if
         call QSort(nodesvec, size(nodesvec), 'n')   
         call Unique(nodesvec, size(nodesvec), engInNodes)
         ! Output: unique vector engInNodes
@@ -960,12 +1045,6 @@ contains
         ! Body of CoefficientInterpolation
         ! A*x = b with A = [ RBFMatrix PolBasis, Polbasis^T 0] x = Weights of RBF and polynomial  b = [f 0] with f being the original coefficients of one Snapshot
         ! Details, see Computation Approach Book
-        
-        ! Normalize Snapshots between 0 and 10
-        !do i = 1, DoF        
-        !    NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
-        !    Snapshots(:,i) = (Snapshots(:,i)/NormFact(i) + 0.5)
-        !end do
 
         allocate(coeff_temp(size(coeff, dim=1), size(coeff,dim=2)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressInterp "
@@ -1375,10 +1454,14 @@ contains
         open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
-        if (IV%SystemType == 'W') then
-            LastLine = FileSize/107
-        else     
-            LastLine = FileSize/106
+        if (IV%NoDim == 3) then
+            LastLine = FileSize/175
+        else
+            if (IV%SystemType == 'W') then
+                LastLine = FileSize/107
+            else     
+                LastLine = FileSize/106
+            end if
         end if
             
         ! Read until last line
@@ -1484,10 +1567,14 @@ contains
         open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
-        if (IV%SystemType == 'W') then
-            LastLine = FileSize/107
-        else     
-            LastLine = FileSize/106
+        if (IV%NoDim == 3) then
+            LastLine = FileSize/175
+        else
+            if (IV%SystemType == 'W') then
+                LastLine = FileSize/107
+            else     
+                LastLine = FileSize/106
+            end if
         end if
             
         ! Read until last line
@@ -1514,10 +1601,14 @@ contains
         open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
-        if (IV%SystemType == 'W') then
-            LastLine = FileSize/107
-        else     
-            LastLine = FileSize/106
+        if (IV%NoDim == 3) then
+            LastLine = FileSize/175
+        else
+            if (IV%SystemType == 'W') then
+                LastLine = FileSize/107
+            else     
+                LastLine = FileSize/106
+            end if
         end if
             
         ! Read until last line
@@ -1545,10 +1636,14 @@ contains
         open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
-        if (IV%SystemType == 'W') then
-            LastLine = FileSize/107
-        else     
-            LastLine = FileSize/106
+        if (IV%NoDim == 3) then
+            LastLine = FileSize/175
+        else
+            if (IV%SystemType == 'W') then
+                LastLine = FileSize/107
+            else     
+                LastLine = FileSize/106
+            end if
         end if
             
         ! Read until last line
@@ -1575,10 +1670,14 @@ contains
         open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
-        if (IV%SystemType == 'W') then
-            LastLine = FileSize/107
-        else     
-            LastLine = FileSize/106
+        if (IV%NoDim == 3) then
+            LastLine = FileSize/175
+        else
+            if (IV%SystemType == 'W') then
+                LastLine = FileSize/107
+            else     
+                LastLine = FileSize/106
+            end if
         end if
             
         ! Read until last line

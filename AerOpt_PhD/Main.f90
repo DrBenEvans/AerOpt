@@ -42,12 +42,19 @@ program AerOpt
     
     ! Get Time and Date for File and Folder Name creation
     call DATE_AND_TIME(date, time)
+    allocate(character(len=1) :: istr)
+    write( istr, '(I1)' )  IV%NoDim
     
-    newdir = '2DEngInletSnapshots_'//IV%version//'_'//date(3:8)//'_'//time(1:4) 
+    newdir = 'AerOpt'//istr//'D_'//IV%version//'_'//date(3:8)//'_'//time(1:4) 
+    deallocate(istr)
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
     print *, 'Start Read Data'
-    call SubReadData()
+    if (IV%NoDim == 2) then
+        call SubReadData()
+    elseif (IV%NoDim == 3) then
+        call SubReadData_3D()
+    end if    
     ! Output: Boundf, Coord, Connec, Coord_CN
     
     ! ****Create Folder Structure for PrePro & Solver Output**** !
@@ -71,7 +78,11 @@ program AerOpt
 
     ! ****Generate Full Fidelity Solutions of Snapshots**** !
     print *, 'Start PreMeshing'
-    call PreMeshing()
+    if (IV%NoDim == 2) then
+        call PreMeshing()
+    elseif (IV%NoDim == 3) then
+        call PreMeshing_3D()
+    end if
     print *, 'End PreMeshing - All Area Coefficients calculated'
     print *, ''
     call SubCFD(1, IV%NoSnap, Snapshots, IV%NoSnap)

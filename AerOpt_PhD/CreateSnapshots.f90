@@ -28,10 +28,10 @@ module CreateSnapshots
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
         
         ! Initialize min/max Motion Matrix    
-        MxDisp(:,1) = (/IV%xrange(1:IV%NoCN), IV%yrange(1:IV%NoCN), IV%zrange(1:IV%NoCN), IV%angle(1:IV%NoCN)/) ! min
-        MxDisp(:,2) = (/IV%xrange((IV%NoCN+1):2*IV%NoCN), IV%yrange((IV%NoCN+1):2*IV%NoCN), IV%zrange((IV%NoCN+1):2*IV%NoCN), IV%angle((IV%NoCN+1):2*IV%NoCN)/) ! max
+        MxDisp(:,1) = (/IV%xrange(1:IV%NoCN), IV%yrange(1:IV%NoCN), IV%zrange(1:IV%NoCN), IV%angle(1:IV%NoCN)/) ! max
+        MxDisp(:,2) = (/IV%xrange((IV%NoCN+1):2*IV%NoCN), IV%yrange((IV%NoCN+1):2*IV%NoCN), IV%zrange((IV%NoCN+1):2*IV%NoCN), IV%angle((IV%NoCN+1):2*IV%NoCN)/) ! min
          
-        !**Reduction of MxDisp to Nonzero Values - (only for LHS-routine to reduce processing time)**!
+        !**Reduction of MxDisp to Nonzero Values - (to reduce processing time)**!
         cond = MxDisp(:,1) /= MxDisp(:,2)         
         j = 1
         do i = 1, size(cond)            

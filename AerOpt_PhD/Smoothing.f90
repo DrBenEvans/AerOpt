@@ -22,7 +22,7 @@
         convergence = -3
         initialResidual = 0.0
         conv = 0.0
-        NoPmove = size(MovingGeomIndex, dim = 1)
+        NoPmove = size(InnerBound, dim = 1)
         smoothfactor = 0.1
         NoSweepsinit = NoPmove*smoothfactor
         smoothfactor = 1
@@ -126,7 +126,7 @@
         convergence = -3
         initialResidual = 0.0
         conv = 0.0
-        NoPmove = size(MovingGeomIndex, dim = 1)
+        NoPmove = size(InnerBound, dim = 1)
         NoSweepsinit = NoPmove*maxval(IV%smoothfactor(1:IV%NoCN))
         shapeenclosed = .false.
         allocate(x(NoPmove),stat=allocateStatus)
@@ -161,8 +161,8 @@
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
 
         ! Extract actual boundary order from boundary faces
-        x = RD%coord(orderedBoundaryIndex,1)
-        y = RD%coord(orderedBoundaryIndex,2)
+        x = RD%coord_temp(orderedBoundaryIndex,1)
+        y = RD%coord_temp(orderedBoundaryIndex,2)
 
         ! CN of smoothed surface
         CNxsmooth = x(CN_indordered)
@@ -188,6 +188,7 @@
             call calcBeta(x, y, NoPmove, shapeenclosed, betamin, betamean, beta1, beta2)
     
             ! Check for badly conditioned elements
+!! Do once in PreMeshing?
             if (betamin*20 < betamean) then
                 
                 ! Identify worst element and modify
@@ -269,13 +270,14 @@
         
         ! Move Domain Nodes
         if (intersect == 1) then
-                call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))
-                CNDisp = CNDisp*(1.0/NoIterFDGD)
+            call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))
+            CNDisp = CNDisp*(1.0/NoIterFDGD)
         else
+            RD%Coord_temp = RD%Coord
             NoIterFDGD = NoIterFDGD*2
             call SmoothingFDGD(CNDisp, NoIterFDGD)
         end if
-    
+
     end subroutine SmoothingFDGD
     
     

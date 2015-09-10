@@ -29,7 +29,12 @@ module CFD
     !!!!! IMPLEMENT Mesh Quality Test
     
             ! Write Snapshot to File
-            call writeDatFile(i)
+            if (IV%NoDim == 2) then
+                call writeDatFile(i)
+            elseif (IV%NoDim == 3) then
+                call writepltFile(i)
+                call writebcoFile(i)
+            end if
         end do
         deallocate(RD%coord_temp)
  
@@ -66,13 +71,17 @@ module CFD
             call Sleep(NoFiles)
         end if
         
+        if (IV%NoDim == 3) then
+            call generateUnkFile()
+        end if
+        
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y') then
             allocate(character(len=200) :: strSystem)
             do i = 1, NoFiles
                 call DetermineStrLen(istr, i)
                 call TransferSolutionOutput()
                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
-                strSystem = 'move '//trim(IV%filename)//istr//'.resp "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp"'
+                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
                 call system(trim(strSystem))
                 strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
                 call system(trim(strSystem))                
@@ -110,10 +119,14 @@ module CFD
         call DetermineStrLen(istr, i)
     
         ! write Inputfile
-        call PreProInpFile()
+        if (IV%NoDim == 2) then
+            call PreProInpFile()
+        elseif (IV%NoDim == 3) then
+            call PreProInpFile_3D()
+        end if
         
         if (IV%SystemType == 'W') then
-             
+! Parallelise by sending as Job?             
             allocate(character(len=100) :: strSystem)
             strSystem = pathPrePro//' < '//newdir//'\'//InFolder//'/PreprocessingInput.txt >nul 2>&1'
             
@@ -126,7 +139,16 @@ module CFD
         end if
         print *, 'Preprocessing Geometry', i
         print *, ' '
-        call system(trim(strSystem))   ! System operating command called to activate fortran       
+        call system(trim(strSystem))   ! System operating command called to activate fortran 
+        if (IV%NoDim == 3) then
+            if (IV%SystemType == 'W') then
+                call system('move '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
+                call system('move '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
+            else
+                call system('mv '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
+                call system('mv '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
+            end if
+        end if
         deallocate (istr)
         deallocate (strSystem)
     
@@ -144,10 +166,18 @@ module CFD
         call DetermineStrLen(istr, i)
         
         ! Creates the input file including Solver Parameters and a second file including I/O filenames
-        call WriteSolverInpFile()
+        if (IV%NoDim == 2) then
+            call WriteSolverInpFile()
+        elseif (IV%NoDim == 3) then
+            call WriteSolverInpFile_3D()
+        end if
         
         ! writes the batchfile to execute Solver on Cluster
-        call writeBatchFile()
+        if (IV%NoDim == 2) then
+            call writeBatchFile()
+        elseif (IV%NoDim == 3) then
+            call writeBatchFile_3D()
+        end if
     
         ! Is AerOpt executed from Linux or Windows?                
         if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
@@ -155,18 +185,18 @@ module CFD
             if (IV%runOnCluster == 'Y') then
                 ! Transfer Files from Windows Machine onto Cluster
                 call transferFilesWin()            
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
                 call Triggerfile()           ! Triggerfile for submission
                 ! Submits Batchfile via Putty
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Trigger.sh', 'putty')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'putty')
             else
                 print *, 'Solving Geometry', i
                 allocate(character(len=200) :: strSystem)
-                strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh >nul 2>&1'
+                strSystem = pathSolver//' < '//newdir//'/'//InFolder//'\'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh >nul 2>&1'
                 call system(trim(strSystem))
-                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.resp "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.resp"'
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk"'
                 call system(trim(strSystem))
-                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
                 call system(trim(strSystem))
                 deallocate (strSystem)
             end if 
@@ -175,11 +205,11 @@ module CFD
             
 		    print *, 'Solving Geometry', i
             allocate(character(len=200) :: strSystem)
-            strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh > /dev/null'
+            strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh > /dev/null'
             call system(trim(strSystem))
-            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.resp "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.resp"'
+            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
             call system(trim(strSystem))
-            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
+            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
             call system(trim(strSystem))
             deallocate (strSystem)
             
@@ -192,11 +222,10 @@ module CFD
             end if
             
             ! Submits Batchfile
-            call system('chmod a+x ./Trigger.sh')
-            call system('./Trigger.sh')
+            call system('chmod a+x ./Communication')
+            call system('./Communication')
                     
         end if
-                
         deallocate(istr)
     
     end subroutine Solver
@@ -230,15 +259,15 @@ module CFD
                 call CheckSimStatus()
                 ! Submit File
                 if (IV%SystemType == 'W')   then
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'plink')
+                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'plink')
                 else
-                    call system('chmod a+x ./CheckStatus.scr')
-                    call system('./CheckStatus.scr')
+                    call system('chmod a+x ./Communication')
+                    call system('./Communication')
                 end if
                 ! Creates File to transfer response from Windows to Linux
                 if (IV%SystemType == 'W')   then
                     call CheckSimStatus2()
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'CheckStatus.scr', 'psftp')
+                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
                 end if
             
                 open(1, file='check.txt',form='formatted',status='old')
@@ -363,10 +392,14 @@ module CFD
         ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
         open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")     
         inquire(1, size = FileSize) 
-        if (IV%SystemType == 'W') then
-            LastLine = FileSize/107
-        else     
-            LastLine = FileSize/106
+        if (IV%NoDim == 3) then
+            LastLine = FileSize/175
+        else
+            if (IV%SystemType == 'W') then
+                LastLine = FileSize/107
+            else     
+                LastLine = FileSize/106
+            end if
         end if
         
         ! Read until last line
@@ -383,7 +416,10 @@ module CFD
                 exit   
             end if       
         end do
-        
+        if (Input(2) > IV%NoIter) then
+            Converge = .false.
+        end if
+                
         deallocate(istr)
             
     end subroutine FileCheckConvergence
@@ -399,10 +435,10 @@ module CFD
         
         call DeleteErrorFiles(istr)
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
-            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')
+            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
         elseif (IV%SystemType /= 'W')  then                
-            call system('chmod a+x ./FileCreateDir.scr')
-            call system('./FileCreateDir.scr')
+            call system('chmod a+x ./Communication')
+            call system('./Communication')
         end if
                 
         deallocate(istr)
