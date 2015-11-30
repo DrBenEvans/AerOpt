@@ -15,7 +15,6 @@ module ReadData
     
     type(ReadVariablesData) :: RD
     double precision, dimension(:,:), allocatable :: ArrayTemp
-    integer, dimension(:), allocatable :: orderedBoundaryIndex   ! Vector conatining the Index of boundary points in the correct order
     
 contains
       
@@ -341,15 +340,39 @@ contains
         write(5,*) 'ivd%numberOfMGIterations = ' ,strNI , ','
         write(5,*) 'ivd%alpha = ' ,trim(strAlpha), ','
         write(5,*) 'ivd%MachNumber = ' ,trim(strMa), ','
-        write(5,*) 'ivd%numberOfRelaxationSteps = 1, '
         write(5,*) 'ivd%ReynoldsNumber = ', trim(strRe), ','
         write(5,*) 'ivd%gamma = ', trim(strGamma), ','
         write(5,*) 'ivd%turbulenceModel = ', trim(strturbulencemodel), ','
-        write(5,*) 'ivd%useMatrixDissipation = .false.,'
         write(5,*) 'ivd%writeToFileInterval = 100,'
         write(5,*) 'ivd%useTimeResidual = .false.,'
         write(5,*) 'ivd%enginesFrontMassFlow = ', trim(strEFMF), ','
         write(5,*) 'ivd%maxitt = ', trim(strmaxit), ','
+        ! Others
+        write(5,*) 'ivd%numberOfRelaxationSteps = 1, '
+        write(5,*) 'ivd%useMatrixDissipation = .false.,'
+        write(5,*) 'ivd%numberOfGridsToUse = 1,'
+        write(5,*) 'ivd%viscosityScheme = 1,'
+        write(5,*) 'ivd%boundaryTerm = 1,'
+        write(5,*) 'ivd%CFLNumber = 1.0,'
+        write(5,*) 'ivd%turbulenceCFLFactor = 1.0,'
+        write(5,*) 'ivd%multigridScheme = 3,'
+        write(5,*) 'ivd%tripFactor = 1.0,'
+        write(5,*) 'ivd%dissipationScheme = 2,'
+        write(5,*) 'ivd%coarseGriddissipationScheme = 2,'
+        write(5,*) 'ivd%secondOrderDissipationFactor = 0.3,'
+        write(5,*) 'ivd%fourthOrderDissipationFactor = 0.2,'
+        write(5,*) 'ivd%coarseGridDissipationFactor = 0.5,'
+        write(5,*) 'ivd%turbulenceSmoothingFactor = 0.0,'
+        write(5,*) 'ivd%numberOfRSSteps = 0,'
+        write(5,*) 'ivd%tripNodes(1) = 203,'
+        write(5,*) 'ivd%tripNodes(2) = 252,'
+        write(5,*) 'ivd%residualSmoothingFactor = 0.0,'
+        write(5,*) 'ivd%numberOfPSSteps = 0,'
+        write(5,*) 'ivd%prolongationSmoothingFactor = 0.0,'
+        write(5,*) 'ivd%useDissipationWeighting = .false.,'
+        write(5,*) 'ivd%normalComponentRelaxation = 1.0,'
+        write(5,*) 'ivd%sizeOfSeparationField = 25,'
+        write(5,*) 'ivd%numberOfTriperations = 0,'
         write(5,*) '/'
         close(5)
         
@@ -379,7 +402,6 @@ contains
     
     end subroutine WriteSolverInpFile
  
-! Go through Ben's list
     subroutine WriteSolverInpFile_3D()
     ! Objective: Create Solver Input files
     
@@ -512,7 +534,7 @@ contains
             write(1,*) '#BSUB -n '//strProc
             write(1,*) '#BSUB -W '//strwait//':00'
             write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr
-            write(1,'(A)') pathSolver
+            write(1,'(A)') 'mpirun -machinefile $LSB_DJOB_HOSTFILE -n '//strProc//' '//pathSolver
             !write(1,*) '#BSUB -n 1'
             !#BSUB -R "span[ptile=12]"
             
@@ -754,9 +776,9 @@ contains
         write(1, '(A)') 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk"'
         write(1, '(A)') 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.rsd"'
         if (IV%NoDim == 2) then
-            write(1, '(A)') 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.dat "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.dat"'
+            write(1, '(A)') 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.dat "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.dat"'
         else
-            write(1, '(A)') 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'.plt "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.plt"'
+            write(1, '(A)') 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.plt "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.plt"'
         end if
         close(1)
         deallocate(istr)
@@ -862,6 +884,7 @@ contains
         call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.unk')
         open(1, file= 'Communication', form='formatted',status='unknown')
         write(1,'(A)') trim(IV%filename)//NoGenstr
+  ! Always hybrid?
         write(1,'(A)') 't'
         write(1,*) IV%Ma
         write(1,*) IV%Tamb
@@ -877,7 +900,7 @@ contains
     end subroutine generateEnSightFileLin3D
         
     subroutine generateEnSightFileWin(i, NoGen)
-    
+! ALSO 3D 
        ! Variables
         implicit none
         integer :: i, NoGen

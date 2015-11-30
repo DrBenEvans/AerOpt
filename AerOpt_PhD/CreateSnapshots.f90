@@ -15,7 +15,7 @@ module CreateSnapshots
     
         ! Variables
         implicit none
-        integer :: i, j
+        integer :: i, j, k
         double precision :: newscore, bestscore  
         double precision, dimension(IV%NoSnap,maxDoF) :: Snaptemp
         allocate(MxDisp(maxDoF,2),stat=allocateStatus)
@@ -24,22 +24,35 @@ module CreateSnapshots
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
         allocate(Snapshots(IV%NoSnap,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
-        allocate(MxDisp_Move(IV%DoF,2),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
         
         ! Initialize min/max Motion Matrix    
         MxDisp(:,1) = (/IV%xrange(1:IV%NoCN), IV%yrange(1:IV%NoCN), IV%zrange(1:IV%NoCN), IV%angle(1:IV%NoCN)/) ! max
         MxDisp(:,2) = (/IV%xrange((IV%NoCN+1):2*IV%NoCN), IV%yrange((IV%NoCN+1):2*IV%NoCN), IV%zrange((IV%NoCN+1):2*IV%NoCN), IV%angle((IV%NoCN+1):2*IV%NoCN)/) ! min
          
-        !**Reduction of MxDisp to Nonzero Values - (to reduce processing time)**!
+        ! Identify Degrees of Freedom in the system
         cond = MxDisp(:,1) /= MxDisp(:,2)         
+        j = 0
+        do i = 1, size(cond)            
+            if (cond(i) == -1) then
+                j = j + 1
+            end if
+        end do
+
+        if (IV%DoF /= j) then
+            write(*,*) 'Degrees of Freedom changed to', j
+        end if
+        IV%DoF = j
+        
+        !**Reduction of MxDisp to Nonzero Values - (to reduce processing time)**!
+        allocate(MxDisp_Move(IV%DoF,2),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
         j = 1
         do i = 1, size(cond)            
             if (cond(i) == -1) then
                 MxDisp_Move(j,:) = MxDisp(i,:)
                 j = j + 1
             end if
-        end do               
+        end do
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
         call LHS(Snapshots, IV%NoSnap, IV%NoCN)     ! Output: Snapshots - an initial Sampling via LHS        

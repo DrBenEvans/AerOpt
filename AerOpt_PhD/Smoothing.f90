@@ -8,25 +8,22 @@
     
     contains
     
-    subroutine SmoothingLinear(CNDisp)
+    recursive subroutine SmoothingLinear(CNDisp, NoMove, counter)
     
         ! Variables
         implicit none
-        integer :: ismooth, NoSweeps, NoPmove, NoIterFDGD, isweep, i, NoSweepsinit
-        double precision, dimension(:), allocatable :: ddn_before, ddn_after, nx, ny, sx, sy, x, y, xnew, ynew, CNxfinal, CNyfinal, CNxsmooth, CNysmooth, beta1, beta2
+        integer :: ismooth, NoSweeps, NoPmove, NoMove, isweep, intersect, i, NoSweepsinit, counter
+        double precision, dimension(:), allocatable :: ddn_before, ddn_after, nx, ny, sx, sy, x, y, xnew, ynew, xbefore, ybefore, CNxfinal, CNyfinal, CNxsmooth, CNysmooth, beta1, beta2, smoothing, normx, normy
         double precision, dimension(maxDoF) :: CNDisp
-        double precision :: conv, initialResidual, res, convergence, smoothfactor
-        logical ::  shapeenclosed
+        double precision :: conv, initialResidual, res, betamean, betamin, magnitude, N2CN
+        double precision, dimension(2) :: a
         
         ! Body of SubSmoothing
-        convergence = -3
         initialResidual = 0.0
         conv = 0.0
         NoPmove = size(InnerBound, dim = 1)
-        smoothfactor = 0.1
-        NoSweepsinit = NoPmove*smoothfactor
-        smoothfactor = 1
-        shapeenclosed = 1
+        N2CN = NoPmove/IV%NoCN
+        NoSweepsinit = N2CN**2*maxval(IV%smoothfactor(1:IV%NoCN))
         allocate(x(NoPmove),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
         allocate(y(NoPmove),stat=allocateStatus)
@@ -35,107 +32,9 @@
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
         allocate(ynew(NoPmove),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(CNxfinal(IV%NoCN),stat=allocateStatus)
+        allocate(xbefore(NoPmove),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(CNyfinal(IV%NoCN),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(CNxsmooth(IV%NoCN),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(CNysmooth(IV%NoCN),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(nx(NoPmove),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(ny(NoPmove),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(sx(NoPmove),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(sy(NoPmove),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(beta1(NoPmove),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(beta2(NoPmove),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        x = RD%coord(orderedBoundaryIndex,1)
-        y = RD%coord(orderedBoundaryIndex,2)
-        
-        ! CN of smoothed surface
-        CNxsmooth = x(CN_ind)
-        CNysmooth = y(CN_ind)
-        
-        ! Final CN
-        CNxfinal = x(CN_ind) + CNDisp(1:IV%NoCN)
-        CNyfinal = y(CN_ind) + CNDisp((IV%NoCN+1):(2*IV%NoCN))
-        
-        do while (conv > convergence)            
-            
-            ! 1. Calculate Second Derivative before       
-            allocate(ddn_before(NoPmove),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-            call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, shapeenclosed, beta1, beta2)
-            
-            !2. Move Boundary Nodes (linear)
-            call LinearMotion(x, y, CNxfinal, CNyfinal)
-            
-            do isweep = 1, NoSweeps
-                !3. Calculate Second Derivative after
-                allocate(ddn_after(NoPmove),stat=allocateStatus)
-                if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-                call CalcSecondDerivative(ddn_after, NoPmove, x, y, nx, ny, sx, sy, shapeenclosed, beta1, beta2)
-                
-                !4. Apply smoothing
-                do ismooth = 1, NoPmove
-                    xnew(ismooth) = x(ismooth) + smoothfactor*(ddn_after(ismooth) - ddn_before(ismooth))*nx(ismooth)
-                    ynew(ismooth) = y(ismooth) + smoothfactor*(ddn_after(ismooth) - ddn_before(ismooth))*ny(ismooth)  
-                end do
-                x = xnew
-                y = ynew
-            end do
-            
-            !5. Check for convergence 
-            res = sqrt(sum((x(CN_ind) - CNxsmooth)**2 + (y(CN_ind) - CNysmooth)**2))
-            if (initialResidual == 0) then
-                initialResidual = res
-            end if
-            conv = log(res/initialResidual)/log(10.0)
-            CNxsmooth = x(CN_ind) 
-            CNysmooth = y(CN_ind)
-        end do
-        
-        !6. if converged: Move CN locations and bound back onto desired position
-        call LinearMotion(x, y, CNxfinal, CNyfinal)
-        
-        ! Hand over Coordinates to temporary coord
-        RD%coord_temp(orderedBoundaryIndex,1) = x
-        RD%coord_temp(orderedBoundaryIndex,2) = y
-    
-    end subroutine SmoothingLinear
-    
-    recursive subroutine SmoothingFDGD(CNDisp, NoIterFDGD)
-    
-        ! Variables
-        implicit none
-        integer :: ismooth, NoSweeps, NoPmove, NoIterFDGD, isweep, intersect, i, NoSweepsinit
-        double precision, dimension(:), allocatable :: ddn_before, ddn_after, nx, ny, sx, sy, x, y, xnew, ynew, CNxsmooth, CNysmooth, beta1, beta2, smoothing
-        double precision, dimension(maxDoF) :: CNDisp, zeros
-        double precision :: conv, initialResidual, res, convergence, betamean, betamin, magnitude
-        double precision, dimension(2) :: a, b
-        logical :: shapeenclosed
-        
-        ! Body of SubSmoothing
-        zeros = 0.0
-        convergence = -3
-        initialResidual = 0.0
-        conv = 0.0
-        NoPmove = size(InnerBound, dim = 1)
-        NoSweepsinit = NoPmove*maxval(IV%smoothfactor(1:IV%NoCN))
-        shapeenclosed = .false.
-        allocate(x(NoPmove),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(y(NoPmove),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(xnew(NoPmove),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-        allocate(ynew(NoPmove),stat=allocateStatus)
+        allocate(ybefore(NoPmove),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
         allocate(CNxsmooth(IV%NoCN),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
@@ -159,33 +58,242 @@
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
         allocate(smoothing(NoPmove),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
-
+        allocate(normx(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(normy(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(CNxfinal(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(CNyfinal(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+ 
         ! Extract actual boundary order from boundary faces
         x = RD%coord_temp(orderedBoundaryIndex,1)
         y = RD%coord_temp(orderedBoundaryIndex,2)
-
+        
+        ! Save for Intersection
+        xbefore = x
+        ybefore = y
+        
+        ! CN of smoothed surface
+        CNxsmooth = x(CN_indordered)
+        CNysmooth = y(CN_indordered)
+        
+        ! Final CN positions
+        do i = 1, IV%NoCN
+            CNxfinal(i) = x(CN_indordered(i)) + CNDisp(i)/NoMove
+            CNyfinal(i) = y(CN_indordered(i)) + CNDisp(IV%NoCN+i)/NoMove
+            if (IV%CNconnecttrans(i) /= 0) then
+                CNxfinal(i) = x(CN_indordered(i)) + CNDisp(IV%CNconnecttrans(i))/NoMove
+                CNyfinal(i) = y(CN_indordered(i)) + CNDisp(IV%NoCN+IV%CNconnecttrans(i))/NoMove
+            end if
+        end do
+        
+        !Pre-calculate smoothing and x/y-normalization value
+        call calcSmoothing(x, y, NoPmove, IV%smoothfactor(1:IV%NoCN)/maxval(IV%smoothfactor(1:IV%NoCN)), smoothing)
+        !call normXY(x, y, normx, normy, CNxfinal, CNyfinal, NoPmove)
+        
+        do while (conv > IV%smoothconvergence)            
+            
+            ! Calculate Second Derivative before       
+            call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+            
+            ! Move Boundary Nodes (linear)
+            call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
+            
+            ! Calculate edge lengths of each element on left(beta1) and right(beta2) side
+            call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
+            
+            ! Check for badly conditioned elements
+            if (betamin*20 < betamean) then
+                
+                ! Identify worst element and modify
+                call findPoint(x, y, NoPmove, betamin, beta1, beta2)
+            
+                ! Move Boundary Nodes to initial position
+                CNxfinal = x(CN_indordered) - CNDisp(1:IV%NoCN)/NoMove
+                CNyfinal = y(CN_indordered) - CNDisp((IV%NoCN+1):(2*IV%NoCN))/NoMove
+                call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
+                
+                ! Re-calculate second derivative after element modification
+                call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+                
+                ! Move Boundary Mesh back to desired position
+                CNxfinal = x(CN_indordered) + CNDisp(1:IV%NoCN)/NoMove
+                CNyfinal = y(CN_indordered) + CNDisp((IV%NoCN+1):(2*IV%NoCN))/NoMove
+                call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
+                
+                ! Re-calculate edge lengths
+                call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
+                
+            end if
+ 
+            ! Number of sweeps is pre-calculated and fixed during the smoothing
+            ! This is not exact, but accurate enough
+            nosweeps = floor(nosweepsinit*(betamean/betamin)**2)
+            
+            do isweep = 1, NoSweeps
+                
+                ! Calculate Second Derivative after
+                ddn_after = 0.0
+                beta1 = 0.0
+                beta2 = 0.0
+                call CalcSecondDerivative(ddn_after, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+                betamin = minval((/minval(beta1),minval(beta2)/))
+                
+                ! Apply smoothing
+                do ismooth = 1, NoPmove
+                    xnew(ismooth) = x(ismooth) + betamin**2/2.0*smoothing(ismooth)*(ddn_after(ismooth) - ddn_before(ismooth))*nx(ismooth) !*normx(ismooth)
+                    ynew(ismooth) = y(ismooth) + betamin**2/2.0*smoothing(ismooth)*(ddn_after(ismooth) - ddn_before(ismooth))*ny(ismooth) !*normy(ismooth)  
+                end do
+                x = xnew
+                y = ynew
+            
+            end do
+!open(1, file= 'XYCoord.dat', form='formatted', status = 'unknown')
+!do isweep = 1, 715
+!    write(1,'(2f22.15)') x(isweep), y(isweep)
+!end do
+!close(1)
+            ! Check for convergence 
+            res = sqrt(sum((x(CN_indordered) - CNxsmooth)**2 + (y(CN_indordered) - CNysmooth)**2))
+            if (abs(initialResidual - res) < 10e-10) then
+                conv = -4
+            end if 
+            if (initialResidual == 0) then
+                initialResidual = res
+            end if
+            if (conv /= -4) then
+                conv = log(res/initialResidual)/log(10.0)
+            end if
+                
+            CNxsmooth = x(CN_indordered) 
+            CNysmooth = y(CN_indordered)
+        end do
+           
+        ! If converged: Move CN locations and bound back onto desired position
+        call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
+        
+        ! Hand over Coordinates to temporary coord
+        RD%coord_temp(orderedBoundaryIndex,1) = x
+        RD%coord_temp(orderedBoundaryIndex,2) = y
+        
+        ! Rotate
+        do i = 1, IV%NoCN
+            if (IV%angle(i) /= 0) then
+                call AngleofAttack(CNDisp(4*i)/NoMove, i)
+            end if
+        end do
+      
+        ! Check for valid background mesh
+        call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
+        call CheckforIntersections(DelaunayCoordDomain, DelaunayElemDomain, intersect)
+      
+        ! Move Domain Nodes
+        if (intersect == 1) then
+            if (counter < NoMove) then
+                counter = counter + 1
+                call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1)) 
+                call PreMeshingMid()
+                call SmoothingLinear(CNDisp, NoMove, counter)               
+            else
+                call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))
+                if (NoMove > 1) then
+                    call PreMeshingEnd()
+                end if
+            end if
+        else
+            RD%coord_temp(orderedBoundaryIndex,1) = xbefore
+            RD%coord_temp(orderedBoundaryIndex,2) = ybefore 
+            counter = 2*counter-1
+            NoMove = NoMove*2
+            call SmoothingLinear(CNDisp, NoMove, counter)
+        end if
+       
+    end subroutine SmoothingLinear
+    
+    recursive subroutine SmoothingFDGD(CNDisp, NoMove, counter)
+    
+        ! Variables
+        implicit none
+        integer :: ismooth, NoSweeps, NoPmove, NoMove, isweep, intersect, i, NoSweepsinit, counter
+        double precision, dimension(:), allocatable :: ddn_before, ddn_after, nx, ny, sx, sy, x, y, xnew, ynew, xbefore, ybefore, CNxsmooth, CNysmooth, beta1, beta2, smoothing
+        double precision, dimension(maxDoF) :: CNDisp, zeros
+        double precision :: conv, initialResidual, res, betamean, betamin, magnitude, N2CN
+        double precision, dimension(2) :: a, b
+        
+        ! Body of SubSmoothing
+        zeros = 0.0
+        initialResidual = 0.0
+        conv = 0.0
+        NoPmove = size(InnerBound, dim = 1)
+        N2CN = NoPmove/IV%NoCN
+        NoSweepsinit = N2CN**2*maxval(IV%smoothfactor(1:IV%NoCN))
+        allocate(x(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(y(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(xnew(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(ynew(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(xbefore(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(ybefore(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(CNxsmooth(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(CNysmooth(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(nx(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(ny(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(sx(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(sy(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(ddn_before(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(ddn_after(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(beta1(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(beta2(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(smoothing(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        
+        ! Extract actual boundary order from boundary faces
+        x = RD%coord_temp(orderedBoundaryIndex,1)
+        y = RD%coord_temp(orderedBoundaryIndex,2)
+        
+        ! Save for Intersection
+        xbefore = x
+        ybefore = y
+        
         ! CN of smoothed surface
         CNxsmooth = x(CN_indordered)
         CNysmooth = y(CN_indordered)
  
-        do while (conv > convergence)
+        do while (conv > IV%smoothconvergence)
 
-            ! 1. Calculate Second Derivative before       
-            call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, shapeenclosed, beta1, beta2)
-            
-            !2. Pre-Processing of starting Geometry for FDGD
+            ! Calculate Second Derivative before       
+            call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+
+            ! Pre-Processing of starting Geometry for FDGD
             call PreMeshingBoundary()
             
-            !3. Set new DelaunayCoord
-            call RelocateCN(CNDisp, NoIterFDGD)
+            ! Set new DelaunayCoord
+            call RelocateCN(CNDisp, NoMove, counter)
             
-            !4. Move Boundary Mesh via FDGD
+            ! Move Boundary Mesh via FDGD
             call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1)) 
             x = RD%coord_temp(orderedBoundaryIndex,1)
             y = RD%coord_temp(orderedBoundaryIndex,2)
             
             ! Calculate edge lengths of each element on left(beta1) and right(beta2) side
-            call calcBeta(x, y, NoPmove, shapeenclosed, betamin, betamean, beta1, beta2)
+            call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
     
             ! Check for badly conditioned elements
 !! Do once in PreMeshing?
@@ -198,52 +306,52 @@
             
                 ! Move Boundary Mesh to initial position
                 call PreMeshingBoundary()
-                call RelocateCN(zeros, NoIterFDGD)
+                call RelocateCN(zeros, NoMove, counter)
                 call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1)) 
                 x = RD%coord_temp(orderedBoundaryIndex,1)
                 y = RD%coord_temp(orderedBoundaryIndex,2)
                 
                 ! Re-calculate second derivative after element modification
-                call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, shapeenclosed, beta1, beta2)
+                call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
                 
                 ! Move Boundary Mesh back to desired position
-                call RelocateCN(CNDisp, NoIterFDGD)
+                call RelocateCN(CNDisp, NoMove, counter)
                 call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1)) 
                 x = RD%coord_temp(orderedBoundaryIndex,1)
                 y = RD%coord_temp(orderedBoundaryIndex,2)
                 
                 ! Re-calculate edge lengths
-                call calcBeta(x, y, NoPmove, shapeenclosed, betamin, betamean, beta1, beta2)
+                call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
                 
             end if
  
             ! Number of sweeps and the individual smoothing is pre-calculated and fixed during the smoothing
             ! This is not exact, but accurate enough
             nosweeps = floor(nosweepsinit*(betamean/betamin)**2)
-            call calcSmoothing(x, y, NoPmove, IV%smoothfactor(1:IV%NoCN)/maxval(IV%smoothfactor(1:IV%NoCN)), smoothing, shapeenclosed)
+            call calcSmoothing(x, y, NoPmove, IV%smoothfactor(1:IV%NoCN)/maxval(IV%smoothfactor(1:IV%NoCN)), smoothing)
                 
             do isweep = 1, NoSweeps
                 
-                !7. Calculate Second Derivative after
+                ! Calculate Second Derivative after
                 ddn_after = 0.0
                 beta1 = 0.0
                 beta2 = 0.0
-                call CalcSecondDerivative(ddn_after, NoPmove, x, y, nx, ny, sx, sy, shapeenclosed, beta1, beta2)
+                call CalcSecondDerivative(ddn_after, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
                 betamin = minval((/minval(beta1),minval(beta2)/))
-
-                !9. Apply smoothing
+            
+                ! Apply smoothing
                 do ismooth = 1, NoPmove
                     xnew(ismooth) = x(ismooth) + betamin**2/2.0*smoothing(ismooth)*(ddn_after(ismooth) - ddn_before(ismooth))*nx(ismooth)
                     ynew(ismooth) = y(ismooth) + betamin**2/2.0*smoothing(ismooth)*(ddn_after(ismooth) - ddn_before(ismooth))*ny(ismooth)  
                 end do
                 x = xnew
                 y = ynew
-    
+            
             end do
             RD%coord_temp(orderedBoundaryIndex,1) = x
             RD%coord_temp(orderedBoundaryIndex,2) = y
     
-            !10. Check for convergence 
+            ! Check for convergence 
             res = sqrt(sum((x(CN_indordered) - CNxsmooth)**2 + (y(CN_indordered) - CNysmooth)**2))
             if (abs(initialResidual - res) < 10e-10) then
                 conv = -4
@@ -259,23 +367,47 @@
             CNysmooth = y(CN_indordered)
         end do
         
-        !8. if converged: Move CN locations and bound back onto desired position
+        !If converged: Move CN locations and bound back onto desired position
         call PreMeshingBoundary()
-        call RelocateCN(CNDisp, NoIterFDGD)
+        call RelocateCN(CNDisp, NoMove, counter)
         call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1))
-                
+        
+        ! Rotate
+        do i = 1, IV%NoCN
+            if (IV%angle(i) /= 0) then
+                call AngleofAttack(CNDisp(4*i)/NoMove, i)
+            end if
+        end do
+            
         ! Check for valid background mesh
         call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
         call CheckforIntersections(DelaunayCoordDomain, DelaunayElemDomain, intersect)
         
         ! Move Domain Nodes
         if (intersect == 1) then
-            call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))
-            CNDisp = CNDisp*(1.0/NoIterFDGD)
+            if (counter < NoMove) then
+                counter = counter + 1
+                call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))              
+                call PreMeshingMid()
+                call SmoothingFDGD(CNDisp, NoMove, counter)               
+            else
+                call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))
+                if (NoMove > 1) then
+                    call PreMeshingEnd()
+                end if
+                if (allocated(dRot) == .true.) then
+                    deallocate(dRot)
+                end if
+            end if
         else
-            RD%Coord_temp = RD%Coord
-            NoIterFDGD = NoIterFDGD*2
-            call SmoothingFDGD(CNDisp, NoIterFDGD)
+            RD%coord_temp(orderedBoundaryIndex,1) = xbefore
+            RD%coord_temp(orderedBoundaryIndex,2) = ybefore
+            if (allocated(dRot) == .true.) then
+                deallocate(dRot)
+            end if
+            NoMove = NoMove*2
+            counter = 2*counter-1
+            call SmoothingFDGD(CNDisp, NoMove, counter)
         end if
 
     end subroutine SmoothingFDGD
@@ -285,17 +417,16 @@
     
     
     
-    subroutine CalcSecondDerivative(ddn, NoPmove, x, y, nx, ny, sx, sy, shapeenclosed, beta1, beta2)
+    subroutine CalcSecondDerivative(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
     
         ! Variables
         implicit none
         integer :: ip, NoPmove, i
         double precision :: magnitude, dx1, dx2
-        logical :: shapeenclosed
         double precision, dimension(:), allocatable :: x, y, ddn, sx, sy, nx, ny
         double precision, dimension(NoPmove) :: beta1, beta2
         
-        if (shapeenclosed == .true.) then
+        if (IV%shapeenclosed == .true.) then
             call CalcSecondDerivativeclosed(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
         else
             call CalcSecondDerivativeopen(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
@@ -411,30 +542,28 @@
     
     end subroutine CalcSecondDerivativeopen
     
-    subroutine calcBeta(x, y, NoPmove, shapeenclosed, betamin, betamean, beta1, beta2)
+    subroutine calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
     
         ! Variables
         implicit none
         double precision :: betamin, betamean
         double precision, dimension(NoPmove) :: x, y, beta1, beta2
         integer :: NoPmove
-        logical :: shapeenclosed
         
         ! Body of calcBeta
-        if (shapeenclosed == .true.) then
-            call calcBetaclosed(x, y, NoPmove, shapeenclosed, betamin, betamean, beta1, beta2)
+        if (IV%shapeenclosed == .true.) then
+            call calcBetaclosed(x, y, NoPmove, betamin, betamean, beta1, beta2)
         else
-            call calcBetaopen(x, y, NoPmove, shapeenclosed, betamin, betamean, beta1, beta2)
+            call calcBetaopen(x, y, NoPmove, betamin, betamean, beta1, beta2)
         end if
     
     end subroutine calcBeta
     
-    subroutine calcBetaclosed(x, y, NoPmove, shapeenclosed, betamin, betamean, beta1, beta2)
+    subroutine calcBetaclosed(x, y, NoPmove, betamin, betamean, beta1, beta2)
     
         ! Variables
         implicit none
         double precision :: betamin, betamean, magnitude
-        logical :: shapeenclosed
         double precision, dimension(NoPmove) :: x, y, beta1, beta2, sx, sy
         integer :: NoPmove, i
         
@@ -469,12 +598,11 @@
     
     end subroutine calcBetaclosed
     
-    subroutine calcBetaopen(x, y, NoPmove, shapeenclosed, betamin, betamean, beta1, beta2)
+    subroutine calcBetaopen(x, y, NoPmove, betamin, betamean, beta1, beta2)
 
         ! Variables
         implicit none
         double precision :: betamin, betamean, magnitude
-        logical :: shapeenclosed
         double precision, dimension(NoPmove) :: x, y, beta1, beta2, sx, sy
         integer :: NoPmove, i
 
@@ -508,65 +636,17 @@
         betamean = (sum(beta1)+sum(beta2))/(size(beta1, dim = 1)+size(beta2, dim = 1))
     
     end subroutine calcBetaopen
-    
-    subroutine LinearMotion(x, y, CNxfinal, CNyfinal)
-    
-        ! Variables
-        implicit none
-        integer :: i, j
-        double precision :: CNdist
-        double precision, dimension(maxDoF) :: CNDisp
-        double precision, dimension(:), allocatable :: x, y, CNxfinal, CNyfinal
-    
-        ! Body of LinearMotion
-        do i = 1, IV%NoCN
-            CNDisp(i) = CNxfinal(i) - x(CN_ind(i))
-            CNDisp(i+IV%NoCN) = CNyfinal(i) - y(CN_ind(i))
-            x(CN_ind(i)) = x(CN_ind(i)) + CNDisp(i)
-            y(CN_ind(i)) = y(CN_ind(i)) + CNDisp(i+IV%NoCN)
-        end do
         
-        ! Move boundary points linearly
-        do i = 1, IV%NoCN          
-            if (i /= IV%NoCN) then
-                CNdist = abs(x(CN_ind(i+1)) - x(CN_ind(i)))
-                do j = CN_ind(i)+1, CN_ind(i+1)-1
-                    y(j) = y(j) + CNDisp(i+IV%NoCN) - abs(x(CN_ind(i)) - x(j))*(1/CNdist)*CNDisp(i+IV%NoCN)
-                    y(j) = y(j) + CNDisp(i+IV%NoCN+1) - abs(x(CN_ind(i+1)) - x(j))*(1/CNdist)*CNDisp(i+IV%NoCN+1)
-                end do
-                CNdist = abs(y(CN_ind(i+1)) - y(CN_ind(i)))
-                do j = CN_ind(i)+1, CN_ind(i+1)-1
-                    x(j) = x(j) + CNDisp(i) - abs(y(CN_ind(i)) - y(j))*(1/CNdist)*CNDisp(i)
-                    x(j) = x(j) + CNDisp(i+1) - abs(y(CN_ind(i+1)) - y(j))*(1/CNdist)*CNDisp(i+1)
-                end do
-            else
-                CNdist = x(CN_ind(1)) - x(CN_ind(i))
-                do j = CN_ind(i)+1, CN_ind(i+1)-1
-                    y(j) = y(j) + CNDisp(i+IV%NoCN) - abs(x(CN_ind(i)) - x(j))*(1/CNdist)*CNDisp(i+IV%NoCN)
-                    y(j) = y(j) + CNDisp(1+IV%NoCN) - abs(x(CN_ind(1)) - x(j))*(1/CNdist)*CNDisp(1+IV%NoCN)
-                end do                  
-                CNdist = y(CN_ind(1)) - y(CN_ind(i))
-                do j = CN_ind(i)+1, CN_ind(i+1)-1
-                    x(j) = x(j) + CNDisp(i) - abs(y(CN_ind(i)) - y(j))*(1/CNdist)*CNDisp(i)
-                    x(j) = x(j) + CNDisp(1) - abs(y(CN_ind(1)) - y(j))*(1/CNdist)*CNDisp(1)
-                end do
-            end if
-        end do    
-
-
-    end subroutine LinearMotion
-    
-    subroutine calcSmoothing(x, y, NoPmove, smoothfactor, smoothing, shapeenclosed)
+    subroutine calcSmoothing(x, y, NoPmove, smoothfactor, smoothing)
     
         ! Variables
         implicit none
         integer :: NoPmove
-        logical :: shapeenclosed
         double precision, dimension(IV%NoCN) :: smoothfactor
         double precision, dimension(NoPmove) :: x, y, smoothing
         
         ! Body of calcAlpha
-        if (shapeenclosed == .true.) then
+        if (IV%shapeenclosed == .true.) then
             smoothing = smoothingclosed(x, y, NoPmove, smoothfactor)
         else
             smoothing = smoothingopen(x, y, NoPmove, smoothfactor)
@@ -583,8 +663,18 @@
         double precision, dimension(IV%NoCN) :: smoothfactor
         double precision, dimension(NoPmove) :: x, y, smoothingclosed
         double precision, dimension(:), allocatable :: dist
+        integer, dimension(:), allocatable :: CN_sort, sortind
     
-        ! Body of smoothingopen
+        ! Order CN low to high
+        allocate(CN_sort(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(sortind(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        CN_sort = CN_indordered
+        sortind = (/ (j, j=1,IV%NoCN) /) 
+        call QSortInt(CN_sort, size(CN_sort, dim = 1), 'y', sortind)
+    
+        ! Body of smoothingclosed
         allocate(dist(NoPmove+1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
         dist(1) = 0.0
@@ -595,18 +685,18 @@
  
         smoothingclosed = 0.0
         do i = 1, IV%NoCN-1
-            delta = (dist(CN_indordered(i+1))-dist(CN_indordered(i)))
-            do j = CN_indordered(i)+1, CN_indordered(i+1)
-                smoothingclosed(j) = smoothfactor(i)*(1 - (dist(j) - dist(CN_indordered(i)))/delta) + smoothfactor(i+1)*((dist(j) - dist(CN_indordered(i)))/delta)
+            delta = (dist(CN_sort(i+1))-dist(CN_sort(i)))
+            do j = CN_sort(i)+1, CN_sort(i+1)
+                smoothingclosed(j) = smoothfactor(sortind(i))*(1 - (dist(j) - dist(CN_sort(i)))/delta) + smoothfactor(sortind(i+1))*((dist(j) - dist(CN_sort(i)))/delta)
             end do
         end do
         
-        delta = (dist(NoPmove+1)-dist(CN_indordered(IV%NoCN)) + dist(CN_indordered(1)))
-        do j = CN_indordered(IV%NoCN)+1, NoPmove
-            smoothingclosed(j) = smoothfactor(IV%NoCN)*(1 - (dist(j) - dist(CN_indordered(IV%NoCN)))/delta) + smoothfactor(1)*((dist(j) - dist(CN_indordered(IV%NoCN)))/delta)
+        delta = (dist(NoPmove+1)-dist(CN_sort(IV%NoCN)) + dist(CN_sort(1)))
+        do j = CN_sort(IV%NoCN)+1, NoPmove
+            smoothingclosed(j) = smoothfactor(sortind(IV%NoCN))*(1 - (dist(j) - dist(CN_sort(IV%NoCN)))/delta) + smoothfactor(sortind(1))*((dist(j) - dist(CN_sort(IV%NoCN)))/delta)
         end do
-        do j = 1, CN_indordered(1)
-            smoothingclosed(j) = smoothfactor(IV%NoCN)*(1 - (dist(j) + dist(NoPmove+1) - dist(CN_indordered(IV%NoCN)))/delta) + smoothfactor(1)*((dist(j) + dist(NoPmove+1) - dist(CN_indordered(IV%NoCN)))/delta)
+        do j = 1, CN_sort(1)
+            smoothingclosed(j) = smoothfactor(sortind(IV%NoCN))*(1 - (dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta) + smoothfactor(sortind(1))*((dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta)
         end do
     
     end function smoothingclosed
@@ -620,7 +710,17 @@
         double precision, dimension(IV%NoCN) :: smoothfactor
         double precision, dimension(NoPmove) :: x, y, smoothingopen
         double precision, dimension(:), allocatable :: dist
+        integer, dimension(:), allocatable :: CN_sort, sortind
     
+        ! Order CN low to high
+        allocate(CN_sort(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(sortind(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        CN_sort = CN_indordered
+        sortind = (/ (j, j=1,IV%NoCN) /) 
+        call QSortInt(CN_sort, size(CN_sort, dim = 1), 'y', sortind)
+        
         ! Body of smoothingopen
         allocate(dist(NoPmove+1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
@@ -630,9 +730,9 @@
 
         smoothingopen = 0.0
         do i = 1, IV%NoCN-1
-            delta = (dist(CN_indordered(i+1))-dist(CN_indordered(i)))
-            do j = CN_indordered(i)+1, CN_indordered(i+1)
-                smoothingopen(j) = smoothfactor(i)*(1 - (dist(j) - dist(CN_indordered(i)))/delta) + smoothfactor(i+1)*((dist(j) - dist(CN_indordered(i)))/delta)
+            delta = (dist(CN_sort(i+1))-dist(CN_sort(i)))
+            do j = CN_sort(i)+1, CN_sort(i+1)
+                smoothingopen(j) = smoothfactor(sortind(i))*(1 - (dist(j) - dist(CN_sort(i)))/delta) + smoothfactor(sortind(i+1))*((dist(j) - dist(CN_sort(i)))/delta)
             end do
         end do
                 
@@ -716,5 +816,285 @@
         end if
         
     end subroutine findPoint
+    
+    subroutine quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
+    
+        ! Variables
+        implicit none
+        integer :: NoPmove
+        double precision, dimension(:), allocatable :: x, y, CNxfinal, CNyfinal
+        
+        ! Body of quasi1DLinear
+        if (IV%shapeenclosed == .true.) then
+            call quasi1DLinearClosed(x, y, CNxfinal, CNyfinal, NoPmove)
+        else
+            call quasi1DLinearOpen(x, y, CNxfinal, CNyfinal, NoPmove)
+        end if
+    
+    end subroutine quasi1DLinear
+    
+    subroutine quasi1DLinearOpen(x, y, CNxfinal, CNyfinal, NoPmove)
+    
+        ! Variables
+        implicit none
+        integer :: i, j, NoPmove
+        double precision :: delta
+        double precision, dimension(IV%NoCN,2) :: dCN
+        double precision, dimension(:), allocatable :: x, y, CNxfinal, CNyfinal, dist
+        integer, dimension(:), allocatable :: CN_sort, sortind
+    
+        ! Order CN low to high
+        allocate(CN_sort(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(sortind(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        CN_sort = CN_indordered
+        sortind = (/ (j, j=1,IV%NoCN) /) 
+        call QSortInt(CN_sort, size(CN_sort, dim = 1), 'y', sortind)
+    
+        ! Body of quasi1DLinear
+        ! Calculate required motion of CN
+        do i = 1, IV%NoCN
+            dCN(i,1) = CNxfinal(i) - x(CN_sort(i))
+            dCN(i,2) = CNyfinal(i) - y(CN_sort(i))
+        end do
+        
+        ! Calculate distance along boundary
+        allocate(dist(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        dist = 0.0
+        do i = 2, NoPmove
+            dist(i) = dist(i-1) + sqrt((x(i)-x(i-1))**2 + (y(i)-y(i-1))**2)
+        end do
+        
+        ! Move boundary points quasi-1D-linear
+        do i = 1, IV%NoCN - 1
+            delta = dist(CN_sort(i+1))-dist(CN_sort(i))
+            do j = CN_sort(i)+1, CN_sort(i+1)
+                y(j) = y(j) + dCN(i,2)*(1 - (dist(j) - dist(CN_sort(i)))/delta) + dCN(i+1,2)*((dist(j) - dist(CN_sort(i)))/delta)
+                x(j) = x(j) + dCN(i,1)*(1 - (dist(j) - dist(CN_sort(i)))/delta) + dCN(i+1,1)*((dist(j) - dist(CN_sort(i)))/delta)
+            end do
+        end do    
+
+    end subroutine quasi1DLinearOpen
+    
+    subroutine quasi1DLinearClosed(x, y, CNxfinal, CNyfinal, NoPmove)
+    
+        ! Variables
+        implicit none
+        integer :: i, j, NoPmove
+        double precision :: delta
+        double precision, dimension(IV%NoCN,2) :: dCN
+        double precision, dimension(:), allocatable :: x, y, CNxfinal, CNyfinal, dist
+        integer, dimension(:), allocatable :: CN_sort, sortind
+    
+        ! Order CN low to high
+        allocate(CN_sort(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(sortind(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        CN_sort = CN_indordered
+        sortind = (/ (j, j=1,IV%NoCN) /) 
+        call QSortInt(CN_sort, size(CN_sort, dim = 1), 'y', sortind)
+        
+        ! Body of quasi1DLinear
+        ! Calculate required motion of CN
+        do i = 1, IV%NoCN
+            dCN(i,1) = CNxfinal(sortind(i)) - x(CN_sort(i))
+            dCN(i,2) = CNyfinal(sortind(i)) - y(CN_sort(i))
+        end do
+        
+        ! Calculate distance along boundary
+        allocate(dist(NoPmove+1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        dist = 0.0
+        do i = 2, NoPmove
+            dist(i) = dist(i-1) + sqrt((x(i)-x(i-1))**2 + (y(i)-y(i-1))**2)
+        end do
+        dist(NoPmove+1) = dist(NoPmove) + sqrt((x(1)-x(NoPmove))**2 + (y(1)-y(NoPmove))**2)
+        
+        ! Move boundary points quasi-1D-linear
+        do i = 1, IV%NoCN - 1
+            delta = dist(CN_sort(i+1))-dist(CN_sort(i))
+            do j = CN_sort(i)+1, CN_sort(i+1)
+                y(j) = y(j) + dCN(i,2)*(1 - (dist(j) - dist(CN_sort(i)))/delta) + dCN(i+1,2)*((dist(j) - dist(CN_sort(i)))/delta)
+                x(j) = x(j) + dCN(i,1)*(1 - (dist(j) - dist(CN_sort(i)))/delta) + dCN(i+1,1)*((dist(j) - dist(CN_sort(i)))/delta)
+            end do
+        end do    
+
+        delta = (dist(NoPmove+1) + dist(CN_sort(1)) - dist(CN_sort(IV%NoCN)))
+        do j = CN_sort(IV%NoCN)+1, NoPmove
+            y(j) = y(j) + dCN(IV%NoCN,2)*(1 - (dist(j) - dist(CN_sort(IV%NoCN)))/delta) + dCN(1,2)*((dist(j) - dist(CN_sort(IV%NoCN)))/delta)
+            x(j) = x(j) + dCN(IV%NoCN,1)*(1 - (dist(j) - dist(CN_sort(IV%NoCN)))/delta) + dCN(1,1)*((dist(j) - dist(CN_sort(IV%NoCN)))/delta)
+        end do
+        do j = 1, CN_sort(1)
+            y(j) = y(j) + dCN(IV%NoCN,2)*(1 - (dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta) + dCN(1,2)*((dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta)
+            x(j) = x(j) + dCN(IV%NoCN,1)*(1 - (dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta) + dCN(1,1)*((dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta)
+        end do
+                    
+    end subroutine quasi1DLinearClosed
+    
+    subroutine normXY(x, y, normx, normy, CNxfinal, CNyfinal, NoPmove)
+    
+        ! Variables
+        implicit none
+        integer :: NoPmove
+        double precision, dimension(:), allocatable :: x, y, CNxfinal, CNyfinal, normx, normy
+        
+        ! Body of quasi1DLinear
+        if (IV%shapeenclosed == .true.) then
+            call normXYclosed(x, y, normx, normy, CNxfinal, CNyfinal, NoPmove)
+        else
+            call normXYopen(x, y, normx, normy, CNxfinal, CNyfinal, NoPmove)
+        end if
+    
+    end subroutine normXY
+    
+    subroutine normXYopen(x, y, normx, normy, CNxfinal, CNyfinal, NoPmove)
+    
+        ! Variables
+        implicit none
+        integer :: i, j, NoPmove
+        double precision :: delta, norm
+        double precision, dimension(IV%NoCN,2) :: dCN
+        double precision, dimension(:), allocatable :: x, y, CNxfinal, CNyfinal, dist, normx, normy
+        integer, dimension(:), allocatable :: CN_sort, sortind
+        
+        ! Order CN low to high
+        allocate(CN_sort(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(sortind(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        CN_sort = CN_indordered
+        sortind = (/ (j, j=1,IV%NoCN) /) 
+        call QSortInt(CN_sort, size(CN_sort, dim = 1), 'y', sortind)
+        
+        ! Body of quasi1DLinear
+        ! Calculate required motion of CN
+        do i = 1, IV%NoCN
+            dCN(i,1) = abs(CNxfinal(sortind(i)) - x(CN_sort(i)))
+            dCN(i,2) = abs(CNyfinal(sortind(i)) - y(CN_sort(i)))
+        end do
+        
+        ! Calculate distance along boundary
+        allocate(dist(NoPmove+1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        dist = 0.0
+        do i = 2, NoPmove
+            dist(i) = dist(i-1) + sqrt((x(i)-x(i-1))**2 + (y(i)-y(i-1))**2)
+        end do
+        dist(NoPmove+1) = dist(NoPmove) + sqrt((x(1)-x(NoPmove))**2 + (y(1)-y(NoPmove))**2)   
+
+        ! Calculate y and x contribution based on distance and magnitude
+        normy = 0.5
+        normx = 0.5
+        do i = 1, IV%NoCN - 1
+            delta = dist(CN_sort(i+1))-dist(CN_sort(i))
+            norm = dCN(i,2) + dCN(i,1) + dCN(i+1,2) + dCN(i+1,1)
+            if (norm /= 0) then
+                do j = CN_sort(i), CN_sort(i+1)
+                    normy(j) = dCN(i,2)/norm*(1 - (dist(j) - dist(CN_sort(i)))/delta) + dCN(i+1,2)/norm*((dist(j) - dist(CN_sort(i)))/delta)
+                    normx(j) = dCN(i,1)/norm*(1 - (dist(j) - dist(CN_sort(i)))/delta) + dCN(i+1,1)/norm*((dist(j) - dist(CN_sort(i)))/delta)
+                end do
+            end if
+            if (normx(CN_sort(i)) == 0 .and. normy(CN_sort(i)) == 0) then
+                normx(CN_sort(i)) = 0.5
+                normy(CN_sort(i)) = 0.5
+            end if
+        end do  
+        if (normx(CN_sort(IV%NoCN)) == 0 .and. normy(CN_sort(IV%NoCN)) == 0) then
+            normx(CN_sort(IV%NoCN)) = 0.5
+            normy(CN_sort(IV%NoCN)) = 0.5
+        end if
+        
+        ! Ensure Sum of normy + normx = 1
+        normy = normy/(normy + normx)
+        normx = normx/(normy + normx)
+                    
+    end subroutine normXYopen
+    
+    subroutine normXYclosed(x, y, normx, normy, CNxfinal, CNyfinal, NoPmove)
+    
+        ! Variables
+        implicit none
+        integer :: i, j, NoPmove
+        double precision :: delta, norm
+        double precision, dimension(IV%NoCN,2) :: dCN
+        double precision, dimension(:), allocatable :: x, y, CNxfinal, CNyfinal, dist, normx, normy
+        integer, dimension(:), allocatable :: CN_sort, sortind
+        
+        ! Order CN low to high
+        allocate(CN_sort(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(sortind(IV%NoCN),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        CN_sort = CN_indordered
+        sortind = (/ (j, j=1,IV%NoCN) /) 
+        call QSortInt(CN_sort, size(CN_sort, dim = 1), 'y', sortind)
+        
+        ! Body of quasi1DLinear
+        ! Calculate required motion of CN
+        do i = 1, IV%NoCN
+            dCN(i,1) = CNxfinal(sortind(i)) - x(CN_sort(i))
+            dCN(i,2) = CNyfinal(sortind(i)) - y(CN_sort(i))
+        end do
+        
+        ! Calculate distance along boundary
+        allocate(dist(NoPmove+1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        dist = 0.0
+        do i = 2, NoPmove
+            dist(i) = dist(i-1) + sqrt((x(i)-x(i-1))**2 + (y(i)-y(i-1))**2)
+        end do
+        dist(NoPmove+1) = dist(NoPmove) + sqrt((x(1)-x(NoPmove))**2 + (y(1)-y(NoPmove))**2)   
+
+        ! Calculate y and x contribution based on distance and magnitude
+        normy(CN_sort(1)) = 0.5
+        normx(CN_sort(1)) = 0.5
+        do i = 1, IV%NoCN - 1
+            delta = dist(CN_sort(i+1))-dist(CN_sort(i))
+            norm = dCN(i,2) + dCN(i,1) + dCN(i+1,2) + dCN(i+1,1)
+            if (norm == 0) then
+                normy((CN_sort(i)+1):CN_sort(i+1)) = 0.5
+                normx((CN_sort(i)+1):CN_sort(i+1)) = 0.5
+            else
+                do j = CN_sort(i), CN_sort(i+1)
+                    normy(j) = dCN(i,2)/norm*(1 - (dist(j) - dist(CN_sort(i)))/delta) + dCN(i+1,2)/norm*((dist(j) - dist(CN_sort(i)))/delta)
+                    normx(j) = dCN(i,1)/norm*(1 - (dist(j) - dist(CN_sort(i)))/delta) + dCN(i+1,1)/norm*((dist(j) - dist(CN_sort(i)))/delta)
+                end do
+            end if
+            if (normx(CN_sort(i)) == 0 .and. normy(CN_sort(i)) == 0) then
+                normx(CN_sort(i)) = 0.5
+                normy(CN_sort(i)) = 0.5
+            end if
+        end do  
+        
+        delta = (dist(NoPmove+1) + dist(CN_sort(1)) - dist(CN_sort(IV%NoCN)))
+        norm = dCN(IV%NoCN,2) + dCN(IV%NoCN,1) + dCN(1,2) + dCN(1,1)
+        if (norm == 0) then
+            normy((CN_sort(IV%NoCN)+1):NoPmove) = 0.5
+            normx((CN_sort(IV%NoCN)+1):NoPmove) = 0.5
+            normy(1:CN_sort(1)) = 0.5
+            normx(1:CN_sort(1)) = 0.5
+        else
+            do j = CN_sort(IV%NoCN)+1, NoPmove
+                normy(j) = dCN(IV%NoCN,2)/norm*(1 - (dist(j) - dist(CN_sort(IV%NoCN)))/delta) + dCN(1,2)/norm*((dist(j) - dist(CN_sort(IV%NoCN)))/delta)
+                normx(j) = dCN(IV%NoCN,1)/norm*(1 - (dist(j) - dist(CN_sort(IV%NoCN)))/delta) + dCN(1,1)/norm*((dist(j) - dist(CN_sort(IV%NoCN)))/delta)
+            end do
+            do j = 1, CN_sort(1)
+                normy(j) = dCN(IV%NoCN,2)/norm*(1 - (dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta) + dCN(1,2)/norm*((dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta)
+                normx(j) = dCN(IV%NoCN,1)/norm*(1 - (dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta) + dCN(1,1)/norm*((dist(j) + dist(NoPmove+1) - dist(CN_sort(IV%NoCN)))/delta)
+            end do
+        end if
+        if (normx(CN_sort(IV%NoCN)) == 0 .and. normy(CN_sort(IV%NoCN)) == 0) then
+            normx(CN_sort(IV%NoCN)) = 0.5
+            normy(CN_sort(IV%NoCN)) = 0.5
+        end if 
+        
+        ! Ensure Sum of normy + normx = 1
+        normy = normy/(normy + normx)
+        normx = normx/(normy + normx)
+                    
+    end subroutine normXYclosed
     
     end module Smoothing

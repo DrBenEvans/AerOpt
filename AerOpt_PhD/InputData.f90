@@ -9,8 +9,7 @@ module InputData
 		real, dimension(100) :: zrange      ! Range of lateral displacement of Control Nodes
         double precision, dimension(100) :: smoothfactor ! Level of smoothing at each CN
         real, dimension(100) :: angle       ! Range of change in angle of Control Nodes
-        real, dimension(50) :: CNconnecttrans    ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
-        real, dimension(50) :: CNconnectangle    ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3       
+        real, dimension(50) :: CNconnecttrans    ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3       
         real :: gamma                   ! Ratio of specific heats
         real :: R                       ! specific gas constant
         real :: Re                      ! Reynoldsnumber
@@ -20,6 +19,7 @@ module InputData
         real :: Pamb    				! ambient Pressure [Pa]
         real :: engFMF                  ! Solver variable - engines Front Mass Flow
         real :: Low2Top                 ! Fraction of Top to Low Nests
+        real :: smoothconvergence       ! Convergence of Mesh smoothing
         integer :: NoNests              ! Number of Nests (Cuckoo Search)
         integer :: NoSnap               ! Number of initial Snapshots
         integer :: NoCN                 ! Number of Control Nodes
@@ -54,6 +54,7 @@ module InputData
         logical :: multiquadric         ! RBF type for POD
         logical :: POD
 		logical :: meanP
+        logical ::  shapeenclosed       ! Closed or open boundary?
     
     end type InputVariablesData
     
@@ -101,7 +102,6 @@ contains
         IV%angle = 0.00                 ! For Aerofoil Angle of Attack Test
         IV%smoothfactor = 0.0           ! Level of smoothing for each CN
         IV%CNconnecttrans = 0           ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
-        IV%CNconnectangle = 0           ! allows to connect Control Node movements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
         IV%engFMF = 1.0			        ! engines Front Mass Flow(Solver variable)
         IV%AlphaInflowDirection = 0.0   ! Angle/Direction of Flow within the Solver(0: Left to Right, 180: Right to Left)
         IV%YawInflowAngle = 0.0         ! Yaw Angle of inflow in Solver
@@ -132,6 +132,8 @@ contains
         IV%Memory = 5
         IV%NoDelBP = 8                  ! Number of Delaunay Boundary Points       
         IV%ObjectiveFunction = 1        ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - max Lift, 4 - min Drag, 5 - max Downforce, 6 - min Lift
+        IV%shapeenclosed = .true.       ! Open or closed boundary?
+        IV%smoothconvergence = -3             ! Rate of convergence for Mesh smoothing
         
         ! POD
         IV%POD = .false.                ! Activation of POD - TRUE is ACTIVE

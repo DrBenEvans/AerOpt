@@ -97,7 +97,7 @@ contains
             NormFact(i) = MxDisp_Move(i,1) - MxDisp_Move(i,2)
             Snapshots_Move(:,i) = Snapshots_Move(:,i)/NormFact(i) + 0.5
         end do
-            
+
         ! Extract Pressure of Snapshots
         call timestamp()
         if (IV%POD == .true.) then
@@ -178,7 +178,7 @@ contains
         Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
         Nests = Snapshots(ind_Fi_initial(1:IV%NoNests),:)
         
-        ! Store Files of Top 5 % fraction of Nests in TopFolder
+        ! Store Files of Top 5 % fraction of Nests in TopFolder - currently just stores best Nest
         !if (nint(IV%NoNests*0.05) > 1) then
         !    store = nint(IV%NoNests*0.05)
         !else
@@ -288,12 +288,7 @@ contains
                 Nests_Move(ii,:) = tempNests_Move
                 Nests(ii,:) = tempNests
                 
-            end do
-
-            ! Full Fidelity Solutions passed on to Solver
-            if (IV%POD == .false.) then        
-                call SubCFD((NoTop + 1), IV%NoNests, Nests((NoTop + 1):IV%NoNests,:), NoDiscard)             
-            end if            
+            end do        
             
             !!*** Loop over Top Nests ***!!
             print *, ''
@@ -396,6 +391,8 @@ contains
             if (IV%POD == .false.) then                
                 !Generate Full Fidelity Solution of new TopNest      
                 call SubCFD(1, NoTop, TopNest, NoTop)
+                ! Full Fidelity Solutions of Discarded Nests       
+                call SubCFD((NoTop + 1), IV%NoNests, Nests((NoTop + 1):IV%NoNests,:), NoDiscard)                        
                 ! Check ALL new Nests
                 print *, 'Generation: ', Gen
                 call PostSolverCheck(IV%NoNests, 1, Nests_Move, Nests)   
@@ -627,9 +624,9 @@ contains
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy + Vz*Vz) 
             
             close(11)
-                open(11, file=newdir//'/'//OutFolder//'/pressure'//istr//'.txt', form='formatted',status='unknown')
-                write(11,'(1F25.15)') pressure(:,i)
-                close(11)
+                !open(11, file=newdir//'/'//OutFolder//'/pressure'//istr//'.txt', form='formatted',status='unknown')
+                !write(11,'(1F25.15)') pressure(:,i)
+                !close(11)
             deallocate(istr)
                 
         end do
