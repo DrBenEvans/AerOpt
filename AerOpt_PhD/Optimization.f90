@@ -9,11 +9,16 @@ module Optimization
     use FDGD
     use Smoothing
     
+    integer, dimension(:), allocatable :: engInNodes           ! Engine inlet Nodes
+    integer :: Gen
+    double precision :: Precovery
     double precision, dimension(:,:), allocatable :: modes, coeff       ! Modes and Coefficient derived by the POD method
     double precision, dimension(:), allocatable :: meanpressure         ! Mean Pressure excluded of Snapshots in POD
-    double precision, dimension(:), allocatable :: engInNodes           ! Engine inlet Nodes
-    double precision, dimension(:,:), allocatable :: pressure           ! Pressure of All initial Snapshots
+    double precision, dimension(:), allocatable :: pTamb                ! total pressure of free-stream flow
+    double precision, dimension(:,:), allocatable :: pressure           ! Static Pressure of All initial Snapshots
+    double precision, dimension(:,:), allocatable :: q                  ! Dynamic Pressure of All initial Snapshots
     double precision, dimension(:), allocatable :: Fi                   ! Vector with all current Fitness values
+    double precision, dimension(:), allocatable :: Precoutput           ! Vector with all current total pressure values
     double precision, dimension(:), allocatable :: NestOpt              ! Control Point Coordinates of Optimum Geometry
     double precision, dimension(:), allocatable :: PolCoeff             ! Polynomial Coefficients for POD RBF interpolation
     double precision, dimension(:,:), allocatable :: Weights            ! Weights for POD RBF interpolation
@@ -27,7 +32,7 @@ contains
         ! Variables
         implicit none
         double precision :: Ac, Ftemp, Fopt, temp, Fibefore
-        integer :: i, j, k, l, ii, Gen, NoSteps, NoTop, NoDiscard, randomNest, store
+        integer :: i, j, k, l, ii, NoSteps, NoTop, NoDiscard, randomNest, store
         double precision, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fi_initial, Fcompare
         double precision, dimension(:,:), allocatable :: Snapshots_Move, newSnapshots, TopNest, TopNest_Move
         integer, dimension(:), allocatable :: ind_Fi, ind_Fi_initial, ind_Fitrack
@@ -99,6 +104,10 @@ contains
         end do
 
         ! Extract Pressure of Snapshots
+        if (IV%ObjectiveFunction == 2 .or. IV%ObjectiveFunction == 7) then
+            call getengineInlet() ! Get boundary nodes, that define the Engine Inlet Plane
+            ! Output: Engine Inlet Nodes(engInNodes)
+        end if
         call timestamp()
         if (IV%POD == .true.) then
             call AllocateModesCoeff()
@@ -115,10 +124,6 @@ contains
             end if
         end if             
         call timestamp()         
-        if (IV%ObjectiveFunction == 2) then
-            call getengineInlet() ! Get boundary nodes, that define the Engine Inlet Plane
-            ! Output: Engine Inlet Nodes(engInNodes)
-        end if
         
         ! Approximate Pressure Field of RandNest input file        
         !open(11,file=newdir//'/RandNest.txt')
@@ -142,6 +147,8 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fi(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        allocate(Precoutput(IV%NoNests),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fi_initial(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
          
@@ -149,8 +156,11 @@ contains
         do ii = 1, IV%NoSnap 
             call getObjectiveFunction(.false., Ftemp, Snapshots(ii,:), NoSnapshot=ii)
             Fi_initial(ii) = Ftemp
+ Precoutput(ii) = Precovery
         end do
         deallocate(pressure)
+        deallocate(q)
+        deallocate(pTamb)
         ! Output: Distortion of all Snapshots as the Fitness (Fi)
          
         allocate(character(len=3) :: istr)
@@ -177,6 +187,7 @@ contains
         Fi = Fi_initial(1:IV%NoNests)
         Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
         Nests = Snapshots(ind_Fi_initial(1:IV%NoNests),:)
+Precoutput = Precoutput(ind_Fi_initial(1:IV%NoNests))
         
         ! Store Files of Top 5 % fraction of Nests in TopFolder - currently just stores best Nest
         !if (nint(IV%NoNests*0.05) > 1) then
@@ -216,6 +227,7 @@ contains
         write(19,*) 'Fitness'
         write(19,'(1I1)',advance="no") 1
         write(19,'(<IV%NoNests>f17.10)') Fi
+write(19,'(<IV%NoNests>f17.10)') Precoutput
         close(19)
         deallocate(istr)
        
@@ -371,7 +383,8 @@ contains
                     if (Ftemp > Fi(randomNest)) then
                         Nests_Move(randomNest,:) = tempNests_Move
                         Nests(randomNest,:) = tempNests
-                        Fi(randomNest) = Ftemp 
+                        Fi(randomNest) = Ftemp
+Precoutput(randomNest) = Precovery
                      end if
                 end if
                 
@@ -421,13 +434,16 @@ contains
 
                 do ii = (NoTop + 1), IV%NoNests
                     call getObjectiveFunction(.false., Fi(ii), NoSnapshot=ii)
+Precoutput(ii) = Precovery
                 end do
                 deallocate(pressure)
+                deallocate(q)
+                deallocate(pTamb)
             end if
             
             !!*** Adaptive Sampling - Finish and Integrate New Jobs (first and last Fitness) ***!!
             if (Gen > 2 .and. Gen < IV%NoG .and. IV%AdaptSamp == .true.) then
-                call AdaptiveSampling(Gen, newSnapshots, Fcompare, NoTop)
+                call AdaptiveSampling(newSnapshots, Fcompare, NoTop)
             end if
             
             ! Re-order Fitness in ascending order
@@ -446,6 +462,7 @@ contains
             ! Re-order Nests for next Generation
             Nests_Move = Nests_Move(ind_Fi,:)
             Nests = Nests(ind_Fi,:)
+Precoutput = Precoutput(ind_Fi)
             
             ! Store Fitness values
             allocate(character(len=3) :: istr)
@@ -456,6 +473,7 @@ contains
             !open(19,file=TopFolder//'/Fitness_'//istr//'.txt',form='formatted',status='new')
             write(19,'(1I3)',advance="no") Gen
             write(19,'(<IV%NoNests>f17.10)') Fi
+write(19,'(<IV%NoNests>f17.10)') Precoutput
             close(19) 
             deallocate(istr)
             
@@ -514,26 +532,30 @@ contains
         
         ! Variables
         implicit none
-        integer :: Start, Ending, Length, i, k, j
-        double precision :: Vamb, rho_amb, Rspec, gamma
+        integer :: Start, Ending, Length, i, k, j, xindex
+        double precision :: Vamb, rho_amb, Rspec, gamma, qamb
         double precision, dimension(:), allocatable :: Output, Vx, Vy, rho, e
         character(len=:), allocatable :: istr
 
         ! Body of Extract Pressure
         Length = Ending - Start + 1
         allocate(rho(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(e(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(Vx(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(Vy(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(Output(6*RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(pressure(RD%np, Length),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
-        
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
+        allocate(q(size(engInNodes, dim = 1), Length),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
+        allocate(pTamb(Length),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
+       
         ! Precalculate ambient Parameters
         print *, 'Start Pressure Extraction'
         Vamb = IV%Ma*sqrt(IV%gamma*IV%R*IV%Tamb)          ! ambient velocity
@@ -563,6 +585,18 @@ contains
             pressure(:,(i - Start + 1)) = (IV%gamma - 1.0)*rho*((e - 0.5*(Vx**2 + Vy**2))) ! Non-dimensional  
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) 
             
+            ! Dynamic Pressure non-dimensional
+            q(:,(i - Start + 1)) = 0.5*rho(engInNodes)*(Vx(engInNodes)**2+Vy(engInNodes)**2)
+          
+            ! free-stream dynamic pressure
+            if (IV%AlphaInflowDirection > 90) then
+                xindex = maxloc(RD%Coord(:,2), dim = 1)
+            else
+                xindex = minloc(RD%Coord(:,2), dim = 1)
+            end if
+            qamb = 0.5*rho(xindex)*(Vx(xindex)**2+Vy(xindex)**2)
+            pTamb(i - Start + 1) = qamb + pressure(xindex,(i - Start + 1))
+             
             close(11)
             deallocate(istr)
                 
@@ -573,6 +607,11 @@ contains
         deallocate(Vy)
         deallocate(e)
         deallocate(rho)
+        
+open(29, file=newdir//'/pTamb.txt', form='formatted',status='unknown',position='append')
+write(29,'(1I3)',advance="no") Gen  
+write(29,'(<IV%NoNests>f17.10)') pTamb
+close(29)
 
     end subroutine ExtractPressure
     
@@ -588,17 +627,17 @@ contains
         ! Body of Extract Pressure
         Length = Ending - Start + 1
         allocate(rho(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(e(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(Vx(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(Vy(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(Vz(RD%np),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(pressure(RD%np, Length),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         
         ! Precalculate ambient Parameters
         print *, 'Start Pressure Extraction'
@@ -671,7 +710,7 @@ contains
         
         ! Perform Single Value Decomposition
         allocate(pressure2(RD%np, IV%NoSnap),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in POD "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in SVD "
         pressure2 = pressure
         call SVD(pressure2, size(pressure, Dim = 1), size(pressure, Dim = 2), modestemp)
         !deallocate(pressure2)
@@ -743,13 +782,13 @@ contains
         !!*** Calculate coordinates of midpoints and afterwards the Area between them ***!!
                  
         ! Assign Right boundary nodes as First Midpoint to act as boundaries
-        Pmid_x(1) = PlaneX(1)
-        Pmid_y(1) = PlaneY(1)
+        !Pmid_x(1) = PlaneX(1)
+        !Pmid_y(1) = PlaneY(1)
         ! Assign Right boundary nodes as Last Midpoint to act as boundaries
-        Pmid_x(NoEngIN-1) = PlaneX(NoEngIN)
-        Pmid_y(NoEngIN-1) = PlaneY(NoEngIN)                    
+        !Pmid_x(NoEngIN-1) = PlaneX(NoEngIN)
+        !Pmid_y(NoEngIN-1) = PlaneY(NoEngIN)                    
         ! Midpoint and Area Calculation
-        do j = 2, (NoEngIN - 2)                       
+        do j = 1, (NoEngIN - 1)                       
             Pmid_x(j) = (PlaneX(j) + PlaneX(j+1))/2.0
             Pmid_y(j) = (PlaneY(j) + PlaneY(j+1))/2.0
         end do      
@@ -789,7 +828,7 @@ contains
         implicit none
         integer :: i,j
         integer, dimension(:,:), allocatable :: nodesall
-        double precision, dimension(:), allocatable :: nodesvec
+        integer, dimension(:), allocatable :: nodesvec
         double precision, dimension(2) :: point
         
         allocate(nodesall(RD%nbf,2),stat=allocateStatus)
@@ -812,8 +851,8 @@ contains
             allocate(nodesvec(3*j))
             nodesvec = (/nodesall(1:j,1), nodesall(1:j,2), nodesall(1:j,3)/)
         end if
-        call QSort(nodesvec, size(nodesvec), 'n')   
-        call Unique(nodesvec, size(nodesvec), engInNodes)
+        call QSortInt(nodesvec, size(nodesvec), 'n')   
+        call UniqueInt(nodesvec, size(nodesvec), engInNodes)
         ! Output: unique vector engInNodes
    
     end subroutine getengineInlet
@@ -1353,6 +1392,8 @@ contains
                 call getDownForce(Fi, NoSnapshot)
             elseif (IV%ObjectiveFunction == 6) then
                 call getzeroLift(Fi, NoSnapshot)
+            elseif (IV%ObjectiveFunction == 7) then
+                call getDistortionandPressureRecovery(Fi, NoSnapshot)
             end if
         end if
     
@@ -1688,12 +1729,87 @@ contains
         
     end subroutine getminDrag
     
-    subroutine AdaptiveSampling(Gen, newSnapshots, Fcompare, NoTop)
+    subroutine getDistortionandPressureRecovery(Distortion, NoSnapshot)
+    ! Objective: Determine the Distortion of each Snapshot by using the Area Weighted Average Pressure and Trapezoidal Numerical Integration
+    
+        ! Variables
+        implicit none
+        integer :: NoEngIN, NoSnapshot, j
+        double precision, dimension(:), allocatable :: PlaneX, PlaneY, dP, h, Area_trap, Pmid_x, Pmid_y, Area, pT
+        double precision :: Pmean, Distortion, pTmean
+ 
+        allocate(PlaneX(size(engInNodes)),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+        allocate(PlaneY(size(engInNodes)),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+        allocate(dP(size(engInNodes)),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+        allocate(h(size(engInNodes)-1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+        allocate(Area_trap(size(engInNodes)-1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+        allocate(Pmid_x(size(engInNodes)-1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+        allocate(Pmid_y(size(engInNodes)-1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+        allocate(Area(size(engInNodes)-2),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+        allocate(pT(size(engInNodes)),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+     
+        ! Body of getDistortionandPressureRecovery             
+        NoEngIN = size(engInNodes)
+            
+        ! Output: engInNodes
+        PlaneX = RD%coord(engInNodes,1)
+        PlaneY = RD%coord(engInNodes,2)
+        
+        !!*** Calculate coordinates of midpoints and afterwards the Area between them for average weighter pressure calculation ***!!
+                                    
+        ! Midpoint and Area Calculation
+        do j = 1, (NoEngIN - 1)                       
+            Pmid_x(j) = (PlaneX(j) + PlaneX(j+1))/2.0
+            Pmid_y(j) = (PlaneY(j) + PlaneY(j+1))/2.0
+        end do     
+            
+        do j = 1, (NoEngIN - 2)
+            Area(j) = sqrt((Pmid_x(j) - Pmid_x(j+1))**2 + (Pmid_y(j) - Pmid_y(j+1))**2)
+        end do  
+        
+        ! Total Pressure
+        pT = pressure(engInNodes,NoSnapshot) + q(:,NoSnapshot)
+        pTmean = sum(pT(2:(NoEngIN-1))*Area, dim = 1)/sum(Area, dim = 1)
+           
+        ! Check Pressure Recovery constraint
+        Precovery = (pTmean/pTamb(NoSnapshot))
+        
+        ! Calculate Area Weighted Average Pressure6
+        Pmean = sum(pT(2:(NoEngIN-1))*Area, dim = 1)/sum(Area, dim = 1)
+            
+        ! Calculate Pressure Deviation
+        dP = abs(pT - Pmean)           
+            
+        ! Determine Length and Height of Intercepting Plane
+        do j = 1, (NoEngIN-1)
+            h(j) = DistP2P(2, PlaneX(j), PlaneX(j+1), PlaneY(j), PlaneY(j+1))
+        end do
+            
+        ! Apply Trapezoidal Rule to numerically integrate the Distortion
+        Area_trap = h*(dP(1:(NoEngIN-1)) + dP(2:NoEngIN))/2.0
+        Distortion = sum(Area_trap, dim = 1)/(Pmean*sum(h, dim = 1))
+        Distortion = Distortion*(-1) ! To adapt to maximization Problem
+        ! Output: Distortion constrained by a pressure recovery cap
+            
+        Distortion = Distortion + (Precovery-1)
+        
+    end subroutine getDistortionandPressureRecovery
+    
+    subroutine AdaptiveSampling(newSnapshots, Fcompare, NoTop)
     
         ! Variables
         implicit none
         logical :: Converge
-        integer :: Gen, NoConv, k, NoTop
+        integer :: NoConv, k, NoTop
         double precision :: Ftemp
         double precision, dimension(:), allocatable :: Fcompare
         double precision, dimension(:,:), allocatable :: tempSnapshots, newSnapshots
@@ -1758,6 +1874,8 @@ contains
         write(19,*) ' '
         close(19)
         deallocate(pressure)
+        deallocate(q)
+        deallocate(pTamb)
         deallocate(istr)
                                
         ! Resize Snapshots Array to include new Snapshots
