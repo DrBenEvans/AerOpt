@@ -81,6 +81,7 @@ contains
         tempNests = (/ (0, i=1,(maxDoF)) /)
         alpha = 1.0
         beta = 0.0
+        Gen = 1
         
         ! Specific Parameters required for Top Nest monitoring
         allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
@@ -156,7 +157,7 @@ contains
         do ii = 1, IV%NoSnap 
             call getObjectiveFunction(.false., Ftemp, Snapshots(ii,:), NoSnapshot=ii)
             Fi_initial(ii) = Ftemp
- Precoutput(ii) = Precovery
+ !Precoutput(ii) = Precovery
         end do
         deallocate(pressure)
         deallocate(q)
@@ -187,7 +188,7 @@ contains
         Fi = Fi_initial(1:IV%NoNests)
         Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
         Nests = Snapshots(ind_Fi_initial(1:IV%NoNests),:)
-Precoutput = Precoutput(ind_Fi_initial(1:IV%NoNests))
+!Precoutput = Precoutput(ind_Fi_initial(1:IV%NoNests))
         
         ! Store Files of Top 5 % fraction of Nests in TopFolder - currently just stores best Nest
         !if (nint(IV%NoNests*0.05) > 1) then
@@ -214,22 +215,7 @@ Precoutput = Precoutput(ind_Fi_initial(1:IV%NoNests))
         deallocate(ind_Fi_initial)
         
         ! Write Output File for Analysis including Initial and all moved Nests of each Generation
-        allocate(character(len=3) :: istr)
-        write(istr, '(1f3.1)') IV%Ma
-        open(29,file=newdir//'/Nests'//istr//'.txt', form='formatted',status='unknown')   
-        write(29, *) 'Snapshots'
-        write(29,'(<IV%NoSnap>f17.10)') Snapshots
-        write(29, *) 'Generation    1'
-        write(29,'(<IV%NoNests>f17.10)') Nests
-        close(29)
-        open(19,file=newdir//'/Fitness'//istr//'.txt', form='formatted',status='unknown')       
-        !open(19,file=TopFolder//'/Fitness_1.txt', form='formatted',status='unknown')
-        write(19,*) 'Fitness'
-        write(19,'(1I1)',advance="no") 1
-        write(19,'(<IV%NoNests>f17.10)') Fi
-write(19,'(<IV%NoNests>f17.10)') Precoutput
-        close(19)
-        deallocate(istr)
+        call writeFitnessandNestoutput()
        
         !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
         do Gen = 2, IV%NoG
@@ -384,7 +370,7 @@ write(19,'(<IV%NoNests>f17.10)') Precoutput
                         Nests_Move(randomNest,:) = tempNests_Move
                         Nests(randomNest,:) = tempNests
                         Fi(randomNest) = Ftemp
-Precoutput(randomNest) = Precovery
+!Precoutput(randomNest) = Precovery
                      end if
                 end if
                 
@@ -428,13 +414,14 @@ Precoutput(randomNest) = Precovery
                         Nests_Move(randomNest,:) = TopNest_Move(ii,:)
                         Nests(randomNest,:) = TopNest(ii,:)
                         Fi(randomNest) = Ftemp
+!Precoutput(randomNest) = Precovery
                         ind_Fitrack(randomNest) = ii
                     end if
                 end do
 
                 do ii = (NoTop + 1), IV%NoNests
                     call getObjectiveFunction(.false., Fi(ii), NoSnapshot=ii)
-Precoutput(ii) = Precovery
+!Precoutput(ii) = Precovery
                 end do
                 deallocate(pressure)
                 deallocate(q)
@@ -462,29 +449,13 @@ Precoutput(ii) = Precovery
             ! Re-order Nests for next Generation
             Nests_Move = Nests_Move(ind_Fi,:)
             Nests = Nests(ind_Fi,:)
-Precoutput = Precoutput(ind_Fi)
+!Precoutput = Precoutput(ind_Fi)
             
-            ! Store Fitness values
-            allocate(character(len=3) :: istr)
-            write(istr, '(1f3.1)') IV%Ma
-            !call DetermineStrLen(istr, Gen)
+            ! Print out Fitness values
             print *, 'Current best solutions:' , Fi(1:nint(IV%NoNests*IV%Low2Top))
-            open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
-            !open(19,file=TopFolder//'/Fitness_'//istr//'.txt',form='formatted',status='new')
-            write(19,'(1I3)',advance="no") Gen
-            write(19,'(<IV%NoNests>f17.10)') Fi
-write(19,'(<IV%NoNests>f17.10)') Precoutput
-            close(19) 
-            deallocate(istr)
             
-            ! Store moved Nests in Output Analysis File
-            allocate(character(len=3) :: istr)
-            write(istr, '(1f3.1)') IV%Ma
-            open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
-            write(29, *) 'Generation', Gen
-            write(29,'(<IV%NoNests>f17.10)') Nests
-            close(29)
-            deallocate(istr)
+            ! write Nest and Fitness Output into File
+            call writeFitnessandNestoutput()
             
             ! Store Files of Top 5 % fraction of Nests in TopFolder
             if (Fibefore /= Fi(1)) then
@@ -590,9 +561,9 @@ write(19,'(<IV%NoNests>f17.10)') Precoutput
           
             ! free-stream dynamic pressure
             if (IV%AlphaInflowDirection > 90) then
-                xindex = maxloc(RD%Coord(:,2), dim = 1)
+                xindex = maxloc(RD%Coord(:,1), dim = 1)
             else
-                xindex = minloc(RD%Coord(:,2), dim = 1)
+                xindex = minloc(RD%Coord(:,1), dim = 1)
             end if
             qamb = 0.5*rho(xindex)*(Vx(xindex)**2+Vy(xindex)**2)
             pTamb(i - Start + 1) = qamb + pressure(xindex,(i - Start + 1))

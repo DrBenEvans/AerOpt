@@ -928,4 +928,45 @@ contains
         
     end subroutine generateEnSightFileWin
     
+    subroutine writeFitnessandNestoutput()
+    
+        ! Variables
+        implicit none
+        logical :: ex
+    
+        ! Body of writeFitnessandNestoutput
+        allocate(character(len=3) :: istr)
+        write(istr, '(1f3.1)') IV%Ma
+        
+        !call DetermineStrLen(istr, Gen)        
+        !open(19,file=TopFolder//'/Fitness_'//istr//'.txt',form='formatted',status='new')
+        
+        inquire(file=newdir//'/Nests'//istr//'.txt', exist = ex)       
+        if (ex == .true.) then
+            open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append') ! Comment for GUI
+            open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
+        else
+            open(29,file=newdir//'/Nests'//istr//'.txt', form='formatted',status='new')
+            write(29, *) 'Snapshots'
+            write(29,'(<IV%NoSnap>f17.10)') CS%Snapshots
+            open(19,file=newdir//'/Fitness'//istr//'.txt', form='formatted',status='new')                   ! Comment for GUI
+            write(19,*) 'Fitness'
+        end if
+        
+        ! Store moved Nests in Output Analysis File
+        write(29, *) 'Generation', OV%Gen
+        write(29,'(<IV%NoNests>f17.10)') OV%Nests
+        close(29)
+      
+        ! Store Fitness values
+        write(19,'(1I3)',advance="no") OV%Gen
+        write(19,'(<IV%NoNests>f17.10)') OV%Fi       
+        if (IV%objectivefunction == 7) then
+            write(19,'(<IV%NoNests>f17.10)') OV%Precoutput
+        end if
+        close(19)
+        deallocate(istr)
+        
+    end subroutine writeFitnessandNestoutput
+    
 end module ReadData
