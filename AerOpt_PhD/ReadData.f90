@@ -735,17 +735,17 @@ contains
     end subroutine DeleteErrorFiles
     
        
-    subroutine moveTopNestFilesLin(i, NoGen)
+    subroutine moveTopNestFilesLin(i)
 
         ! Variables
         implicit none
-        integer :: i, NoGen
+        integer :: i
         character(len=255) :: Output
         character(len=:), allocatable :: NoGenstr
         
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i)
-        call DetermineStrLen(NoGenstr, NoGen) 
+        call DetermineStrLen(NoGenstr, OV%Gen) 
         open(1, file='Communication', form='formatted',status='unknown')
         write(1, '(A)') 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk"'
         write(1, '(A)') 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
@@ -762,16 +762,16 @@ contains
         
     end subroutine moveTopNestFilesLin
     
-    subroutine moveTopNestFilesWin(i, NoGen)
+    subroutine moveTopNestFilesWin(i)
 
         ! Variables
         implicit none
-        integer :: i, NoGen
+        integer :: i
         character(len=:), allocatable :: NoGenstr
         
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i)
-        call DetermineStrLen(NoGenstr, NoGen)
+        call DetermineStrLen(NoGenstr, OV%Gen)
         open(1, file='Communication.bat', form='formatted',status='unknown')
         write(1, '(A)') 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk"'
         write(1, '(A)') 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.rsd"'
@@ -783,7 +783,7 @@ contains
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
-        call system('Communication.bat')    ! Submits create directory file
+        call system('Communication.bat >nul 2>&1')    ! Submits create directory file
         
     end subroutine moveTopNestFilesWin
     
@@ -791,7 +791,7 @@ contains
 
         ! Variables
         implicit none
-        integer :: i, NoGen
+        integer :: i
         character(len=:), allocatable :: NoGenstr
         
         ! Body of moveTopNestFiles
@@ -818,7 +818,7 @@ contains
 
         ! Variables
         implicit none
-        integer :: i, NoGen
+        integer :: i
         character(len=255) :: Output
         character(len=:), allocatable :: NoGenstr
         
@@ -837,20 +837,18 @@ contains
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
-        call system('Communication.bat')    ! Submits create directory file
+        call system('Communication.bat >nul 2>&1')    ! Submits create directory file
         
     end subroutine copyTopNestFilesWin
     
-    subroutine generateEnSightFileLin(i, NoGen)
+    subroutine generateEnSightFileLin()
     
        ! Variables
         implicit none
-        integer :: i, NoGen
         character(len=:), allocatable :: NoGenstr
     
         ! Body of generateEnSightFile
-        call DetermineStrLen(NoGenstr, NoGen)
-        call DetermineStrLen(istr, i)
+        call DetermineStrLen(NoGenstr, OV%Gen)
         call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.dat '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
         call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
         open(1, file= 'Communication', form='formatted',status='unknown')
@@ -870,15 +868,15 @@ contains
         
     end subroutine generateEnSightFileLin
     
-    subroutine generateEnSightFileLin3D(i, NoGen)
+    subroutine generateEnSightFileLin3D(i)
     
        ! Variables
         implicit none
-        integer :: i, NoGen
+        integer :: i
         character(len=:), allocatable :: NoGenstr
     
         ! Body of generateEnSightFile
-        call DetermineStrLen(NoGenstr, NoGen)
+        call DetermineStrLen(NoGenstr, OV%Gen)
         call DetermineStrLen(istr, i)
         call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.plt')
         call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.unk')
@@ -899,32 +897,33 @@ contains
         
     end subroutine generateEnSightFileLin3D
         
-    subroutine generateEnSightFileWin(i, NoGen)
+    subroutine generateEnSightFileWin()
 ! ALSO 3D 
        ! Variables
         implicit none
-        integer :: i, NoGen
         character(len=:), allocatable :: NoGenstr
     
         ! Body of generateEnSightFile
-        call DetermineStrLen(NoGenstr, NoGen)
-        call DetermineStrLen(istr, i)
-        call system('move '//trim(IV%filepath)//'\'//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\base.plt '//trim(IV%filepath)//'\'//trim(IV%filename)//NoGenstr//'.plt')
-        call system('move '//trim(IV%filepath)//'\'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'\'//trim(IV%filename)//NoGenstr//'.unk')
+        call DetermineStrLen(NoGenstr, OV%Gen)
         open(1, file= 'Communication', form='formatted',status='unknown')
-        write(1,'(A)') trim(IV%filename)//NoGenstr
-        write(1,'(A)') 't'
+        write(1,'(A)') trim(IV%filename)//NoGenstr//'.dat'
+        write(1,'(A)') trim(IV%filename)//NoGenstr//'.resp'
+        write(1,'(A)') 'f'
         write(1,*) IV%Ma
         write(1,*) IV%Tamb
         write(1,*) IV%Pamb
         write(1,'(A)') '1017'
         close(1)
-        call system(trim(IV%filepath)//'\Executables\engen_3D < Communication >nul 2>&1')
-        call system('move *ENSIGHT* '//trim(IV%filepath)//'\'//newdir//'\'//TopFolder)
-        call system('del '//trim(IV%filepath)//'\'//trim(IV%filename)//NoGenstr//'.plt')
-        call system('move '//trim(IV%filepath)//'\'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'\'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk ')
-
-        deallocate(istr)       
+        open(1, file= 'Communication.bat', form='formatted',status='unknown')
+        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.dat "'//trim(IV%filename)//NoGenstr//'.dat"'
+        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk "'//trim(IV%filename)//NoGenstr//'.resp"'
+        write(1,'(A)') 'Executables\engen_2D < Communication >nul 2>&1'
+        write(1,'(A)') 'move *ENSIGHT* '//newdir//'\'//TopFolder
+        write(1,'(A)') 'del '//trim(IV%filename)//NoGenstr//'.dat'
+        write(1,'(A)') 'del '//trim(IV%filename)//NoGenstr//'.resp'
+        close(1)
+        call system('Communication.bat >nul 2>&1')
+        deallocate(NoGenstr)  
         
     end subroutine generateEnSightFileWin
     

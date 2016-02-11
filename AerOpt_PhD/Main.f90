@@ -71,7 +71,7 @@ program AerOpt
     open(29, file=newdir//'/Snapshots'//istr//'.txt', form='formatted',status='unknown')
     deallocate(istr)
     write(29, *) 'Snapshots'   
-    write(29,'(<IV%NoSnap>f17.10)') Snapshots
+    write(29,'(<IV%NoSnap>f17.10)') CS%Snapshots
     close(29)
 
 !!!! IMPLEMENT double-check, wether Dimension of file and Input are compliant OR error check while Reading files
@@ -85,7 +85,7 @@ program AerOpt
     end if
     print *, 'End PreMeshing - All Area Coefficients calculated'
     print *, ''
-    call SubCFD(1, IV%NoSnap, Snapshots, IV%NoSnap)
+    call SubCFD(1, IV%NoSnap, CS%Snapshots, IV%NoSnap)
     call PostSolverCheck(IV%NoSnap, 0)
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !

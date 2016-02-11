@@ -58,13 +58,12 @@ module CFD
         
     end subroutine SubCFD
     
-    subroutine PostSolverCheck(NoFiles, InitConv, Nests_Move, Nests)
+    subroutine PostSolverCheck(NoFiles, InitConv)
     
         ! Variables
         implicit none
         integer :: NoFiles, i, InitConv
-        double precision, dimension(IV%NoNests,IV%DoF), optional :: Nests_Move
-        double precision, dimension(IV%NoNests,maxDoF), optional :: Nests   
+  
         ! Body of PostSolverCheck
         ! ****Wait & Check for FLITE Solver Output**** !
         if (IV%runOnCluster == 'Y') then
@@ -97,7 +96,7 @@ module CFD
         print *, '*************************************'
         print *, ''
         i = 0
-        call CheckforConvergence(i, InitConv, NoFiles, Nests_Move, Nests)
+        call CheckforConvergence(i, InitConv, NoFiles)
         print*, 'All Solutions converged'
         
         ! Delete the Error files to allow sleep check in next generation
@@ -288,7 +287,7 @@ module CFD
         
     end subroutine Sleep
     
-    recursive subroutine CheckforConvergence(Iter, InitConv, NoFiles, Nests_Move, Nests)
+    recursive subroutine CheckforConvergence(Iter, InitConv, NoFiles)
     
         ! Variables
         implicit none
@@ -298,9 +297,7 @@ module CFD
         logical :: Converge
         character(len=200) :: strCommand
         integer, dimension(:), allocatable :: DivNestPos, tempArray
-        double precision, dimension(:), allocatable :: MidPoints       
-        double precision, dimension(IV%NoNests,IV%DoF), optional :: Nests_Move
-        double precision, dimension(IV%NoNests,maxDoF), optional :: Nests
+        double precision, dimension(:), allocatable :: MidPoints
         
         allocate(DivNestPos(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CheckForConvergence "
@@ -320,12 +317,12 @@ module CFD
                     print *, 'File', i, 'failed to converge and will be resimulated'
                     NoConv = NoConv + 1
                     DivNestPos(NoConv) = i
-                    MidPoints = MxDisp(:,1) - (MxDisp(:,1) - MxDisp(:,2))/2.0  ! Midpoint calculation
+                    MidPoints = CS%MxDisp(:,1) - (CS%MxDisp(:,1) - CS%MxDisp(:,2))/2.0  ! Midpoint calculation
                     if (InitConv == 0) then
-                        Snapshots(i,:) = Snapshots(i,:) - ((Snapshots(i,:) - MidPoints)/2.0)   ! Half way between current Nest and Midpoint
+                        CS%Snapshots(i,:) = CS%Snapshots(i,:) - ((CS%Snapshots(i,:) - MidPoints)/2.0)   ! Half way between current Nest and Midpoint
                     else
-                        Nests_Move(i,:) = Nests_Move(i,:) - ((Nests_Move(i,:) - MidPoints)/2.0) ! Half way between current Nest and Midpoint
-                        Nests(i,:) = Nests(i,:) - ((Nests(i,:) - MidPoints)/2.0)
+                        OV%Nests_Move(i,:) = OV%Nests_Move(i,:) - ((OV%Nests_Move(i,:) - MidPoints)/2.0) ! Half way between current Nest and Midpoint
+                        OV%Nests(i,:) = OV%Nests(i,:) - ((OV%Nests(i,:) - MidPoints)/2.0)
                     end if
             end if
             Converge = .true.
@@ -348,9 +345,9 @@ module CFD
             do ii = 1, NoConv
                 
                 if (InitConv == 0) then
-                    call SubCFD(DivNestPos(ii), DivNestPos(ii), Snapshots(DivNestPos(ii),:), 1)
+                    call SubCFD(DivNestPos(ii), DivNestPos(ii), CS%Snapshots(DivNestPos(ii),:), 1)
                 else
-                    call SubCFD(DivNestPos(ii), DivNestPos(ii), Nests(DivNestPos(ii),:), 1)    
+                    call SubCFD(DivNestPos(ii), DivNestPos(ii), OV%Nests(DivNestPos(ii),:), 1)    
                 end if
                 
                 ! Delete the Error files to allow sleep check
@@ -363,11 +360,7 @@ module CFD
             Iter = Iter + 1
             
             if (Iter < 4) then
-                if (InitConv == 0) then
-                    call CheckforConvergence(Iter, InitConv, NoFiles)
-                else
-                    call CheckforConvergence(Iter, InitConv, NoFiles, Nests_Move, Nests)
-                end if
+                call CheckforConvergence(Iter, InitConv, NoFiles)
             end if
             
             if (NoConv /= 0) then

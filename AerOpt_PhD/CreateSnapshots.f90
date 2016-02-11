@@ -2,13 +2,8 @@ module CreateSnapshots
     
         use Toolbox
         use InputData
-        double precision :: rn                                            ! Counts random numbers
-        double precision, dimension(:,:), allocatable :: MxDisp           ! Matrix with min/max Displacements
-        double precision, dimension(:,:), allocatable :: MxDisp_Move      ! Matrix with only moving min/max Displacements
-        integer, dimension(:), allocatable :: cond            ! Identifies zero/non-zero values
-        double precision, dimension(:,:), allocatable :: Snapshots     ! Matrix containing the initial Nests
         
-    contains
+contains
     
     subroutine SubCreateSnapshots()
     ! Objective: Create Nests (Locations of  for Snapshots
@@ -18,22 +13,22 @@ module CreateSnapshots
         integer :: i, j, k
         double precision :: newscore, bestscore  
         double precision, dimension(IV%NoSnap,maxDoF) :: Snaptemp
-        allocate(MxDisp(maxDoF,2),stat=allocateStatus)
+        allocate(CS%MxDisp(maxDoF,2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
-        allocate(cond(maxDoF),stat=allocateStatus)
+        allocate(CS%cond(maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
-        allocate(Snapshots(IV%NoSnap,maxDoF),stat=allocateStatus)
+        allocate(CS%Snapshots(IV%NoSnap,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
         
         ! Initialize min/max Motion Matrix    
-        MxDisp(:,1) = (/IV%xrange(1:IV%NoCN), IV%yrange(1:IV%NoCN), IV%zrange(1:IV%NoCN), IV%angle(1:IV%NoCN)/) ! max
-        MxDisp(:,2) = (/IV%xrange((IV%NoCN+1):2*IV%NoCN), IV%yrange((IV%NoCN+1):2*IV%NoCN), IV%zrange((IV%NoCN+1):2*IV%NoCN), IV%angle((IV%NoCN+1):2*IV%NoCN)/) ! min
+        CS%MxDisp(:,1) = (/IV%xrange(1:IV%NoCN), IV%yrange(1:IV%NoCN), IV%zrange(1:IV%NoCN), IV%angle(1:IV%NoCN)/) ! max
+        CS%MxDisp(:,2) = (/IV%xrange((IV%NoCN+1):2*IV%NoCN), IV%yrange((IV%NoCN+1):2*IV%NoCN), IV%zrange((IV%NoCN+1):2*IV%NoCN), IV%angle((IV%NoCN+1):2*IV%NoCN)/) ! min
          
         ! Identify Degrees of Freedom in the system
-        cond = MxDisp(:,1) /= MxDisp(:,2)         
+        CS%cond = CS%MxDisp(:,1) /= CS%MxDisp(:,2)         
         j = 0
-        do i = 1, size(cond)            
-            if (cond(i) == -1) then
+        do i = 1, size(CS%cond)            
+            if (CS%cond(i) == -1) then
                 j = j + 1
             end if
         end do
@@ -44,31 +39,31 @@ module CreateSnapshots
         IV%DoF = j
         
         !**Reduction of MxDisp to Nonzero Values - (to reduce processing time)**!
-        allocate(MxDisp_Move(IV%DoF,2),stat=allocateStatus)
+        allocate(CS%MxDisp_Move(IV%DoF,2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in CreateSnapshots "
         j = 1
-        do i = 1, size(cond)            
-            if (cond(i) == -1) then
-                MxDisp_Move(j,:) = MxDisp(i,:)
+        do i = 1, size(CS%cond)            
+            if (CS%cond(i) == -1) then
+                CS%MxDisp_Move(j,:) = CS%MxDisp(i,:)
                 j = j + 1
             end if
         end do
 
         ! Execute Latin Hypercube Sampling with movable min/max Displacements
-        call LHS(Snapshots, IV%NoSnap, IV%NoCN)     ! Output: Snapshots - an initial Sampling via LHS        
-        bestscore = score(Snapshots)
+        call LHS(CS%Snapshots, IV%NoSnap, IV%NoCN)     ! Output: Snapshots - an initial Sampling via LHS        
+        bestscore = score(CS%Snapshots)
         do i = 1, 1000
             call LHS(Snaptemp, IV%NoSnap, IV%NoCN)
             
             newscore = score(Snaptemp)
             if (newscore > bestscore) then
-                Snapshots = Snaptemp
+                CS%Snapshots = Snaptemp
                 bestscore = newscore
             end if
         end do
         
         ! Include initial Geometry as Snapshot
-        Snapshots(1,:) = 0.0
+        CS%Snapshots(1,:) = 0.0
 
     end subroutine SubCreateSnapshots
     
@@ -87,8 +82,8 @@ module CreateSnapshots
         Sampling = 0.0
         do j = 1, maxDoF
             
-            max = MxDisp(j,1) - (MxDisp(j,1) - MxDisp(j,2))/(2*NoSampPoints)
-            min = MxDisp(j,2) + (MxDisp(j,1) - MxDisp(j,2))/(2*NoSampPoints)
+            max = CS%MxDisp(j,1) - (CS%MxDisp(j,1) - CS%MxDisp(j,2))/(2*NoSampPoints)
+            min = CS%MxDisp(j,2) + (CS%MxDisp(j,1) - CS%MxDisp(j,2))/(2*NoSampPoints)
             linSamp = linSpacing(max, min, NoSampPoints) ! equal spacing of Design Space/Movement Domain in 1D
             
             call randperm(NoSampPoints, rp) ! generates a vector of random integer values       
