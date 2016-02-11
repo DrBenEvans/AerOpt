@@ -139,7 +139,7 @@ contains
         do ii = 1, IV%NoSnap 
             call getObjectiveFunction(.false., Ftemp, CS%Snapshots(ii,:), NoSnapshot=ii)
             Fi_initial(ii) = Ftemp
- !OV%Precoutput(ii) = Precovery
+ OV%Precoutput(ii) = OV%Precovery
         end do
         deallocate(OV%pressure)
         deallocate(OV%MaLocal)
@@ -173,7 +173,7 @@ contains
         OV%Fi = Fi_initial(1:IV%NoNests)
         OV%Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
         OV%Nests = CS%Snapshots(ind_Fi_initial(1:IV%NoNests),:)
-!OV%Precoutput = OV%Precoutput(ind_Fi_initial(1:IV%NoNests))
+OV%Precoutput = OV%Precoutput(ind_Fi_initial(1:IV%NoNests))
         
         ! Store Files of Top 5 % fraction of Nests in TopFolder - currently just stores best Nest
         !if (nint(IV%NoNests*0.05) > 1) then
@@ -319,17 +319,52 @@ contains
                    
                 end if
                 
-                ! Check if out of bounds             
-                if (IV%constrain == .true.) then                
-                    do k = 1, IV%DoF
-                        if (tempNests_Move(k) > 1) then
-                            tempNests_Move(k) = 1
+                k = 1
+                do while (k /= (IV%NoNests+1))
+                    ! Check if out of bounds             
+                    if (IV%constrain == .true.) then                
+                        do k = 1, IV%DoF
+                            if (tempNests_Move(k) > 1) then
+                                tempNests_Move(k) = 1
+                            end if
+                            if (tempNests_Move(k) < 0) then
+                                tempNests_Move(k) = 0 
+                            end if                   
+                        end do
+                    end if
+                    
+                    ! Check, if Nest already exists
+                    do k = 1, IV%NoNests                  
+                        if (all(tempNests_move == OV%Nests_move(k,:))) then
+                            print*, 'Nest already exists'
+                            open(39,file=newdir//'/NestDoubled.txt',form='formatted',status='unknown',position='append')
+                            write(39, *) 'Generation', OV%Gen, 'replaced'
+                            close(39)
+                            ! Perform Random Walk instead                   
+                            Ac = IV%Aconst/(OV%Gen**2.0)
+                            call random_number(CS%rn)
+                            NoSteps = nint(log(CS%rn)*(-IV%NoLeviSteps))
+                            NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
+                            tempNests_Move = Ac*LevyWalk(NoSteps, IV%DoF) + OV%Nests_Move(ii,:)
+                            EXIT
                         end if
-                        if (tempNests_Move(k) < 0) then
-                            tempNests_Move(k) = 0 
-                        end if                   
                     end do
-                end if
+                    do k = 1, NoTop                  
+                        if (all(tempNests_move == TopNest_move(k,:))) then
+                            print*, 'Nest already exists'
+                            open(39,file=newdir//'/NestDoubled.txt',form='formatted',status='unknown',position='append')
+                            write(39, *) 'Generation', OV%Gen, 'replaced'
+                            close(39)
+                            ! Perform Random Walk instead                   
+                            Ac = IV%Aconst/(OV%Gen**2.0)
+                            call random_number(CS%rn)
+                            NoSteps = nint(log(CS%rn)*(-IV%NoLeviSteps))
+                            NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
+                            tempNests_Move = Ac*LevyWalk(NoSteps, IV%DoF) + OV%Nests_Move(ii,:)
+                            EXIT
+                        end if
+                    end do
+                end do
                 
                 ! Refill tempNests and de-normalize
                 l = 1
@@ -356,7 +391,7 @@ contains
                         OV%Nests_Move(randomNest,:) = tempNests_Move
                         OV%Nests(randomNest,:) = tempNests
                         OV%Fi(randomNest) = Ftemp
-!Precoutput(randomNest) = OV%Precovery
+OV%Precoutput(randomNest) = OV%Precovery
                      end if
                 end if
                 
@@ -400,14 +435,14 @@ contains
                         OV%Nests_Move(randomNest,:) = TopNest_Move(ii,:)
                         OV%Nests(randomNest,:) = TopNest(ii,:)
                         OV%Fi(randomNest) = Ftemp
-!OV%Precoutput(randomNest) = Precovery
+OV%Precoutput(randomNest) = OV%Precovery
                         ind_Fitrack(randomNest) = ii
                     end if
                 end do
 
                 do ii = (NoTop + 1), IV%NoNests
                     call getObjectiveFunction(.false., OV%Fi(ii), NoSnapshot=ii)
-!OV%Precoutput(ii) = Precovery
+OV%Precoutput(ii) = OV%Precovery
                 end do
                 deallocate(OV%pressure)
                 deallocate(OV%MaLocal)
@@ -435,7 +470,7 @@ contains
             ! Re-order Nests for next Generation
             OV%Nests_Move = OV%Nests_Move(ind_Fi,:)
             OV%Nests = OV%Nests(ind_Fi,:)
-!Precoutput = Precoutput(ind_Fi)
+OV%Precoutput = OV%Precoutput(ind_Fi)
             
             ! Print out Fitness values
             print *, 'Current best solutions:' , OV%Fi(1:nint(IV%NoNests*IV%Low2Top))
@@ -514,8 +549,6 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(OV%MaLocal(size(OV%engInNodes, dim = 1), Length),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
-        !allocate(OV%MaLocal2(RD%np, Length),stat=allocateStatus)
-        !if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
         allocate(OV%pTamb(Length),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ExtractPressure "
        
@@ -548,9 +581,8 @@ contains
             OV%pressure(:,(i - Start + 1)) = (IV%gamma - 1.0)*rho*((e - 0.5*(Vx**2 + Vy**2))) ! Non-dimensional  
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) 
             
-            ! Dynamic Pressure non-dimensional
+            ! Local Mach number non-dimensional
             OV%MaLocal(:,(i - Start + 1)) = sqrt(Vx(OV%engInNodes)**2 + Vy(OV%engInNodes)**2)/(sqrt(IV%gamma*OV%pressure(OV%engInNodes,(i - Start + 1))/rho(OV%engInNodes)))
-            !OV%MaLocal2(:,(i - Start + 1)) = sqrt(Vx**2 + Vy**2)/(sqrt(IV%gamma*OV%pressure(:,(i - Start + 1))/rho))
             
             ! free-stream dynamic pressure
             if (IV%AlphaInflowDirection > 90) then
@@ -1743,10 +1775,6 @@ close(29)
         
         ! Total Pressure
         pT = OV%pressure(OV%engInNodes,NoSnapshot)*(1+(IV%gamma-1)*0.5*OV%MaLocal(:,NoSnapshot)**2)**(IV%gamma/(IV%gamma-1))
-        pT2 = OV%pressure(OV%engInNodes,NoSnapshot)*(1+(IV%gamma-1)*0.5*OV%MaLocal2(OV%engInNodes,NoSnapshot)**2)**(IV%gamma/(IV%gamma-1))
-        print *, pT
-        print *, pT2
-        pause
         pTmean = sum(pT(2:(NoEngIN-1))*Area, dim = 1)/sum(Area, dim = 1)
            
         ! Check Pressure Recovery constraint
