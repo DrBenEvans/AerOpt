@@ -13,7 +13,7 @@
         ! Variables
         implicit none
         integer :: ismooth, NoSweeps, NoPmove, NoMove, isweep, intersect, i, NoSweepsinit, counter
-        double precision, dimension(:), allocatable :: ddn_before, ddn_after, nx, ny, sx, sy, x, y, xnew, ynew, xbefore, ybefore, CNxfinal, CNyfinal, CNxsmooth, CNysmooth, beta1, beta2, smoothing, normx, normy
+        double precision, dimension(:), allocatable :: ddn_before, ddn_after, dn_before, dn_after, nx, ny, sx, sy, x, y, xnew, ynew, xbefore, ybefore, CNxfinal, CNyfinal, CNxsmooth, CNysmooth, beta1, beta2, smoothing, normx, normy
         double precision, dimension(maxDoF) :: CNDisp
         double precision :: conv, initialResidual, res, betamean, betamin, magnitude, N2CN
         double precision, dimension(2) :: a
@@ -51,6 +51,10 @@
         allocate(ddn_before(NoPmove),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
         allocate(ddn_after(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(dn_before(NoPmove),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
+        allocate(dn_after(NoPmove),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
         allocate(beta1(NoPmove),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Smoothing "
@@ -96,62 +100,60 @@
         do while (conv > IV%smoothconvergence)            
             
             ! Calculate Second Derivative before       
-            call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
-            
-            ! Move Boundary Nodes (linear)
-            call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
+            call CalcSecondDerivativeInitial(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
             
             ! Calculate edge lengths of each element on left(beta1) and right(beta2) side
             call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
             
+            ! Move Boundary Nodes (linear)
+            call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
+            
             ! Check for badly conditioned elements
             if (betamin*20 < betamean) then
-                
-                ! Identify worst element and modify
-                call findPoint(x, y, NoPmove, betamin, beta1, beta2)
-            
-                ! Move Boundary Nodes to initial position
-                CNxfinal = x(CN_indordered) - CNDisp(1:IV%NoCN)/NoMove
-                CNyfinal = y(CN_indordered) - CNDisp((IV%NoCN+1):(2*IV%NoCN))/NoMove
-                call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
-                
-                ! Re-calculate second derivative after element modification
-                call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
-                
-                ! Move Boundary Mesh back to desired position
-                CNxfinal = x(CN_indordered) + CNDisp(1:IV%NoCN)/NoMove
-                CNyfinal = y(CN_indordered) + CNDisp((IV%NoCN+1):(2*IV%NoCN))/NoMove
-                call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
-                
-                ! Re-calculate edge lengths
-                call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
-                
-            end if
+             
+                !print*, 'small'
+                !! Identify worst element and modify
+                !call findPoint(x, y, NoPmove, betamin, beta1, beta2)
+                !
+                !! Move Boundary Nodes to initial position
+                !CNxfinal = x(CN_indordered) - CNDisp(1:IV%NoCN)/NoMove
+                !CNyfinal = y(CN_indordered) - CNDisp((IV%NoCN+1):(2*IV%NoCN))/NoMove
+                !call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
+                !
+                !! Re-calculate second derivative after element modification
+                !call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+                !    
+                !! Re-calculate edge lengths
+                !call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
+                !
+                !! Move Boundary Mesh back to desired position
+                !CNxfinal = x(CN_indordered) + CNDisp(1:IV%NoCN)/NoMove
+                !CNyfinal = y(CN_indordered) + CNDisp((IV%NoCN+1):(2*IV%NoCN))/NoMove
+                !call quasi1DLinear(x, y, CNxfinal, CNyfinal, NoPmove)
+                    
+            end if            
  
             ! Number of sweeps is pre-calculated and fixed during the smoothing
             ! This is not exact, but accurate enough
-            nosweeps = floor(nosweepsinit*(betamean/betamin)**2)
-            
+            NoSweeps = floor(NoSweepsInit*(betamean/betamin)**2)
+
             do isweep = 1, NoSweeps
                 
                 ! Calculate Second Derivative after
                 ddn_after = 0.0
-                beta1 = 0.0
-                beta2 = 0.0
                 call CalcSecondDerivative(ddn_after, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
-                betamin = minval((/minval(beta1),minval(beta2)/))
                 
                 ! Apply smoothing
                 do ismooth = 1, NoPmove
-                    xnew(ismooth) = x(ismooth) + betamin**2/2.0*smoothing(ismooth)*(ddn_after(ismooth) - ddn_before(ismooth))*nx(ismooth) !*normx(ismooth)
-                    ynew(ismooth) = y(ismooth) + betamin**2/2.0*smoothing(ismooth)*(ddn_after(ismooth) - ddn_before(ismooth))*ny(ismooth) !*normy(ismooth)  
+				    xnew(ismooth) = x(ismooth) + betamin**2/2.0*smoothing(ismooth)*(ddn_after(ismooth) - ddn_before(ismooth))*nx(ismooth) !*normx(ismooth) !-(dn_after(ismooth) - dn_before(ismooth)))*nx(ismooth) 
+                    ynew(ismooth) = y(ismooth) + betamin**2/2.0*smoothing(ismooth)*(ddn_after(ismooth) - ddn_before(ismooth))*ny(ismooth) !*normy(ismooth) !-(dn_after(ismooth) - dn_before(ismooth)))*ny(ismooth) 
                 end do
                 x = xnew
                 y = ynew
             
             end do
-!open(1, file= 'XYCoord.dat', form='formatted', status = 'unknown')
-!do isweep = 1, 715
+!open(1, file= 'XYcoord.dat', form='formatted', status = 'unknown')
+!do isweep = 1, 100
 !    write(1,'(2f22.15)') x(isweep), y(isweep)
 !end do
 !close(1)
@@ -166,7 +168,7 @@
             if (conv /= -4) then
                 conv = log(res/initialResidual)/log(10.0)
             end if
-                
+print *, conv                
             CNxsmooth = x(CN_indordered) 
             CNysmooth = y(CN_indordered)
         end do
@@ -279,8 +281,11 @@
         do while (conv > IV%smoothconvergence)
 
             ! Calculate Second Derivative before       
-            call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+            call CalcSecondDerivativeInitial(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
 
+            ! Calculate edge lengths of each element on left(beta1) and right(beta2) side
+            call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
+            
             ! Pre-Processing of starting Geometry for FDGD
             call PreMeshingBoundary()
             
@@ -291,12 +296,8 @@
             call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1)) 
             x = RD%coord_temp(orderedBoundaryIndex,1)
             y = RD%coord_temp(orderedBoundaryIndex,2)
-            
-            ! Calculate edge lengths of each element on left(beta1) and right(beta2) side
-            call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
     
             ! Check for badly conditioned elements
-!! Do once in PreMeshing?
             if (betamin*20 < betamean) then
                 
                 ! Identify worst element and modify
@@ -314,15 +315,15 @@
                 ! Re-calculate second derivative after element modification
                 call CalcSecondDerivative(ddn_before, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
                 
+                ! Re-calculate edge lengths
+                call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
+                
                 ! Move Boundary Mesh back to desired position
                 call RelocateCN(CNDisp, NoMove, counter)
                 call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1)) 
                 x = RD%coord_temp(orderedBoundaryIndex,1)
                 y = RD%coord_temp(orderedBoundaryIndex,2)
-                
-                ! Re-calculate edge lengths
-                call calcBeta(x, y, NoPmove, betamin, betamean, beta1, beta2)
-                
+                  
             end if
  
             ! Number of sweeps and the individual smoothing is pre-calculated and fixed during the smoothing
@@ -334,10 +335,7 @@
                 
                 ! Calculate Second Derivative after
                 ddn_after = 0.0
-                beta1 = 0.0
-                beta2 = 0.0
                 call CalcSecondDerivative(ddn_after, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
-                betamin = minval((/minval(beta1),minval(beta2)/))
             
                 ! Apply smoothing
                 do ismooth = 1, NoPmove
@@ -350,6 +348,12 @@
             end do
             RD%coord_temp(orderedBoundaryIndex,1) = x
             RD%coord_temp(orderedBoundaryIndex,2) = y
+            
+!open(1, file= 'XYcoord.dat', form='formatted', status = 'unknown')
+!do isweep = 1, 258
+!    write(1,'(2f22.15)') x(isweep), y(isweep)
+!end do
+!close(1)
     
             ! Check for convergence 
             res = sqrt(sum((x(CN_indordered) - CNxsmooth)**2 + (y(CN_indordered) - CNysmooth)**2))
@@ -415,9 +419,7 @@
     
     
     
-    
-    
-    subroutine CalcSecondDerivative(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+    subroutine CalcSecondDerivativeInitial(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
     
         ! Variables
         implicit none
@@ -427,14 +429,14 @@
         double precision, dimension(NoPmove) :: beta1, beta2
         
         if (IV%shapeenclosed == .true.) then
-            call CalcSecondDerivativeclosed(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+            call CalcSecondDerivativeclosedInitial(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
         else
-            call CalcSecondDerivativeopen(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+            call CalcSecondDerivativeopenInitial(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
         end if
     
-    end subroutine CalcSecondDerivative
+    end subroutine CalcSecondDerivativeInitial
     
-    subroutine CalcSecondDerivativeclosed(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+    subroutine CalcSecondDerivativeclosedInitial(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
     
         ! Variables
         implicit none
@@ -490,9 +492,9 @@
         beta1(NoPmove) = dx1
         beta2(NoPmove) = dx2
     
-    end subroutine CalcSecondDerivativeclosed
+    end subroutine CalcSecondDerivativeclosedInitial
     
-    subroutine CalcSecondDerivativeopen(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+    subroutine CalcSecondDerivativeopenInitial(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
     
         ! Variables
         implicit none
@@ -538,6 +540,119 @@
         end do
         beta1(NoPmove) = (x(NoPmove) - x(NoPmove-1))*sx(NoPmove) + (y(NoPmove) - y(NoPmove-1))*sy(NoPmove)
         beta2(NoPmove) = beta1(NoPmove)
+        ddn(NoPmove) = 0
+    
+    end subroutine CalcSecondDerivativeopenInitial
+    
+    subroutine CalcSecondDerivative(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+    
+        ! Variables
+        implicit none
+        integer :: ip, NoPmove, i
+        double precision :: magnitude, dx1, dx2
+        double precision, dimension(:), allocatable :: x, y, ddn, sx, sy, nx, ny
+        double precision, dimension(NoPmove) :: beta1, beta2
+        
+        if (IV%shapeenclosed == .true.) then
+            call CalcSecondDerivativeclosed(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+        else
+            call CalcSecondDerivativeopen(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+        end if
+    
+    end subroutine CalcSecondDerivative
+    
+    subroutine CalcSecondDerivativeclosed(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+    
+        ! Variables
+        implicit none
+        integer :: ip, NoPmove, i
+        double precision :: magnitude, dx1, dx2
+        double precision, dimension(:), allocatable :: x, y, ddn, sx, sy, nx, ny
+        double precision, dimension(NoPmove) :: beta1, beta2
+    
+        ! Body of CalcSecondDerivative                
+        ! ComputeNormal
+        nx(1) = -(y(2)-y(NoPmove))
+        ny(1) = x(2)-x(NoPmove)
+        do ip = 2, NoPmove-1
+            nx(ip) = -(y(ip+1)-y(ip-1))
+            ny(ip) = x(ip+1)-x(ip-1)
+        end do
+        nx(NoPmove) = -(y(1)-y(NoPmove-1))
+        ny(NoPmove) = x(1)-x(NoPmove-1)
+
+        ! Normalize
+        do i = 1, NoPmove
+            magnitude = sqrt(nx(i)**2 + ny(i)**2)
+            nx(i) = nx(i)/magnitude
+            ny(i) = ny(i)/magnitude
+        end do
+            
+        ! Compute the s vectors
+        sx = ny
+        sy = -nx
+             
+        ! Compute Gradient
+        dx1 = beta1(1)
+        dx2 = beta2(1)
+        ddn(1) = 2*(dx1*(x(2)*nx(1) + y(2)*ny(1)) - &
+        (dx1+dx2)*(x(1)*nx(1) + y(1)*ny(1)) + &
+        dx2*(x(NoPmove)*nx(1) + y(NoPmove)*ny(1)))/(dx1*dx2*(dx1 + dx2))
+        do i = 2, NoPmove-1
+            dx1 = beta1(i)
+            dx2 = beta2(i)
+            ddn(i) = 2*(dx1*(x(i+1)*nx(i) + y(i+1)*ny(i)) - &
+            (dx1+dx2)*(x(i)*nx(i) + y(i)*ny(i)) + &
+            dx2*(x(i-1)*nx(i) + y(i-1)*ny(i)))/(dx1*dx2*(dx1 + dx2))  
+        end do
+        dx1 = beta1(NoPmove)
+        dx2 = beta2(NoPmove)
+        ddn(NoPmove) = 2*(dx1*(x(1)*nx(NoPmove) + y(1)*ny(NoPmove)) - &
+        (dx1+dx2)*(x(NoPmove)*nx(NoPmove) + y(NoPmove)*ny(NoPmove)) + &
+        dx2*(x(NoPmove-1)*nx(NoPmove) + y(NoPmove-1)*ny(NoPmove)))/(dx1*dx2*(dx1 + dx2))
+    
+    end subroutine CalcSecondDerivativeclosed
+    
+    subroutine CalcSecondDerivativeopen(ddn, NoPmove, x, y, nx, ny, sx, sy, beta1, beta2)
+    
+        ! Variables
+        implicit none
+        integer :: ip, NoPmove, i
+        double precision :: magnitude, dx1, dx2
+        double precision, dimension(:), allocatable :: x, y, ddn, sx, sy, nx, ny
+        double precision, dimension(NoPmove) :: beta1, beta2
+    
+        ! Body of CalcSecondDerivative                
+        ! ComputeNormal
+        do ip = 2, NoPmove-1
+            nx(ip) = -(y(ip+1)-y(ip-1))
+            ny(ip) = x(ip+1)-x(ip-1)
+        end do
+        nx(1) = nx(2)
+        ny(1) = ny(2)
+        nx(NoPmove) = nx(NoPmove-1)
+        ny(NoPmove) = ny(NoPmove-1)
+
+        ! Normalize
+        do i = 1, NoPmove
+            magnitude = sqrt(nx(i)**2 + ny(i)**2)
+            nx(i) = nx(i)/magnitude
+            ny(i) = ny(i)/magnitude
+        end do
+            
+        ! Compute the s vectors
+        sx = ny
+        sy = -nx
+             
+        ! Compute Gradient
+        ddn(1) = 0
+        do i = 2, NoPmove-1
+            dx1 = beta1(i)
+            dx2 = beta2(i)
+            ddn(i) = 2*(dx1*(x(i+1)*nx(i) + y(i+1)*ny(i)) - &
+            (dx1+dx2)*(x(i)*nx(i) + y(i)*ny(i)) + &
+            dx2*(x(i-1)*nx(i) + y(i-1)*ny(i)))/(dx1*dx2*(dx1 + dx2))  
+        end do
         ddn(NoPmove) = 0
     
     end subroutine CalcSecondDerivativeopen
@@ -933,6 +1048,73 @@
         end do
                     
     end subroutine quasi1DLinearClosed
+    
+    subroutine CalcFirstDerivative(dn, NoPmove, x, y, nx, ny, sx, sy)
+    
+        ! Variables
+        implicit none
+        integer :: ip, NoPmove, i
+        double precision :: magnitude, dx1, dx2
+        double precision, dimension(:), allocatable :: x, y, dn, sx, sy, nx, ny
+        
+        if (IV%shapeenclosed == .true.) then
+            call CalcFirstDerivativeclosed(dn, NoPmove, x, y, nx, ny, sx, sy)
+        else
+            !call CalcFirstDerivativeopen(dn, NoPmove, x, y, nx, ny, sx, sy)
+        end if
+    
+    end subroutine CalcFirstDerivative
+    
+    subroutine CalcFirstDerivativeclosed(dn, NoPmove, x, y, nx, ny, sx, sy)
+    
+        ! Variables
+        implicit none
+        integer :: ip, NoPmove, i
+        double precision :: magnitude, dx1, dx2
+        double precision, dimension(:), allocatable :: x, y, dn, sx, sy, nx, ny
+    
+        ! Body of CalcSecondDerivative                
+        ! ComputeNormal
+        nx(1) = -(y(2)-y(NoPmove))
+        ny(1) = x(2)-x(NoPmove)
+        do ip = 2, NoPmove-1
+            nx(ip) = -(y(ip+1)-y(ip-1))
+            ny(ip) = x(ip+1)-x(ip-1)
+        end do
+        nx(NoPmove) = -(y(1)-y(NoPmove-1))
+        ny(NoPmove) = x(1)-x(NoPmove-1)
+
+        ! Normalize
+        do i = 1, NoPmove
+            magnitude = sqrt(nx(i)**2 + ny(i)**2)
+            nx(i) = nx(i)/magnitude
+            ny(i) = ny(i)/magnitude
+        end do
+            
+        ! Compute the s vectors
+        sx = ny
+        sy = -nx
+             
+        ! Compute Gradient
+        dx1 = (x(1) - x(NoPmove))*sx(1) + (y(1) - y(NoPmove))*sy(1)
+        dx2 = (x(2) - x(1))*sx(1) + (y(2) - y(1))*sy(1)
+        dn(1) = (dx1**2*(x(2)*nx(1) + y(2)*ny(1)) + &
+        (dx2**2-dx1**2)*(x(1)*nx(1) + y(1)*ny(1)) - &
+        dx2**2*(x(NoPmove)*nx(1) + y(NoPmove)*ny(1)))/(dx1*dx2*(dx1 + dx2))
+        do i = 2, NoPmove-1
+            dx1 = (x(i) - x(i-1))*sx(i) + (y(i) - y(i-1))*sy(i)
+            dx2 = (x(i+1) - x(i))*sx(i) + (y(i+1) - y(i))*sy(i)            
+            dn(i) = (dx1**2*(x(i+1)*nx(i) + y(i+1)*ny(i)) + &
+            (dx2**2-dx1**2)*(x(i)*nx(i) + y(i)*ny(i)) - &
+            dx2**2*(x(i-1)*nx(i) + y(i-1)*ny(i)))/(dx1*dx2*(dx1 + dx2))
+        end do
+        dx1 = (x(NoPmove) - x(NoPmove-1))*sx(NoPmove) + (y(NoPmove) - y(NoPmove-1))*sy(NoPmove)
+        dx2 = (x(1) - x(NoPmove))*sx(NoPmove) + (y(1) - y(NoPmove))*sy(NoPmove)
+        dn(NoPmove) = (dx1**2*(x(1)*nx(NoPmove) + y(1)*ny(NoPmove)) + &
+        (dx2**2-dx1**2)*(x(NoPmove)*nx(NoPmove) + y(NoPmove)*ny(NoPmove)) - &
+        dx2**2*(x(NoPmove-1)*nx(NoPmove) + y(NoPmove-1)*ny(NoPmove)))/(dx1*dx2*(dx1 + dx2))          
+    
+    end subroutine CalcFirstDerivativeclosed
     
     subroutine normXY(x, y, normx, normy, CNxfinal, CNyfinal, NoPmove)
     

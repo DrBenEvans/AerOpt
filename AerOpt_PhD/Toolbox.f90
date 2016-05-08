@@ -10,7 +10,6 @@ module Toolbox
         double precision, dimension(:), allocatable :: pTamb                ! total pressure of free-stream flow of each Nest
         double precision, dimension(:,:), allocatable :: pressure           ! Static Pressure at every mesh node for each Nest
         double precision, dimension(:,:), allocatable :: MaLocal            ! Local Mach number at every mesh node for each Nest
-        double precision, dimension(:,:), allocatable :: MaLocal2            ! Local Mach number at every mesh node for each Nest
         double precision, dimension(:), allocatable :: Fi                   ! Vector with all current Fitness values
         double precision, dimension(:), allocatable :: Precoutput           ! Vector with all current total pressure values
         double precision, dimension(:), allocatable :: PolCoeff             ! Polynomial Coefficients for POD RBF interpolation

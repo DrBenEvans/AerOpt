@@ -184,10 +184,10 @@ module CFD
             if (IV%runOnCluster == 'Y') then
                 ! Transfer Files from Windows Machine onto Cluster
                 call transferFilesWin()            
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
                 call Triggerfile()           ! Triggerfile for submission
                 ! Submits Batchfile via Putty
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'putty')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'putty')
             else
                 print *, 'Solving Geometry', i
                 allocate(character(len=200) :: strSystem)
@@ -221,8 +221,8 @@ module CFD
             end if
             
             ! Submits Batchfile
-            call system('chmod a+x ./Communication')
-            call system('./Communication')
+            call system('chmod a+x ./Communication2')
+            call system('./Communication2')
                     
         end if
         deallocate(istr)
@@ -258,18 +258,18 @@ module CFD
                 call CheckSimStatus()
                 ! Submit File
                 if (IV%SystemType == 'W')   then
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'plink')
+                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'plink')
                 else
-                    call system('chmod a+x ./Communication')
-                    call system('./Communication')
+                    call system('chmod a+x ./Communication2')
+                    call system('./Communication2')
                 end if
                 ! Creates File to transfer response from Windows to Linux
                 if (IV%SystemType == 'W')   then
                     call CheckSimStatus2()
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
+                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
                 end if
             
-                open(1, file='check.txt',form='formatted',status='old')
+                open(1, file='check2.txt',form='formatted',status='old')
                 read(1,*) jobcheck
                 close(1)
                 deallocate(istr)
@@ -428,10 +428,10 @@ module CFD
         
         call DeleteErrorFiles(istr)
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
-            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
+            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
         elseif (IV%SystemType /= 'W')  then                
-            call system('chmod a+x ./Communication')
-            call system('./Communication')
+            call system('chmod a+x ./Communication2')
+            call system('./Communication2')
         end if
                 
         deallocate(istr)

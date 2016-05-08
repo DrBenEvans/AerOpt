@@ -4,8 +4,8 @@ module ReadData
     use Toolbox
     type ReadVariablesData
     
-        integer :: ne, np, nbf, nbc, NoParts                                    ! Number of elements, Nodes/Points & boundary faces
-        integer, dimension(:), allocatable :: boundtype, boundpart, MovingParts ! Boundary Information of Mesh: Type, Part of boundary    
+        integer :: ne, np, nbf, nbc                                             ! Number of elements, Nodes/Points & boundary faces
+        integer, dimension(:), allocatable :: boundtype, boundpart              ! Boundary Information of Mesh: Type, Part of boundary    
         integer, dimension(:,:), allocatable :: connec, bound                   ! Connectivity & Boundary Matrix of Fine Mesh    
         double precision, dimension(:,:), allocatable :: coord                  ! Coordinates Matrix of Mesh
         double precision, dimension(:,:), allocatable :: Coord_CN               ! desired Coordinates of the Control Nodes
@@ -44,17 +44,6 @@ contains
             end if
         end do
         
-        ! If only specified parts wish to be moved, include this back into the .dat file!
-        !read(1,'(1I8)') RD%NoParts
-        RD%NoParts = 0 ! Delete to specify parts
-        if (RD%NoParts /= 0) then
-            allocate(RD%MovingParts(RD%NoParts),stat=allocateStatus)
-            if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-            do i = 1, RD%NoParts
-                read(1, *) RD%MovingParts(i)
-            end do
-        end if
-        
         ! Read in Header parameters and allocate arrays
         read(1,*)        
         read(1,*) RD%ne, RD%np, RD%nbf
@@ -85,7 +74,7 @@ contains
             read(1, *) Input
             RD%coord(i,:) = Input(2:3)          
         end do
-        
+
         ! Trash
         if (clean == 4) then
             read(1,*) 
@@ -101,7 +90,8 @@ contains
             RD%bound(i,:) = Input(1:2)
             RD%boundtype(i) = Input(clean)
             ! RD%boundpart
-        end do        
+        end do
+        deallocate(Input)        
         close(1)
     
         allocate(RD%Coord_CN(IV%NoCN,IV%NoDim),stat=allocateStatus)
@@ -182,12 +172,12 @@ contains
         call createDirectories()
         if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine          
             if (IV%RunOnCluster == 'Y') then
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')   ! Submits create directory file
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')   ! Submits create directory file
             end if
-            call system('Communication')    ! Submits create directory file
+            call system('Communication2')    ! Submits create directory file
         else
-            call system('chmod a+x ./Communication')    
-            call system('./Communication')    ! Submits create directory file     
+            call system('chmod a+x ./Communication2')    
+            call system('./Communication2')    ! Submits create directory file     
         end if  
     
     end subroutine CreateFolderStructure
@@ -227,6 +217,63 @@ contains
         deallocate (istr)
     
     end subroutine writeDatFile
+    
+    subroutine readDatFile(ii)
+    
+        ! Variables
+        implicit none
+        integer :: i, ii, NoHeadLines, clean, NoColumns1, NoColumns2
+        character(len=5) :: container
+        double precision, dimension(:), allocatable :: Input
+    
+        ! Body of readDatFile
+        NoColumns1 = 5
+        NoColumns2 = 5
+        clean = 4
+        
+        ! Determine correct String      
+        call DetermineStrLen(istr, ii) 
+        open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
+        read(1,*) NoHeadLines
+        do i = 1, NoHeadLines
+            read(1,*) container
+            if (container == 'clean') then
+                NoColumns1 = IV%NoDim + 2
+                NoColumns2 = IV%NoDim + 1
+                clean = IV%NoDim + 1
+            end if
+        end do
+        deallocate(istr)
+
+        ! Read in Header parameters and allocate arrays
+        read(1,*)        
+        read(1,*)
+        allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+         
+        ! Connectivities
+        allocate(Input(NoColumns1),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        read(1,*) 
+        do i = 1, RD%ne
+            read(1, *) Input
+        end do
+        deallocate(Input)
+         
+        ! Coordinates
+        allocate(Input(NoColumns2),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+
+        read(1,*) 
+        do i = 1, RD%np
+            read(1, *) Input
+            RD%coord_temp(i,:) = Input(2:3)          
+        end do
+
+	 deallocate(Input)
+	 close(1)
+       
+    end subroutine readDatFile
     
     subroutine writepltFile(ii)
     ! Objective: write 3D Mesh file (.plt) as Output
@@ -319,7 +366,7 @@ contains
         character(len=12) :: strRe              ! String for Reynoldsnumber
         character(len=7) :: strAlpha            ! String for Solver inflow direction
         character(len=5) :: strGamma            ! String for Gamma Ratio
-        character(len=5) :: strmaxit            ! String for maximum Iterations
+        character(len=6) :: strmaxit            ! String for maximum Iterations
         character(len=1) :: strturbulencemodel  ! String for Turbulence model
         character(len=255) :: Output
     
@@ -330,7 +377,7 @@ contains
         write( strRe, '(F12.2)' )  IV%Re
         write( strAlpha, '(F7.2)' )  IV%AlphaInflowDirection
         write( strGamma, '(F5.2)' )  IV%gamma
-        write( strmaxit, '(I5)' )  IV%maxit
+        write( strmaxit, '(I6)' )  IV%maxit
         write( strturbulencemodel, '(I1)' )  IV%turbulencemodel
         
         
@@ -552,14 +599,14 @@ contains
         ! Body of generateUnkFile
         do i = 1, IV%NoNests
             call DetermineStrLen(istr, i)
-            open(1, file= 'Communication', form='formatted',status='unknown')
+            open(1, file= 'Communication2', form='formatted',status='unknown')
             write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg'
             write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.res'
             write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'
             write(1,'(A)') 'f'
             write(1,'(A)') 'f'
             close(1)
-            call system(trim(IV%filepath)//'/Executables/makeplot < Communication > /dev/null')
+            call system(trim(IV%filepath)//'/Executables/makeplot < Communication2 > /dev/null')
             call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd')
             call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk')
             deallocate(istr)
@@ -579,9 +626,9 @@ contains
         ! Body of createDirectories
         call getcwd(currentDir)
         if (IV%SystemType == 'W') then
-            open(1, file='Communication.bat', form='formatted',status='unknown')
+            open(1, file='Communication2.bat', form='formatted',status='unknown')
         else
-            open(1, file='Communication', form='formatted',status='unknown')
+            open(1, file='Communication2', form='formatted',status='unknown')
         end if
         write(1,*) 'cd '
         write(1,*) 'cd ..'
@@ -611,7 +658,7 @@ contains
         
         ! Body of createDirectories
         call getcwd(currentDir)
-        open(1, file='Communication', form='formatted',status='unknown')
+        open(1, file='Communication2', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%filepath)//'/'//newdir//'/'//InFolder
@@ -639,7 +686,7 @@ contains
         implicit none
     
         ! Body of TriggerFile
-        open(1, file='Communication', form='formatted',status='unknown')
+        open(1, file='Communication2', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr
@@ -650,7 +697,7 @@ contains
             write(1,*) 'bsub < batchfile'
         end if
         close(1)
-                        
+          
     end subroutine TriggerFile
     
     subroutine TriggerFile2()
@@ -660,7 +707,7 @@ contains
         implicit none
     
         ! Body of TriggerFile
-        open(1, file='Communication', form='formatted',status='unknown')
+        open(1, file='Communication2', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ..'
@@ -677,11 +724,11 @@ contains
         implicit none
     
         ! Body of CheckSimStatus
-        open(1, file='Communication', form='formatted',status='unknown')
+        open(1, file='Communication2', form='formatted',status='unknown')
         write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr      
-        write(1,'(A)') '[ -e '//trim(IV%filename)//istr//'.e* ] && echo 1 > check.txt || echo 0 > check.txt'
+        write(1,'(A)') '[ -e '//trim(IV%filename)//istr//'.e* ] && echo 1 > check2.txt || echo 0 > check2.txt'
         write(1,'(A)') 'cd '//trim(IV%filepath)
-        write(1, '(A)') 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/check.txt check.txt'
+        write(1, '(A)') 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/check2.txt check2.txt'
         close(1)
     
     end subroutine CheckSimStatus
@@ -693,11 +740,11 @@ contains
         implicit none
     
         ! Body of CheckSimStatus
-        open(1, file='Communication', form='formatted',status='unknown')
+        open(1, file='Communication2', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'       
         write(1,*) 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//trim(IV%filename)//istr
-        write(1,*) 'get check.txt'       
+        write(1,*) 'get check2.txt'       
         close(1)
     
     end subroutine CheckSimStatus2
@@ -710,7 +757,7 @@ contains
         integer :: strOut      
     
         ! Body of TransferSolutionOutput
-        open(1, file='Communication', form='formatted',status='unknown')
+        open(1, file='Communication2', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder
@@ -727,7 +774,7 @@ contains
         character(len=*) :: i
     
         ! Body of DeleteErrorFiles
-        open(1, file='Communication', form='formatted',status='unknown')
+        open(1, file='Communication2', form='formatted',status='unknown')
         write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//i//'.e*'
         write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//i//'.e*'
         close(1)
@@ -746,7 +793,7 @@ contains
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i)
         call DetermineStrLen(NoGenstr, OV%Gen) 
-        open(1, file='Communication', form='formatted',status='unknown')
+        open(1, file='Communication2', form='formatted',status='unknown')
         write(1, '(A)') 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk"'
         write(1, '(A)') 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
         if (IV%NoDim == 2) then
@@ -757,8 +804,8 @@ contains
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
-        call system('chmod a+x Communication')
-        call system('./Communication')    ! Submits Move file
+        call system('chmod a+x Communication2')
+        call system('./Communication2')    ! Submits Move file
         
     end subroutine moveTopNestFilesLin
     
@@ -772,7 +819,7 @@ contains
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i)
         call DetermineStrLen(NoGenstr, OV%Gen)
-        open(1, file='Communication.bat', form='formatted',status='unknown')
+        open(1, file='Communication2.bat', form='formatted',status='unknown')
         write(1, '(A)') 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk"'
         write(1, '(A)') 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.rsd"'
         if (IV%NoDim == 2) then
@@ -783,7 +830,7 @@ contains
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
-        call system('Communication.bat >nul 2>&1')    ! Submits create directory file
+        call system('Communication2.bat >nul 2>&1')    ! Submits create directory file
         
     end subroutine moveTopNestFilesWin
     
@@ -798,7 +845,7 @@ contains
         call DetermineStrLen(istr, i-1)
         call DetermineStrLen(NoGenstr, i)
         
-        open(1, file='Communication', form='formatted',status='unknown')        
+        open(1, file='Communication2', form='formatted',status='unknown')        
         write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk"'
         write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
         if (IV%NoDim == 2) then
@@ -809,8 +856,8 @@ contains
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
-        call system('chmod a+x Communication')
-        call system('./Communication')    ! Submits Move file
+        call system('chmod a+x Communication2')
+        call system('./Communication2')    ! Submits Move file
         
     end subroutine copyTopNestFilesLin
     
@@ -826,7 +873,7 @@ contains
         call DetermineStrLen(istr, i-1)
         call DetermineStrLen(NoGenstr, i)
         
-        open(1, file='Communication.bat', form='formatted',status='unknown')        
+        open(1, file='Communication2.bat', form='formatted',status='unknown')        
         write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk"'
         write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.rsd"'
         if (IV%NoDim == 2) then
@@ -837,7 +884,7 @@ contains
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
-        call system('Communication.bat >nul 2>&1')    ! Submits create directory file
+        call system('Communication2.bat >nul 2>&1')    ! Submits create directory file
         
     end subroutine copyTopNestFilesWin
     
@@ -851,7 +898,7 @@ contains
         call DetermineStrLen(NoGenstr, OV%Gen)
         call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.dat '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
         call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
-        open(1, file= 'Communication', form='formatted',status='unknown')
+        open(1, file= 'Communication2', form='formatted',status='unknown')
         write(1,'(A)') trim(IV%filename)//NoGenstr
         write(1,'(A)') trim(IV%filename)//NoGenstr
         write(1,'(A)') 'f'
@@ -860,11 +907,11 @@ contains
         write(1,*) IV%Pamb
         write(1,'(A)') '1017'
         close(1)
-        call system(trim(IV%filepath)//'/Executables/engen_2D < Communication > /dev/null')
+        call system(trim(IV%filepath)//'/Executables/engen_2D < Communication2 > /dev/null')
         call system('mv *ENSIGHT* '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder)
         call system('rm '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
         call system('rm '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
-        deallocate(istr)       
+        deallocate(NoGenstr)       
         
     end subroutine generateEnSightFileLin
     
@@ -880,7 +927,7 @@ contains
         call DetermineStrLen(istr, i)
         call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.plt')
         call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.unk')
-        open(1, file= 'Communication', form='formatted',status='unknown')
+        open(1, file= 'Communication2', form='formatted',status='unknown')
         write(1,'(A)') trim(IV%filename)//NoGenstr
   ! Always hybrid?
         write(1,'(A)') 't'
@@ -889,11 +936,11 @@ contains
         write(1,*) IV%Pamb
         write(1,'(A)') '1017'
         close(1)
-        call system(trim(IV%filepath)//'/Executables/engen_3D < Communication > /dev/null')
+        call system(trim(IV%filepath)//'/Executables/engen_3D < Communication2 > /dev/null')
         call system('mv *ENSIGHT* '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder)
         call system('rm '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.plt')
         call system('mv '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk ')
-        deallocate(istr)       
+        deallocate(NoGenstr)       
         
     end subroutine generateEnSightFileLin3D
         
@@ -905,7 +952,7 @@ contains
     
         ! Body of generateEnSightFile
         call DetermineStrLen(NoGenstr, OV%Gen)
-        open(1, file= 'Communication', form='formatted',status='unknown')
+        open(1, file= 'Communication2', form='formatted',status='unknown')
         write(1,'(A)') trim(IV%filename)//NoGenstr//'.dat'
         write(1,'(A)') trim(IV%filename)//NoGenstr//'.resp'
         write(1,'(A)') 'f'
@@ -914,15 +961,15 @@ contains
         write(1,*) IV%Pamb
         write(1,'(A)') '1017'
         close(1)
-        open(1, file= 'Communication.bat', form='formatted',status='unknown')
+        open(1, file= 'Communication2.bat', form='formatted',status='unknown')
         write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.dat "'//trim(IV%filename)//NoGenstr//'.dat"'
         write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk "'//trim(IV%filename)//NoGenstr//'.resp"'
-        write(1,'(A)') 'Executables\engen_2D < Communication >nul 2>&1'
+        write(1,'(A)') 'Executables\engen_2D < Communication2 >nul 2>&1'
         write(1,'(A)') 'move *ENSIGHT* '//newdir//'\'//TopFolder
         write(1,'(A)') 'del '//trim(IV%filename)//NoGenstr//'.dat'
         write(1,'(A)') 'del '//trim(IV%filename)//NoGenstr//'.resp'
         close(1)
-        call system('Communication.bat >nul 2>&1')
+        call system('Communication2.bat >nul 2>&1')
         deallocate(NoGenstr)  
         
     end subroutine generateEnSightFileWin

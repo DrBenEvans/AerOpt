@@ -65,7 +65,6 @@ program AerOpt
     print *, 'Start LHS Sampling - Create Initial Nests'
     call SubCreateSnapshots()    
     ! Output: Initial Nests - Sampling Points for Snapshots
-
     allocate(character(len=3) :: istr)
     write(istr, '(1f3.1)') IV%Ma
     open(29, file=newdir//'/Snapshots'//istr//'.txt', form='formatted',status='unknown')

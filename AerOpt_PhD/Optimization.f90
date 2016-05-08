@@ -64,7 +64,7 @@ contains
         alpha = 1.0
         beta = 0.0
         OV%Gen = 1
-        
+       
         ! Specific Parameters required for Top Nest monitoring
         allocate(TopNest(NoTop,maxDoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
@@ -136,7 +136,7 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
          
         ! Determine Objective Function
-        do ii = 1, IV%NoSnap 
+        do ii = 1, IV%NoSnap
             call getObjectiveFunction(.false., Ftemp, CS%Snapshots(ii,:), NoSnapshot=ii)
             Fi_initial(ii) = Ftemp
  OV%Precoutput(ii) = OV%Precovery
@@ -145,7 +145,7 @@ contains
         deallocate(OV%MaLocal)
         deallocate(OV%pTamb)
         ! Output: Distortion of all Snapshots as the Fitness (Fi)
-         
+       
         allocate(character(len=3) :: istr)
         write(istr, '(1f3.1)') IV%Ma
         open(19,file=newdir//'/Fitness_0.txt', form='formatted',status='unknown')
@@ -157,7 +157,7 @@ contains
         end if
         close(19)
         deallocate(istr)
-        
+      
         ! Pass on Top Snapshot parameters to Nests
         ind_Fi_initial = (/ (i, i=1,IV%NoSnap) /)
         call QSort(Fi_initial,size(Fi_initial), 'y', ind_Fi_initial) ! Result in Ascending order
@@ -201,7 +201,7 @@ OV%Precoutput = OV%Precoutput(ind_Fi_initial(1:IV%NoNests))
         
         ! Write Output File for Analysis including Initial and all moved Nests of each Generation
         call writeFitnessandNestoutput()
-       
+      
         !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
         do G = 2, IV%NoG
         OV%Gen = G
@@ -335,22 +335,7 @@ OV%Precoutput = OV%Precoutput(ind_Fi_initial(1:IV%NoNests))
                     
                     ! Check, if Nest already exists
                     do k = 1, IV%NoNests                  
-                        if (all(tempNests_move == OV%Nests_move(k,:))) then
-                            print*, 'Nest already exists'
-                            open(39,file=newdir//'/NestDoubled.txt',form='formatted',status='unknown',position='append')
-                            write(39, *) 'Generation', OV%Gen, 'replaced'
-                            close(39)
-                            ! Perform Random Walk instead                   
-                            Ac = IV%Aconst/(OV%Gen**2.0)
-                            call random_number(CS%rn)
-                            NoSteps = nint(log(CS%rn)*(-IV%NoLeviSteps))
-                            NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
-                            tempNests_Move = Ac*LevyWalk(NoSteps, IV%DoF) + OV%Nests_Move(ii,:)
-                            EXIT
-                        end if
-                    end do
-                    do k = 1, NoTop                  
-                        if (all(tempNests_move == TopNest_move(k,:))) then
+                        if (all(tempNests_move == OV%Nests_move(k,:)) .or. all(tempNests_move == TopNest_move(nint(k*(1-IV%Low2Top)),:))) then
                             print*, 'Nest already exists'
                             open(39,file=newdir//'/NestDoubled.txt',form='formatted',status='unknown',position='append')
                             write(39, *) 'Generation', OV%Gen, 'replaced'
@@ -584,13 +569,15 @@ OV%Precoutput = OV%Precoutput(ind_Fi)
             ! Local Mach number non-dimensional
             OV%MaLocal(:,(i - Start + 1)) = sqrt(Vx(OV%engInNodes)**2 + Vy(OV%engInNodes)**2)/(sqrt(IV%gamma*OV%pressure(OV%engInNodes,(i - Start + 1))/rho(OV%engInNodes)))
             
+            
+! ambient pressure calculated based on Reynolds number and Ma and input Temperature            
             ! free-stream dynamic pressure
             if (IV%AlphaInflowDirection > 90) then
                 xindex = maxloc(RD%Coord(:,1), dim = 1)
             else
                 xindex = minloc(RD%Coord(:,1), dim = 1)
             end if
-            OV%pTamb(i - Start + 1) = OV%pressure(xindex,(i - Start + 1))*(1+(IV%gamma-1)*0.5*IV%Ma**2)**(IV%gamma/(IV%gamma-1))
+            OV%pTamb(i - Start + 1) = OV%pressure(xindex,(i - Start + 1))*(1.0+(IV%gamma-1.0)*0.5*IV%Ma**2)**(IV%gamma/(IV%gamma-1.0))
              
             close(11)
             deallocate(istr)
@@ -745,14 +732,16 @@ close(29)
         ! Variables
         implicit none
         integer :: NoEngIN, NoSnapshot, j
-        double precision, dimension(:), allocatable :: PlaneX, PlaneY, dPress, h, Area_trap, Pmid_x, Pmid_y, Area, Press_mid
-        double precision :: Press_ave, L, Distortion
+        double precision, dimension(:), allocatable :: PlaneX, PlaneY, dP, h, Area_trap, Pmid_x, Pmid_y, Area, pT
+        double precision :: Distortion, pTmean
  
+        allocate(dP(size(OV%engInNodes)),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
+        allocate(pT(size(OV%engInNodes)),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
         allocate(PlaneX(size(OV%engInNodes)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
         allocate(PlaneY(size(OV%engInNodes)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
-        allocate(dPress(size(OV%engInNodes)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
         allocate(h(size(OV%engInNodes)-1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
@@ -762,57 +751,47 @@ close(29)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
         allocate(Pmid_y(size(OV%engInNodes)-1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
-        allocate(Press_mid(size(OV%engInNodes)-2),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
         allocate(Area(size(OV%engInNodes)-2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
      
-        ! Body of getDistortion
+        ! Body of getDistortionandPressureRecovery             
         NoEngIN = size(OV%engInNodes)
             
         ! Output: engInNodes
         PlaneX = RD%coord(OV%engInNodes,1)
         PlaneY = RD%coord(OV%engInNodes,2)
         
-        !!*** Calculate coordinates of midpoints and afterwards the Area between them ***!!
-                 
-        ! Assign Right boundary nodes as First Midpoint to act as boundaries
-        !Pmid_x(1) = PlaneX(1)
-        !Pmid_y(1) = PlaneY(1)
-        ! Assign Right boundary nodes as Last Midpoint to act as boundaries
-        !Pmid_x(NoEngIN-1) = PlaneX(NoEngIN)
-        !Pmid_y(NoEngIN-1) = PlaneY(NoEngIN)                    
+        !!*** Calculate coordinates of midpoints and afterwards the Area between them for average weighter pressure calculation ***!!
+                                    
         ! Midpoint and Area Calculation
         do j = 1, (NoEngIN - 1)                       
             Pmid_x(j) = (PlaneX(j) + PlaneX(j+1))/2.0
             Pmid_y(j) = (PlaneY(j) + PlaneY(j+1))/2.0
-        end do      
+        end do     
             
         do j = 1, (NoEngIN - 2)
             Area(j) = sqrt((Pmid_x(j) - Pmid_x(j+1))**2 + (Pmid_y(j) - Pmid_y(j+1))**2)
-        end do
+        end do  
         
-        ! Area Weighted Average Pressure (calculated based on the Areas)
-        Press_mid = OV%pressure(OV%engInNodes(2:(NoEngIN-1)),NoSnapshot) ! Extract Pressure of middle engine Inlet Nodes
-        Press_ave = sum(Press_mid*Area, dim = 1)/sum(Area, dim = 1)  
+        ! Total Pressure
+        pT = OV%pressure(OV%engInNodes,NoSnapshot)*(1+(IV%gamma-1)*0.5*OV%MaLocal(:,NoSnapshot)**2)**(IV%gamma/(IV%gamma-1))
+        
+        ! Calculate Total Area Weighted Average Pressure
+        pTmean = sum(pT(2:(NoEngIN-1))*Area, dim = 1)/sum(Area, dim = 1)
+            
         ! Calculate Pressure Deviation
-        ! print *, pressure(engInNodes,i)
-        do j = 1, (NoEngIN)
-            dPress(j) = abs(OV%pressure(OV%engInNodes(j),NoSnapshot) - Press_ave)            
-        end do
-                 
+        dP = abs(pT - pTmean)           
+            
         ! Determine Length and Height of Intercepting Plane
-        L = 0
         do j = 1, (NoEngIN-1)
             h(j) = DistP2P(2, PlaneX(j), PlaneX(j+1), PlaneY(j), PlaneY(j+1))
-            L = L + h(j)
         end do
-              
+            
         ! Apply Trapezoidal Rule to numerically integrate the Distortion
-        Area_trap = h*(dPress(1:(NoEngIN-1)) + dPress(2:NoEngIN))/2.0
-        Distortion = sum(Area_trap, dim = 1)/(Press_ave*L)
+        Area_trap = h*(dP(1:(NoEngIN-1)) + dP(2:NoEngIN))/2.0
+        Distortion = sum(Area_trap, dim = 1)/(pTmean*sum(h, dim = 1))
         Distortion = Distortion*(-1) ! To adapt to maximization Problem
-        ! Output: Distortion
+        ! Output: Distortion constrained by a pressure recovery cap
   
     end subroutine getDistortion
         
@@ -1389,6 +1368,10 @@ close(29)
                 call getzeroLift(Fi, NoSnapshot)
             elseif (IV%ObjectiveFunction == 7) then
                 call getDistortionandPressureRecovery(Fi, NoSnapshot)
+            elseif (IV%ObjectiveFunction == 8) then
+                call getPressureDistribution(Fi, NoSnapshot)
+            elseif (IV%ObjectiveFunction == 9) then
+                call getL1AreaError(Fi, NoSnapshot)
             end if
         end if
     
@@ -1730,8 +1713,8 @@ close(29)
         ! Variables
         implicit none
         integer :: NoEngIN, NoSnapshot, j
-        double precision, dimension(:), allocatable :: PlaneX, PlaneY, dP, h, Area_trap, Pmid_x, Pmid_y, Area, pT, pT2
-        double precision :: Pmean, Distortion, pTmean
+        double precision, dimension(:), allocatable :: PlaneX, PlaneY, dP, h, Area_trap, Pmid_x, Pmid_y, Area, pT
+        double precision :: Distortion, pTmean
  
         allocate(PlaneX(size(OV%engInNodes)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
@@ -1750,8 +1733,6 @@ close(29)
         allocate(Area(size(OV%engInNodes)-2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
         allocate(pT(size(OV%engInNodes)),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
-        allocate(pT2(size(OV%engInNodes)),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortion "
      
         ! Body of getDistortionandPressureRecovery             
@@ -1775,16 +1756,15 @@ close(29)
         
         ! Total Pressure
         pT = OV%pressure(OV%engInNodes,NoSnapshot)*(1+(IV%gamma-1)*0.5*OV%MaLocal(:,NoSnapshot)**2)**(IV%gamma/(IV%gamma-1))
+        
+        ! Calculate Total Area Weighted Average Pressure
         pTmean = sum(pT(2:(NoEngIN-1))*Area, dim = 1)/sum(Area, dim = 1)
            
         ! Check Pressure Recovery constraint
         OV%Precovery = (pTmean/OV%pTamb(NoSnapshot))
-        
-        ! Calculate Area Weighted Average Pressure6
-        Pmean = sum(pT(2:(NoEngIN-1))*Area, dim = 1)/sum(Area, dim = 1)
             
         ! Calculate Pressure Deviation
-        dP = abs(pT - Pmean)           
+        dP = abs(pT - pTmean)           
             
         ! Determine Length and Height of Intercepting Plane
         do j = 1, (NoEngIN-1)
@@ -1793,13 +1773,427 @@ close(29)
             
         ! Apply Trapezoidal Rule to numerically integrate the Distortion
         Area_trap = h*(dP(1:(NoEngIN-1)) + dP(2:NoEngIN))/2.0
-        Distortion = sum(Area_trap, dim = 1)/(Pmean*sum(h, dim = 1))
+        Distortion = sum(Area_trap, dim = 1)/(pTmean*sum(h, dim = 1))
         Distortion = Distortion*(-1) ! To adapt to maximization Problem
         ! Output: Distortion constrained by a pressure recovery cap
             
         Distortion = Distortion + (OV%Precovery-1)
         
     end subroutine getDistortionandPressureRecovery
+    
+    subroutine getL1AreaError(L1_Error, NoSnapshot)
+    
+        ! Variables
+        implicit none
+        integer :: i, j, k, nbp_target, maxbp, NoSnapshot
+        logical :: ex
+        double precision :: A, B, C, Atarget, Btarget, Ctarget, detAB, detCB, detAC, xtemp, ytemp, integral, integral_target, L1_Error
+        double precision, dimension(:), allocatable :: x, y, ptarget, xtarget, ytarget, xintersect, yintersect, xintersect2, yintersect2
+        integer, dimension(:), allocatable :: ind, ind_target, indices, indices_target, order, marker
+    
+        ! Body of getL1AreaError
+        
+        ! Read in Target Reference Data
+        inquire(file=DataFolder//'/Geom_target.txt', exist = ex)
+        if (ex == .true.) then
+            open(29,file=DataFolder//'/Geom_trget.txt',form='formatted',status='old')
+        else
+            STOP "The file 'Geom_target' does not exist. Please generate!"
+        end if
+        read(29,*) nbp_target
+        allocate(ind_target(nbp_target),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(xtarget(nbp_target),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(ytarget(nbp_target),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        do i = 1, nbp_target
+            read(29,*) xtarget(i), ytarget(i)
+        end do
+        close(29)
+        
+        ! Allocate Arrays
+        allocate(ind(nbp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(x(nbp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(y(nbp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        
+        ! Extract coordinates
+        call readDatFile(NoSnapshot)
+        x = RD%coord_temp(orderedBoundaryIndex,1)
+        y = RD%coord_temp(orderedBoundaryIndex,2)
+        deallocate(RD%coord_temp)
+        
+        if (nbp > nbp_target) then
+            maxbp = nbp
+        else
+            maxbp = nbp_target
+        end if
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(xintersect(maxbp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+        allocate(yintersect(maxbp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+        
+        ! Identify intersections between target and current boundary
+        k = 0
+        do j = 1, nbp-1
+            do i = 1, nbp_target-1
+                
+                ! Calculate intersection point
+                A = y(j+1) - y(j)
+                B = x(j) - x(j+1)
+                C = A*x(j) + B*y(j)
+                
+                Atarget = ytarget(i+1) - ytarget(i)
+                Btarget = xtarget(i) - xtarget(i+1)
+                Ctarget = Atarget*xtarget(i) + Btarget*ytarget(i)
+                
+                detAB = A*Btarget - Atarget*B
+                detCB = C*Btarget - Ctarget*B
+                detAC = A*Ctarget - Atarget*C
+                if (abs(detAB) < abs(10e-12)) then
+                    ! Parallel
+                    xtemp = -1000
+                    ytemp = -1000
+                else
+                    ! Non-parallel
+                    xtemp = detCB/detAB
+                    ytemp = detAC/detAB
+                end if
+                
+                ! Check, if intersection point lays on the line segment considered 
+                if ((xtemp - min(x(j),x(j+1))) > -10e-12 .and. (xtemp - max(x(j),x(j+1))) < 10e-12 .and. (ytemp - min(y(j),y(j+1))) > -10e-12  .and. (ytemp - max(y(j),y(j+1))) < 10e-12)  then
+                    if ((xtemp - min(xtarget(i),xtarget(i+1))) > -10e-12 .and. (xtemp - max(xtarget(i),xtarget(i+1))) < 10e-12  .and. (ytemp - min(ytarget(i),ytarget(i+1))) > -10e-12  .and. (ytemp - max(ytarget(i),ytarget(i+1))) < 10e-12 )  then
+                        k = k + 1
+                        ind_target(k) = i
+                        ind(k) = j
+                        xintersect(k) = xtemp
+                        yintersect(k) = ytemp
+                    end if
+                end if
+            end do
+        end do
+        
+        ! Identify doubled points
+        allocate(marker(k),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        marker = 0
+        j = k
+        do i = 2, j
+            if (xintersect(i) == xintersect(i-1) .and. yintersect(i) == yintersect(i-1)) then
+                marker(i) = 1
+                k = k - 1
+            end if
+        end do
+        
+        ! Array allocation with new array size j
+        allocate(xintersect2(k),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "             
+        allocate(yintersect2(k),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+        allocate(indices(k),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+        allocate(indices_target(k),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+        
+        ! Exclude all points identified to be existing twice
+        k = 0
+        do i = 1, j           
+            if (marker(i) == 0) then
+                k = k + 1
+                xintersect2(k) = xintersect(i)
+                yintersect2(k) = yintersect(i)
+                indices(k) = ind(i)
+                indices_target(k) = ind_target(i)
+            end if
+        end do
+        
+        ! Hand over of points to previous array name
+        deallocate(xintersect)
+        allocate(xintersect(k),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+        xintersect = xintersect2
+        deallocate(xintersect2)
+        deallocate(yintersect)
+        allocate(yintersect(k),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+        yintersect = yintersect2
+        deallocate(yintersect2)
+        deallocate(ind)
+        deallocate(ind_target)
+        
+        ! Integrate over both boundaries using trapezoidal rule
+        integral = 0
+        integral_target = 0
+        L1_error = 0
+        do i = 1, k-1
+            
+            integral = integral + 0.5*((x(indices(i)+1) - xintersect(i))*(yintersect(i) + y(indices(i)+1)))
+            do j = indices(i)+1, indices(i+1)-1
+                integral = integral + 0.5*((x(j+1) - x(j))*(y(j+1) + y(j)))
+            end do
+            integral = integral + 0.5*((xintersect(i+1) - x(indices(i+1)))*(yintersect(i+1) + y(indices(i+1))))
+            
+            integral_target = integral_target + 0.5*((xtarget(indices_target(i)+1) - xintersect(i))*(yintersect(i) + ytarget(indices_target(i)+1)))
+            do j = indices_target(i)+1, indices_target(i+1)-1 
+                integral_target = integral_target + 0.5*((xtarget(j+1) - xtarget(j))*(ytarget(j+1) + ytarget(j)))
+            end do
+            integral_target = integral_target + 0.5*((xintersect(i+1) - xtarget(indices_target(i+1)))*(yintersect(i+1) + ytarget(indices_target(i+1))))
+            
+            ! L1 Absolute Error norm (root mean square)
+            L1_error = L1_error + abs(integral - integral_target)
+            integral = 0
+            integral_target = 0
+            
+        end do
+       
+        integral = integral + 0.5*((x(indices(k)+1) - xintersect(k))*(yintersect(k) + y(indices(k)+1)))
+        do j = indices(k)+1, nbp-1 
+            integral = integral + 0.5*((x(j+1) - x(j))*(y(j+1) + y(j)))
+        end do
+        integral = integral + 0.5*((x(1) - x(nbp))*(y(1) + y(nbp)))
+        do j = 1, indices(1)-1
+            integral = integral + 0.5*((x(j+1) - x(j))*(y(j+1) + y(j)))
+        end do
+        integral = integral + 0.5*((xintersect(1) - x(indices(1)))*(yintersect(1) + y(indices(1))))
+            
+        integral_target = integral_target + 0.5*((xtarget(indices_target(k)+1) - xintersect(k))*(yintersect(k) + ytarget(indices_target(k)+1)))
+        do j = indices_target(k)+1, nbp_target-1 
+            integral_target = integral_target + 0.5*((xtarget(j+1) - xtarget(j))*(ytarget(j+1) + ytarget(j)))
+        end do
+        integral_target = integral_target + 0.5*((xtarget(1) - xtarget(nbp_target))*(ytarget(1) + ytarget(nbp_target)))
+        do j = 1, indices_target(1)-1
+            integral_target = integral_target + 0.5*((xtarget(j+1) - xtarget(j))*(ytarget(j+1) + ytarget(j)))
+        end do
+        integral_target = integral_target + 0.5*((xintersect(1) - xtarget(indices_target(1)))*(yintersect(1) + ytarget(indices_target(1))))
+        
+        ! L1 Absolute Error norm
+        L1_error = L1_error + abs(integral - integral_target)
+    
+    end subroutine getL1AreaError
+    
+    subroutine getPressureDistribution(L1_error, NoSnapshot)
+        
+        ! Variables
+        implicit none
+        integer :: i, j, k, nbp_target, maxbp, NoSnapshot, nibp
+        logical :: ex
+        double precision :: A, B, C, Atarget, Btarget, Ctarget, detAB, detCB, detAC, xtemp, ytemp, integral, integral_target, L1_Error, p0
+        double precision, dimension(:), allocatable :: x, y, ptarget, xtarget, Cptarget, xintersect, yintersect, xintersect2, yintersect2
+        integer, dimension(:), allocatable :: ind, ind_target, indices, indices_target, order, marker
+    
+        ! Body of getPressureDistribution
+        nibp = size(InnerBound)
+
+        ! Read in Target Reference Data         
+        inquire(file=DataFolder//'/Cp_target.txt', exist = ex)
+        if (ex == .true.) then
+            open(29,file=DataFolder//'/Cp_target.txt',form='formatted',status='old')
+        else
+            STOP "The file 'Cp_target' does not exist. Please generate!"
+        end if
+
+        read(29,*) nbp_target
+        allocate(ind_target(nbp_target),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(xtarget(nbp_target),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(Cptarget(nbp_target),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        do i = 1, nbp_target
+            read(29,*) xtarget(i), Cptarget(i)
+        end do
+        close(29)
+       
+        ! Allocate Arrays
+        allocate(ind(nibp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(x(nibp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(y(nibp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+
+        ! Extract x coordinate
+        call readDatFile(NoSnapshot)
+        x = RD%coord_temp(orderedBoundaryIndex,1)
+        deallocate(RD%coord_temp)
+        
+        ! Calculate y(pressure coefficient)
+        p0 = 1.344037930148188 ! Soft code later, this is specific for Ma = 0.729, Re = 6.5e7, T = 255.658 and l = 1 feet
+        y = (OV%pressure(orderedBoundaryIndex, NoSnapshot)/p0 - 1)/(0.5*IV%gamma*IV%Ma**2)
+          
+        if (nibp > nbp_target) then
+            maxbp = nibp
+        else
+            maxbp = nbp_target
+        end if
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(xintersect(maxbp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+        allocate(yintersect(maxbp),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+        
+        ! Identify intersections between target and current boundary
+        k = 0
+        do j = 1, nibp-1
+            do i = 1, nbp_target-1
+                
+                ! Calculate intersection point
+                A = y(j+1) - y(j)
+                B = x(j) - x(j+1)
+                C = A*x(j) + B*y(j)
+                
+                Atarget = Cptarget(i+1) - Cptarget(i)
+                Btarget = xtarget(i) - xtarget(i+1)
+                Ctarget = Atarget*xtarget(i) + Btarget*Cptarget(i)
+                
+                detAB = A*Btarget - Atarget*B
+                detCB = C*Btarget - Ctarget*B
+                detAC = A*Ctarget - Atarget*C
+                if (abs(detAB) < abs(10e-12)) then
+                    ! Parallel
+                    xtemp = -1000
+                    ytemp = -1000
+                else
+                    ! Non-parallel
+                    xtemp = detCB/detAB
+                    ytemp = detAC/detAB
+                end if
+                
+                ! Check, if intersection point lays on the line segment considered 
+                if ((xtemp - min(x(j),x(j+1))) > -10e-12 .and. (xtemp - max(x(j),x(j+1))) < 10e-12 .and. (ytemp - min(y(j),y(j+1))) > -10e-12  .and. (ytemp - max(y(j),y(j+1))) < 10e-12)  then
+                    if ((xtemp - min(xtarget(i),xtarget(i+1))) > -10e-12 .and. (xtemp - max(xtarget(i),xtarget(i+1))) < 10e-12  .and. (ytemp - min(Cptarget(i),Cptarget(i+1))) > -10e-12  .and. (ytemp - max(Cptarget(i),Cptarget(i+1))) < 10e-12 )  then
+                        k = k + 1
+                        ind_target(k) = i
+                        ind(k) = j
+                        xintersect(k) = xtemp
+                        yintersect(k) = ytemp
+                    end if
+                end if
+            end do
+        end do
+        
+        if (k == 0) then
+            
+            ! Integrate over both boundaries using trapezoidal rule
+            integral = 0
+            integral_target = 0
+            L1_error = 0
+            
+            do j = 1, nibp-1 
+                integral = integral + 0.5*((x(j+1) - x(j))*(y(j+1) + y(j)))
+            end do
+            integral = integral + 0.5*((x(1) - x(nbp))*(y(1) + y(nbp)))
+            do j = 1, nbp_target-1 
+                integral_target = integral_target + 0.5*((xtarget(j+1) - xtarget(j))*(Cptarget(j+1) + Cptarget(j)))
+            end do
+            integral_target = integral_target + 0.5*((xtarget(1) - xtarget(nbp_target))*(Cptarget(1) + Cptarget(nbp_target)))
+            
+        else
+           
+            ! Identify doubled points
+            allocate(marker(k),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+            marker = 0
+            j = k
+            do i = 2, j
+                if (xintersect(i) == xintersect(i-1) .and. yintersect(i) == yintersect(i-1)) then
+                    marker(i) = 1
+                    k = k - 1
+                end if
+            end do
+        
+            ! Array allocation with new array size j
+            allocate(xintersect2(k),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "             
+            allocate(yintersect2(k),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+            allocate(indices(k),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+            allocate(indices_target(k),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+        
+            ! Exclude all points identified to be existing twice
+            k = 0
+            do i = 1, j           
+                if (marker(i) == 0) then
+                    k = k + 1
+                    xintersect2(k) = xintersect(i)
+                    yintersect2(k) = yintersect(i)
+                    indices(k) = ind(i)
+                    indices_target(k) = ind_target(i)
+                end if
+            end do
+        
+            ! Hand over of points to previous array name
+            deallocate(xintersect)
+            allocate(xintersect(k),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+            xintersect = xintersect2
+            deallocate(xintersect2)
+            deallocate(yintersect)
+            allocate(yintersect(k),stat=allocateStatus)
+            if(allocateStatus/=0) STOP "ERROR: Not enough memory in PressureDistribution "
+            yintersect = yintersect2
+            deallocate(yintersect2)
+            deallocate(ind)
+            deallocate(ind_target)
+        
+            ! Integrate over both boundaries using trapezoidal rule
+            integral = 0
+            integral_target = 0
+            L1_error = 0
+            do i = 1, k-1
+            
+                integral = integral + 0.5*((x(indices(i)+1) - xintersect(i))*(yintersect(i) + y(indices(i)+1)))
+                do j = indices(i)+1, indices(i+1)-1
+                    integral = integral + 0.5*((x(j+1) - x(j))*(y(j+1) + y(j)))
+                end do
+                integral = integral + 0.5*((xintersect(i+1) - x(indices(i+1)))*(yintersect(i+1) + y(indices(i+1))))
+            
+                integral_target = integral_target + 0.5*((xtarget(indices_target(i)+1) - xintersect(i))*(yintersect(i) + Cptarget(indices_target(i)+1)))
+                do j = indices_target(i)+1, indices_target(i+1)-1 
+                    integral_target = integral_target + 0.5*((xtarget(j+1) - xtarget(j))*(Cptarget(j+1) + Cptarget(j)))
+                end do
+                integral_target = integral_target + 0.5*((xintersect(i+1) - xtarget(indices_target(i+1)))*(yintersect(i+1) + Cptarget(indices_target(i+1))))
+            
+                ! L1 Absolute Error norm (root mean square)
+                L1_error = L1_error + abs(integral - integral_target)
+                integral = 0
+                integral_target = 0
+            
+            end do
+       
+            integral = integral + 0.5*((x(indices(k)+1) - xintersect(k))*(yintersect(k) + y(indices(k)+1)))
+            do j = indices(k)+1, nibp-1 
+                integral = integral + 0.5*((x(j+1) - x(j))*(y(j+1) + y(j)))
+            end do
+            integral = integral + 0.5*((x(1) - x(nbp))*(y(1) + y(nbp)))
+            do j = 1, indices(1)-1
+                integral = integral + 0.5*((x(j+1) - x(j))*(y(j+1) + y(j)))
+            end do
+            integral = integral + 0.5*((xintersect(1) - x(indices(1)))*(yintersect(1) + y(indices(1))))
+            
+            integral_target = integral_target + 0.5*((xtarget(indices_target(k)+1) - xintersect(k))*(yintersect(k) + Cptarget(indices_target(k)+1)))
+            do j = indices_target(k)+1, nbp_target-1 
+                integral_target = integral_target + 0.5*((xtarget(j+1) - xtarget(j))*(Cptarget(j+1) + Cptarget(j)))
+            end do
+            integral_target = integral_target + 0.5*((xtarget(1) - xtarget(nbp_target))*(Cptarget(1) + Cptarget(nbp_target)))
+            do j = 1, indices_target(1)-1
+                integral_target = integral_target + 0.5*((xtarget(j+1) - xtarget(j))*(Cptarget(j+1) + Cptarget(j)))
+            end do
+            integral_target = integral_target + 0.5*((xintersect(1) - xtarget(indices_target(1)))*(yintersect(1) + Cptarget(indices_target(1))))
+        
+        end if
+        
+        ! L1 Absolute Error norm
+        L1_error = L1_error + abs(integral - integral_target)
+        L1_error = -L1_error
+        
+    end subroutine getPressureDistribution
     
     subroutine AdaptiveSampling(newSnapshots, Fcompare, NoTop)
     
