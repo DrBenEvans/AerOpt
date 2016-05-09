@@ -85,7 +85,7 @@ program AerOpt
     print *, 'End PreMeshing - All Area Coefficients calculated'
     print *, ''
     call SubCFD(1, IV%NoSnap, CS%Snapshots, IV%NoSnap)
-    call PostSolverCheck(IV%NoSnap, 0)
+    call PostSolverCheckInit(IV%NoSnap, 0)
     
     ! ****Optimize Mesh by the help of Cuckoo Search and POD**** !
     call SubOptimization()

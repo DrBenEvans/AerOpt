@@ -1335,6 +1335,9 @@ close(29)
         logical :: PODevaluation
     
         ! Body of getObjectiveFunction
+        if (OV%Fi(NoSnapshot) == -150) then
+            RETURN
+        end if
         if (PODevaluation == .true.) then
             if (IV%ObjectiveFunction == 2) then
                 call getDistortionPOD(tempNests, Fi)

@@ -95,8 +95,7 @@ module CFD
         print *, '***  Start Check for Convergence  ***'
         print *, '*************************************'
         print *, ''
-        i = 0
-        call CheckforConvergence(i, InitConv, NoFiles)
+        call CheckforConvergence(NoFiles)
         print*, 'All Solutions converged'
         
         ! Delete the Error files to allow sleep check in next generation
@@ -105,6 +104,54 @@ module CFD
         end do
         
     end subroutine PostSolverCheck
+    
+    subroutine PostSolverCheckInit(NoFiles, InitConv)
+    
+        ! Variables
+        implicit none
+        integer :: NoFiles, i, InitConv
+  
+        ! Body of PostSolverCheck
+        ! ****Wait & Check for FLITE Solver Output**** !
+        if (IV%runOnCluster == 'Y') then
+            call Sleep(NoFiles)
+        end if
+        
+        if (IV%NoDim == 3) then
+            call generateUnkFile()
+        end if
+        
+        if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y') then
+            allocate(character(len=200) :: strSystem)
+            do i = 1, NoFiles
+                call DetermineStrLen(istr, i)
+                call TransferSolutionOutput()
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
+                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
+                call system(trim(strSystem))
+                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
+                call system(trim(strSystem))                
+                deallocate(istr)
+            end do
+            deallocate (strSystem)
+        end if
+    
+        ! ****Check Simulation Results**** !
+        print *, ''
+        print *, '*************************************'
+        print *, '***  Start Check for Convergence  ***'
+        print *, '*************************************'
+        print *, ''
+        i = 0
+        call CheckforConvergenceInit(i, InitConv, NoFiles)
+        print*, 'All Solutions converged'
+        
+        ! Delete the Error files to allow sleep check in next generation
+        do i = 1, NoFiles
+            call SubDeleteErrorFiles(i)
+        end do
+        
+    end subroutine PostSolverCheckInit
     
     subroutine PreProcessing(i)
     
@@ -287,7 +334,31 @@ module CFD
         
     end subroutine Sleep
     
-    recursive subroutine CheckforConvergence(Iter, InitConv, NoFiles)
+    subroutine CheckforConvergence(NoFiles)
+    
+        ! Variables
+        implicit none
+        integer :: i, NoFiles
+        logical :: Converge
+    
+        ! Body of CheckforConvergence
+        Converge = .true.
+        do i = 1, NoFiles
+
+            call FileCheckConvergence(Converge, i)  
+          
+            ! All diverged Snapshots are pulled halfway to midpoint(no movement center)
+            if (Converge == .false.) then              
+                    print *, 'File', i, 'failed to converge and will be set to -150'
+                    OV%Fi(i) = -150
+            end if
+            Converge = .true.
+            
+        end do
+        
+    end subroutine CheckforConvergence
+    
+    recursive subroutine CheckforConvergenceInit(Iter, InitConv, NoFiles)
     
         ! Variables
         implicit none
@@ -309,7 +380,7 @@ module CFD
         Converge = .true.
         NoConv = 0 
         do i = 1, NoFiles
-
+    
             call FileCheckConvergence(Converge, i)  
           
             ! All diverged Snapshots are pulled halfway to midpoint(no movement center)
@@ -360,7 +431,7 @@ module CFD
             Iter = Iter + 1
             
             if (Iter < 4) then
-                call CheckforConvergence(Iter, InitConv, NoFiles)
+                call CheckforConvergenceInit(Iter, InitConv, NoFiles)
             end if
             
             if (NoConv /= 0) then
@@ -368,7 +439,7 @@ module CFD
             end if
         end if
         
-    end subroutine CheckforConvergence
+    end subroutine CheckforConvergenceInit
     
     subroutine FileCheckConvergence(Converge, NoFile)
     
