@@ -379,21 +379,20 @@ contains
                 ! Check time of files generated
                 jobcheck = 0
                 if (timestart(2) == timeend(5)) then
-                    if (timestart(3) == timeend(4)) then
-                        if (timestart(5) == timeend(3)) then  
-                            if (timestart(6) == timeend(2)) then
-                                if (timestart(7) == timeend(1)) then
-                                    jobcheck = 1
-                                end if
-                            elseif (timestart(6) < timeend(2)) then
+                if (timestart(3) == timeend(4)) then
+                    if (timestart(5) == timeend(3)) then  
+                        if (timestart(6) == timeend(2)) then
+                            if (timestart(7) == timeend(1)) then
                                 jobcheck = 1
                             end if
-                        elseif (timestart(5) < timeend(3)) then
-                                jobcheck = 1
+                        elseif (timestart(6) < timeend(2)) then
+                            jobcheck = 1
                         end if
-                    elseif (timestart(3) < timeend(4)) then
-                                jobcheck = 1
+                    elseif (timestart(5) < timeend(3)) then
+                            jobcheck = 1
                     end if
+                elseif (timestart(3) < timeend(4)) then
+                            jobcheck = 1
                 elseif (timestart(2) < timeend(5)) then
                             jobcheck = 1
                 end if
