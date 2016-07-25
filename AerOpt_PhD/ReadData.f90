@@ -426,11 +426,11 @@ contains
         ! Create Read File for Solver
         open(1, file=newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh', form='formatted',status='unknown')
         if (IV%SystemType == 'B') then
-            write(1,*) trim(IV%filename)//'.inp'            ! Control Filename
-            write(1,*) trim(IV%filename)//istr//'.sol'      ! Computation Filename
+            write(1,*) InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp'            ! Control Filename
+            write(1,*) InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
             write(1,*) '' !trim(IV%filename), istr, '.unk'     ! Start-up File = previous Result File
-            write(1,*) trim(IV%filename)//istr//'.unk'     ! Result filename
-            write(1,*) trim(IV%filename)//istr//'.rsd'      ! Residual Filename
+            write(1,*) InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'     ! Result filename
+            write(1,*) InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
         elseif (IV%SystemType == 'Q' .or. IV%RunOnCluster == 'Y') then
             write(1,'(A)') trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp'    ! Control Filename
             write(1,'(A)') trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'    ! Solution Filename
@@ -509,17 +509,21 @@ contains
     
     end subroutine WriteSolverInpFile_3D
 
-    subroutine writeBatchFile()
+    subroutine writeBatchFile(start, ending)
     
         ! Variables
         implicit none
-        character(len=:), allocatable :: strProc, strwait
+        integer :: i, start, ending
+        character(len=:), allocatable :: strProc, strwait, strStart, strEnd, istring, strCores
     
         ! Body of writeBatchFile
+        call DetermineStrLen(strStart, start)
+        call DetermineStrLen(strCores, (ending-start +1))
+        call DetermineStrLen(strEnd, ending)
         call DetermineStrLen(strProc, IV%NoProcessors)
-        call DetermineStrLen(strwait, IV%waitmax)
-        open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/batchfile', form='formatted',status='unknown')  
+        call DetermineStrLen(strwait, IV%waitmax)  
         if (IV%SystemType /= 'B') then
+            open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/batchfile', form='formatted',status='unknown')
             write(1,*) '#PBS -N ' ,trim(IV%filename), istr
             write(1,*) '#PBS -q oh'
             write(1,*) '#PBS -l nodes=', strProc
@@ -533,20 +537,31 @@ contains
             write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder// '/'//trim(IV%filename)//istr//'.rsd'
             write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk'
         else
-            write(1,*) '#BSUB -J '//trim(IV%filename)//istr
-            write(1,*) '#BSUB -o '//trim(IV%filename)//istr//'.o'
-            write(1,*) '#BSUB -e '//trim(IV%filename)//istr//'.e'
-            !write(1,*) '#BSUB -q <enter a queue>'
-            write(1,*) '#BSUB -n ', strProc
-            write(1,*) '#BSUB -W ', strwait, ':00'
-            write(1,'(A)') pathSolver//' < '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh'
-            write(1,*) 'cd ..'
-            write(1,*) 'cd ..'
-            write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd'
-            write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk'
-            !write(1,*) '#BSUB -n 1'
-            !#BSUB -R "span[ptile=12]"
-            
+            open(1, file= newdir//'/batchfile', form='formatted',status='unknown')
+            write(1,'(A)') '#!/bin/bash --login'
+            write(1,'(A)') '#SBATCH --job-name=GeomBatch'
+            write(1,'(A)') '#SBATCH -o output.%J'
+            write(1,'(A)') '#SBATCH --error=error.%J'
+            write(1,'(A)') '#SBATCH -n '//strCores
+            write(1,'(A)') '#maximum job time in D-HH:MM'
+            write(1,'(A)') '#SBATCH -t '//strwait//':00:00'
+            write(1,'(A)') '#SBATCH --mem-per-cpu=4000'
+            write(1,'(A)') 'module purge'
+            write(1,'(A)') 'module load parallel'
+            write(1,'(A)') 'srun="srun -n1 -N1 --exclusive"'
+            if (start /= 1) then
+                write(1,'(A)') 'parallel="parallel -N 1 --delay .2 -j $SLURM_NTASKS --joblog parallel_joblog2 --resume"'
+            else
+                write(1,'(A)') 'parallel="parallel -N 1 --delay .2 -j $SLURM_NTASKS --joblog parallel_joblog --resume"'
+            end if
+            write(1,'(A)') '$parallel "$srun --input='//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//'{1}'//'/SolverInput'//'{1}'//'.sh '//pathSolver//'" ::: {'//strStart//'..'//strEnd//'}'
+            write(1,'(A)') ' '
+            do i = start, ending
+                call DetermineStrLen(istring, i)
+                write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istring//'/'//trim(IV%filename)//istring//'.rsd '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istring//'.rsd'
+                write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istring//'/'//trim(IV%filename)//istring//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istring//'.unk'
+                deallocate(istring)
+            end do
         end if
         close(1)
     
@@ -689,12 +704,13 @@ contains
         open(1, file='Communication2', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr
+        !write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr
+        write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir
         
         if (IV%SystemType /= 'B') then
             write(1,*) 'qsub batchfile'
         else
-            write(1,*) 'bsub < batchfile'
+            write(1,*) 'sbatch batchfile'
         end if
         close(1)
           
@@ -767,19 +783,22 @@ contains
         
     end subroutine TransferSolutionOutput
     
-    subroutine DeleteErrorFiles(i)
+    subroutine DeleteLogFiles()
     
         ! Variables
         implicit none
-        character(len=*) :: i
     
         ! Body of DeleteErrorFiles
         open(1, file='Communication2', form='formatted',status='unknown')
-        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//i//'.e*'
-        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//i//'.e*'
+        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/parallel_joblog*'
+        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/error.*'
+        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/output.*'
+        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/error.*'
+        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/output.*'
+        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/parallel_joblog*'
         close(1)
     
-    end subroutine DeleteErrorFiles
+    end subroutine DeletelogFiles
     
        
     subroutine moveTopNestFilesLin(i)
@@ -1005,7 +1024,7 @@ contains
         close(29)
       
         ! Store Fitness values
-        write(19,'(1I3)',advance="no") OV%Gen
+        write(19,'(1I4)',advance="no") OV%Gen
         write(19,'(<IV%NoNests>f17.10)') OV%Fi       
         if (IV%objectivefunction == 7) then
             write(19,'(<IV%NoNests>f17.10)') OV%Precoutput

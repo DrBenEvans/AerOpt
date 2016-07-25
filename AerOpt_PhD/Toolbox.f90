@@ -5,15 +5,16 @@ module Toolbox
         integer, dimension(:), allocatable :: engInNodes           ! Engine inlet Nodes
         integer :: Gen
         double precision :: Precovery
-        double precision, dimension(:,:), allocatable :: modes, coeff       ! Modes and Coefficient derived by the POD method
+        double precision, dimension(:,:), allocatable :: modes, coeff, modes2, coeff2       ! Modes and Coefficient derived by the POD method
         double precision, dimension(:), allocatable :: meanpressure         ! Mean Pressure excluded of Snapshots in POD
         double precision, dimension(:), allocatable :: pTamb                ! total pressure of free-stream flow of each Nest
         double precision, dimension(:,:), allocatable :: pressure           ! Static Pressure at every mesh node for each Nest
         double precision, dimension(:,:), allocatable :: MaLocal            ! Local Mach number at every mesh node for each Nest
         double precision, dimension(:), allocatable :: Fi                   ! Vector with all current Fitness values
+        double precision, dimension(:), allocatable :: converged            ! Vector flagging converged Snapshots
         double precision, dimension(:), allocatable :: Precoutput           ! Vector with all current total pressure values
-        double precision, dimension(:), allocatable :: PolCoeff             ! Polynomial Coefficients for POD RBF interpolation
-        double precision, dimension(:,:), allocatable :: Weights            ! Weights for POD RBF interpolation
+        double precision, dimension(:), allocatable :: PolCoeff, PolCoeff2  ! Polynomial Coefficients for POD RBF interpolation
+        double precision, dimension(:,:), allocatable :: Weights, Weights2  ! Weights for POD RBF interpolation
         double precision, dimension(:,:), allocatable :: Nests_Move, Nests              ! Nest regenerated with each generation
         logical :: InitConv                                                 ! Initial Convergence Check - TRUE: yes 
         

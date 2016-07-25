@@ -631,14 +631,15 @@ module FDGD
 
     end subroutine getAreaCoefficients2
     
-    subroutine CheckforIntersections(DelaunayCoord, DelaunayElem, intersect)
+    subroutine CheckforIntersections(DelaunayCoord, DelaunayElem, intersect, x, y)
     
         ! Variables
         implicit none
         double precision :: xa, ya, xb, yb, xc, yc, S
-        integer :: j, NoElem, intersect
+        integer :: j, i, NoElem, intersect
         double precision, dimension(:,:) :: DelaunayCoord
         integer, dimension(:,:) :: DelaunayElem
+        double precision, dimension(:), optional :: x, y
     
         ! Body of CheckforIntersections
         intersect = 1
@@ -655,17 +656,22 @@ module FDGD
             j = j + 1
             if (S < 0) then  ! If Area negative, the order of the points has changed (DelaunayElement order) and hence an intersection of elements took place
                 print *, 'Intersection identified. Movement will be split up.'
-                !call writeDatfile(10)
                 !open(1, file= 'Delaunaynodes.dat', form='formatted', status = 'unknown')
                 !write(1,'(2f22.15)') transpose(DelaunayCoord)
                 !close(1)
                 !open(1, file= 'DelaunayElem.dat', form='formatted', status = 'unknown')
                 !write(1,'(3I8)') transpose(DelaunayElem)
                 !close(1)
+                !open(1, file= 'XYcoord.dat', form='formatted', status = 'unknown')
+                !do i = 1, size(x)
+                !    write(1,'(2f22.15)') x(i), y(i)
+                !end do
+                !close(1)
                 intersect = 0
                 EXIT
             end if
         end do
+        
     
     end subroutine CheckforIntersections
     

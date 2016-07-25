@@ -48,6 +48,7 @@ module InputData
         character(len=3) :: version
         integer :: MeshMovement         ! Type of Mesh Movement - choices: 1 - 'Linear with Smoothing' , 2 - 'FDGD with Smoothing' , 3 - 'RBF' , 4 - 'FDGD'
         integer :: ObjectiveFunction    ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - max Lift, 4 - min Drag, 5 - max Downforce, 6 - min Lift
+        integer :: Optimiser            ! Which Optimization method shall be used?  1 - MCS, 2 - DE, 3 - PSO
         integer :: Memory                                           ! Memory requirement for Job
         logical :: Meshtest
         logical :: Pol                  ! POD using Polynomial
@@ -132,6 +133,7 @@ contains
         IV%Memory = 1
         IV%NoDelBP = 4                  ! Number of Delaunay Boundary Points       
         IV%ObjectiveFunction = 1        ! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - max Lift, 4 - min Drag, 5 - max Downforce, 6 - min Lift
+        IV%Optimiser = 1                   ! Which Optimization method shall be used?  1 - MCS, 2 - DE, 3 - PSO
         IV%shapeenclosed = .true.       ! Open or closed boundary?
         IV%smoothconvergence = -3             ! Rate of convergence for Mesh smoothing
         

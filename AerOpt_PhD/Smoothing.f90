@@ -189,9 +189,11 @@ print *, conv
       
         ! Check for valid background mesh
         call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
-        call CheckforIntersections(DelaunayCoordDomain, DelaunayElemDomain, intersect)
+        call CheckforIntersections(DelaunayCoordDomain, DelaunayElemDomain, intersect, x, y)
       
         ! Move Domain Nodes
+! ADDED artificially 
+        NoMove = 1
         if (intersect == 1) then
             if (counter < NoMove) then
                 counter = counter + 1
@@ -208,7 +210,8 @@ print *, conv
             RD%coord_temp(orderedBoundaryIndex,1) = xbefore
             RD%coord_temp(orderedBoundaryIndex,2) = ybefore 
             counter = 2*counter-1
-            NoMove = NoMove*2
+            !NoMove = NoMove*2
+            CNDisp = CNDisp/2.0 ! TO-DO only if intersection along boundary was identified
             call SmoothingLinear(CNDisp, NoMove, counter)
         end if
        
@@ -708,6 +711,8 @@ print *, conv
         end do
         beta1(NoPmove) = dot_product((/x(NoPmove)-x(NoPmove-1), y(NoPmove)-y(NoPmove-1)/),(/sx(NoPmove), sy(NoPmove)/))
         beta2(NoPmove) = dot_product((/x(1)-x(NoPmove), y(1)-y(NoPmove)/),(/sx(NoPmove), sy(NoPmove)/))
+beta1(1) = 0.1
+beta2(1) = 0.1
         betamin = minval((/minval(beta1), minval(beta2)/))
         betamean = (sum(beta1)+sum(beta2))/(size(beta1, dim = 1)+size(beta2, dim = 1))
     

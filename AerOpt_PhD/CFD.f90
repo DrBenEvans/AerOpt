@@ -7,7 +7,9 @@ module CFD
     use GenerateMesh
     use FDGD
     
-    contains
+    integer(kind = 4), dimension(8) :: timestart
+    
+contains
     
     subroutine SubCFD(Start, Ending, CN_CoordinatesArray, sizing)
     
@@ -17,7 +19,8 @@ module CFD
         double precision, dimension(sizing, maxDoF) :: CN_CoordinatesArray
 
         ! Body of SubCFD
-        ! ****Generate Snapshots (initial Meshes)**** !
+      
+        ! ****Generate Meshes**** !
         allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
         do i = Start, Ending          
@@ -42,19 +45,33 @@ module CFD
           pause
         end if
        
-        ! ****Call 2D Preprocessor and pass on input parameters**** !
-        print *, 'Start Preprocessing'
-        do i = Start, Ending  
-            call PreProcessing(i)  
+        ! ****call 2d preprocessor and pass on input parameters**** !
+        print *, 'start preprocessing'
+        do i = start, ending  
+            call preprocessing(i)  
         end do
-        print *, 'Finished Preprocessing'
-    
-        ! ****Call 2D FLITE Solver and pass on input parameters**** !
-        print *, 'Call FLITE 2D Solver'
-        do i = Start, Ending        
-           call Solver(i)               
+        print *, 'finished preprocessing'
+        
+        ! Store timestamp
+        call date_and_time ( values = timestart )
+        
+        ! ****call 2d flite solver and pass on input parameters**** !
+        print *, 'call flite 2d solver'
+        !do i = start, ending        
+        !   call solver(i)               
+        !end do
+        do i = start, ending
+            ! Determine correct String      
+            call DetermineStrLen(istr, i)
+            call WriteSolverInpFile()
+            deallocate(istr)
         end do
-        print *, 'Finished Submitting Jobs to FLITE 2D Solver' 
+        call writeBatchFile(start, ending)
+        call Triggerfile()     ! Triggerfile for submission
+        call system('chmod a+x ./Communication2')
+        call system('./Communication2')
+        
+        print *, 'finished submitting jobs to flite 2d solver' 
         
     end subroutine SubCFD
     
@@ -67,7 +84,7 @@ module CFD
         ! Body of PostSolverCheck
         ! ****Wait & Check for FLITE Solver Output**** !
         if (IV%runOnCluster == 'Y') then
-            call Sleep(NoFiles)
+            call Sleep2(NoFiles)
         end if
         
         if (IV%NoDim == 3) then
@@ -96,12 +113,9 @@ module CFD
         print *, '*************************************'
         print *, ''
         call CheckforConvergence(NoFiles)
-        print*, 'All Solutions converged'
+        print*, 'All Solutions checked for convergence'
         
-        ! Delete the Error files to allow sleep check in next generation
-        do i = 1, NoFiles
-            call SubDeleteErrorFiles(i)
-        end do
+        call SubDeleteLogFiles()
         
     end subroutine PostSolverCheck
     
@@ -114,7 +128,7 @@ module CFD
         ! Body of PostSolverCheck
         ! ****Wait & Check for FLITE Solver Output**** !
         if (IV%runOnCluster == 'Y') then
-            call Sleep(NoFiles)
+            call Sleep2(NoFiles)
         end if
         
         if (IV%NoDim == 3) then
@@ -146,10 +160,7 @@ module CFD
         call CheckforConvergenceInit(i, InitConv, NoFiles)
         print*, 'All Solutions converged'
         
-        ! Delete the Error files to allow sleep check in next generation
-        do i = 1, NoFiles
-            call SubDeleteErrorFiles(i)
-        end do
+        call SubDeleteLogFiles()
         
     end subroutine PostSolverCheckInit
     
@@ -220,7 +231,7 @@ module CFD
         
         ! writes the batchfile to execute Solver on Cluster
         if (IV%NoDim == 2) then
-            call writeBatchFile()
+            call writeBatchFile(i,i)
         elseif (IV%NoDim == 3) then
             call writeBatchFile_3D()
         end if
@@ -334,6 +345,72 @@ module CFD
         
     end subroutine Sleep
     
+    subroutine Sleep2(NoFiles)
+    
+        ! Variables
+        implicit none
+        integer :: i, NoFiles, j
+        integer, dimension(13) :: fileinfo
+        integer, dimension(9) :: timeend
+    
+        ! Body of Sleep
+        print*, 'Start Sleep'
+        jobcheck = 0
+        waitTime = 0
+        j = 1
+        do while (jobcheck==0)
+        
+            ! Wait Function
+            print*, 'Sleep', IV%Ma
+            call SleepQQ(IV%delay*1000)
+            print*, 'Wake Up - Check ', j
+            j = j + 1
+           
+            ! Check Status of Simulations by checking if new output files have been moved
+            do i = 1, NoFiles
+                
+                ! Extract last modification time to check if file has been newly moved
+                fileinfo = 0
+                call DetermineStrLen(istr, i)
+                call stat(trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', fileinfo)
+                call ltime(fileinfo(10), timeend)
+                deallocate(istr)
+                
+                ! Check time of files generated
+                jobcheck = 0
+                if (timestart(2) == timeend(5)) then
+                    if (timestart(3) == timeend(4)) then
+                        if (timestart(5) == timeend(3)) then  
+                            if (timestart(6) == timeend(2)) then
+                                if (timestart(7) == timeend(1)) then
+                                    jobcheck = 1
+                                end if
+                            elseif (timestart(6) < timeend(2)) then
+                                jobcheck = 1
+                            end if
+                        elseif (timestart(5) < timeend(3)) then
+                                jobcheck = 1
+                        end if
+                    elseif (timestart(3) < timeend(4)) then
+                                jobcheck = 1
+                    end if
+                elseif (timestart(2) < timeend(5)) then
+                            jobcheck = 1
+                end if
+                if (jobcheck == 0) EXIT                           
+            
+            end do
+        
+            waitTime = (IV%delay/3600.0) + waitTime
+            if (waitTime > IV%waitMax) then
+                STOP 'Cluster Simulation Time exceeded maximum waiting Time'
+            end if
+        
+        end do
+        print*, 'End Sleep - Jobs are finished'
+        
+    end subroutine Sleep2
+    
     subroutine CheckforConvergence(NoFiles)
     
         ! Variables
@@ -342,6 +419,7 @@ module CFD
         logical :: Converge
     
         ! Body of CheckforConvergence
+        OV%converged = 1
         Converge = .true.
         do i = 1, NoFiles
 
@@ -350,7 +428,7 @@ module CFD
             ! All diverged Snapshots are pulled halfway to midpoint(no movement center)
             if (Converge == .false.) then              
                     print *, 'File', i, 'failed to converge and will be set to -150'
-                    OV%Fi(i) = -150
+                    OV%converged(i) = 0
             end if
             Converge = .true.
             
@@ -377,6 +455,8 @@ module CFD
     
         ! Body of CheckforConvergence
         print *, 'Iteration', (Iter + 1)
+        call timestamp()
+		OV%converged = 1
         Converge = .true.
         NoConv = 0 
         do i = 1, NoFiles
@@ -410,7 +490,9 @@ module CFD
         DivNestPos = tempArray
         deallocate(tempArray)
         
-        if (NoConv /= 0) then
+        Iter = Iter + 1
+        
+        if (NoConv /= 0 .and. Iter < 3) then
             
             !!** Re-Do diverged solutions **!!
             do ii = 1, NoConv
@@ -421,22 +503,17 @@ module CFD
                     call SubCFD(DivNestPos(ii), DivNestPos(ii), OV%Nests(DivNestPos(ii),:), 1)    
                 end if
                 
-                ! Delete the Error files to allow sleep check
-                call SubDeleteErrorFiles(NoFiles - IV%NoSnap + DivNestPos(ii))
-                
             end do
             
-            call Sleep(NoFiles)
+            call Sleep2(NoFiles)
+
+            call CheckforConvergenceInit(Iter, InitConv, NoFiles)
             
-            Iter = Iter + 1
-            
-            if (Iter < 4) then
-                call CheckforConvergenceInit(Iter, InitConv, NoFiles)
-            end if
-            
-            if (NoConv /= 0) then
-                STOP 'Convergence of CFD Simulations could not be achieved. Check initial Mesh and/or Movement constraints!'
-            end if
+        end if
+        
+        if (NoConv /= 0 .and. Iter == 3) then
+            OV%converged(DivNestPos) = 0
+            print *, 'Convergence of CFD Simulations could not be achieved. Diverged solutions will be excluded!'
         end if
         
     end subroutine CheckforConvergenceInit
@@ -473,7 +550,7 @@ module CFD
         read(1, *) Input
         close(1)
             
-        ! Convergence = false if last line contains 'NaN'
+        ! Convergence = false if last line contains 'NaN' or is below convergence criteria
         do j = 1, 8
             if (isnan(Input(j))) then
                 Converge = .false.
@@ -488,25 +565,21 @@ module CFD
             
     end subroutine FileCheckConvergence
     
-    subroutine SubDeleteErrorFiles(i)
+    subroutine SubDeleteLogFiles()
     
         ! Variables
-        integer :: i
+        implicit none
         
         ! Body of SubDeleteErrorFiles
-        ! Determine correct String      
-        call DetermineStrLen(istr, i)
         
-        call DeleteErrorFiles(istr)
+        call DeleteLogFiles()
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
             call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
         elseif (IV%SystemType /= 'W')  then                
             call system('chmod a+x ./Communication2')
             call system('./Communication2')
         end if
-                
-        deallocate(istr)
     
-    end subroutine SubDeleteErrorFiles
+    end subroutine SubDeleteLogFiles
     
 end module CFD
