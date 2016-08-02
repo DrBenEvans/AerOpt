@@ -87,8 +87,8 @@ module Optimization
         beta = 0.0
         
         ! Evaluate Fitness of first Generation
-        call SubCFD(1, IV%NoSnap, CS%Snapshots, IV%NoSnap)
-        call PostSolverCheckInit(IV%NoSnap, 0, Fi_initial)
+        call SubCFD((/ (j, j=1, IV%NoSnap) /), CS%Snapshots, IV%NoSnap)
+        call PostSolverCheckInit(IV%NoSnap, 0)
         
         ! Extract moving initial Nests
         j = 1
@@ -106,7 +106,7 @@ module Optimization
         end do
 
         ! Extract Pressure of Snapshots
-        !call InitiatePressure()
+        call InitiatePressure()
         
         ! Approximate Pressure Field of RandNest input file        
         !open(11,file=newdir//'/RandNest.txt')
@@ -156,7 +156,7 @@ module Optimization
                 Fcompare(1) = OV%Fi(1)
                 Fcompare(2) = OV%Fi(IV%NoNests)
                 ! Get High Fidelity Solution
-                call SubCFD((IV%NoSnap + 1), (IV%NoSnap + 2), newSnapshots, 2)
+                call SubCFD((/(IV%NoSnap + 1), (IV%NoSnap + 2)/), newSnapshots, 2)
                 print *, 'Adaptive Sampling - Finish Part 1 / 2'
                 
             end if
@@ -247,7 +247,7 @@ module Optimization
                 close(29)
             
                 !Generate Full Fidelity Solution      
-                call SubCFD(1, IV%NoNests,tempAgent, IV%NoNests)                         
+                call SubCFD((/ (j, j=1, IV%NoNests) /),tempAgent, IV%NoNests)          
                 ! Check ALL new Nests
                 print *, 'Generation: ', OV%Gen
                 !call PostSolverCheck(IV%NoNests, 1)
@@ -418,8 +418,8 @@ module Optimization
         beta = 0.0
         
         ! Evaluate Fitness of first Generation
-        call SubCFD(1, IV%NoSnap, CS%Snapshots, IV%NoSnap)
-        call PostSolverCheckInit(IV%NoSnap, 0, Fi_initial)
+        call SubCFD((/ (j, j=1, IV%NoSnap) /), CS%Snapshots, IV%NoSnap)      
+        call PostSolverCheckInit(IV%NoSnap, 0)
         
         ! Extract moving initial Nests
         j = 1
@@ -437,7 +437,7 @@ module Optimization
         end do
 
         ! Extract Pressure of Snapshots
-        !call InitiatePressure()
+        call InitiatePressure()
         
         ! Approximate Pressure Field of RandNest input file        
         !open(11,file=newdir//'/RandNest.txt')
@@ -498,7 +498,7 @@ module Optimization
                 Fcompare(1) = OV%Fi(1)
                 Fcompare(2) = OV%Fi(IV%NoNests)
                 ! Get High Fidelity Solution
-                call SubCFD((IV%NoSnap + 1), (IV%NoSnap + 2), newSnapshots, 2)
+                call SubCFD((/(IV%NoSnap + 1), (IV%NoSnap + 2)/), newSnapshots, 2)
                 print *, 'Adaptive Sampling - Finish Part 1 / 2'
                 
             end if
@@ -587,7 +587,7 @@ module Optimization
                 close(29)
             
                 !Generate Full Fidelity Solution      
-                call SubCFD(1, IV%NoNests,LocalNest, IV%NoNests)                      
+                call SubCFD((/ (j, j=1, IV%NoNests) /),LocalNest, IV%NoNests)              
                 ! Check ALL new Nests
                 print *, 'Generation: ', OV%Gen
                 !call PostSolverCheck(IV%NoNests, 1)   
@@ -795,8 +795,8 @@ module Optimization
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         
         ! Evaluate Fitness of first Generation
-        call SubCFD(1, IV%NoSnap, CS%Snapshots, IV%NoSnap)
-        call PostSolverCheck(IV%NoSnap, 0)
+        !call SubCFD((/ (j, j=1,IV%NoSnap) /), CS%Snapshots, IV%NoSnap)
+        !call PostSolverCheckInit(IV%NoSnap, 0)
         
         ! Extract moving initial Nests
         j = 1
@@ -879,7 +879,7 @@ module Optimization
                 Fcompare(1) = OV%Fi(1)
                 Fcompare(2) = OV%Fi(IV%NoNests)
                 ! Get High Fidelity Solution
-                call SubCFD((IV%NoSnap + 1), (IV%NoSnap + 2), newSnapshots, 2)
+                call SubCFD((/(IV%NoSnap + 1), (IV%NoSnap + 2)/), newSnapshots, 2)
                 print *, 'Adaptive Sampling - Finish Part 1 / 2'
                 
             end if
@@ -891,7 +891,7 @@ module Optimization
             do ii = IV%NoNests, (NoTop + 1), -1
                 
                 ! Perform Random Walk using Levy Flight with a Cauchy Distribution
-                Ac = IV%Aconst/sqrt(OV%Gen*1.0)
+                Ac = IV%Aconst/(sqrt(OV%Gen*1.0)*100.0)
                 call random_number(CS%rn)
                 NoSteps = nint(log(CS%rn)*(-IV%NoLeviSteps))
                 NoSteps = minval((/ NoSteps, IV%NoLeviSteps /))
@@ -901,10 +901,10 @@ module Optimization
                 if (IV%constrain == .true.) then                
                     do k = 1, IV%DoF
                         if (tempNests_Move(k) > 1) then
-                            tempNests_Move(k) = 0.75
+                            tempNests_Move(k) = 1
                         end if
                         if (tempNests_Move(k) < 0) then
-                           tempNests_Move(k) = 0.25
+                           tempNests_Move(k) = 0
                         end if                   
                     end do
                 end if
@@ -981,10 +981,10 @@ module Optimization
                     if (IV%constrain == .true.) then                
                         do k = 1, IV%DoF
                             if (tempNests_Move(k) > 1) then
-                                tempNests_Move(k) = 0.75
+                                tempNests_Move(k) = 1
                             end if
                             if (tempNests_Move(k) < 0) then
-                                tempNests_Move(k) = 0.25
+                                tempNests_Move(k) = 0
                             end if                   
                         end do
                     end if
@@ -1052,9 +1052,9 @@ module Optimization
                 close(29)
             
                 !Generate Full Fidelity Solution of new TopNest      
-                call SubCFD(1, NoTop, TopNest, NoTop)
+                call SubCFD((/ (j, j=1,NoTop) /), TopNest, NoTop)
                 ! Full Fidelity Solutions of Discarded Nests       
-                call SubCFD((NoTop + 1), IV%NoNests, OV%Nests((NoTop + 1):IV%NoNests,:), NoDiscard)                        
+                call SubCFD((/ (j, j=(NoTop + 1), IV%NoNests) /), OV%Nests((NoTop + 1):IV%NoNests,:), NoDiscard)            
                 ! Check ALL new Nests
                 print *, 'Generation: ', OV%Gen
                 call PostSolverCheck(IV%NoNests, 1)   
@@ -1121,31 +1121,33 @@ module Optimization
             call writeFitnessandNestoutput()
             
             ! Store Files of Top 5 % fraction of Nests in TopFolder
-            store = 1
-            if (Fibefore /= OV%Fi(1)) then
-                do j = 1, store                    
+            if (IV%POD == .false.) then          
+                store = 1
+                if (Fibefore /= OV%Fi(1)) then
+                    do j = 1, store                    
+                        if (IV%SystemType == 'W') then
+                            call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)))
+                            call generateEnSightFileWin()
+                        else
+                            call moveTopNestFilesLin(ind_Fitrack(ind_Fi(j)))
+                            if (IV%NoDim == 2) then
+                                call generateEnSightFileLin()
+                            else
+                                call generateEnSightFileLin3D(ind_Fitrack(ind_Fi(j)))
+                            end if
+                        end if
+                    end do
+                else
                     if (IV%SystemType == 'W') then
-                        call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)))
+                        call copyTopNestFilesWin(OV%Gen)
                         call generateEnSightFileWin()
                     else
-                        call moveTopNestFilesLin(ind_Fitrack(ind_Fi(j)))
+                        call copyTopNestFilesLin(OV%Gen)
                         if (IV%NoDim == 2) then
                             call generateEnSightFileLin()
                         else
                             call generateEnSightFileLin3D(ind_Fitrack(ind_Fi(j)))
                         end if
-                    end if
-                end do
-            else
-                if (IV%SystemType == 'W') then
-                    call copyTopNestFilesWin(OV%Gen)
-                    call generateEnSightFileWin()
-                else
-                    call copyTopNestFilesLin(OV%Gen)
-                    if (IV%NoDim == 2) then
-                        call generateEnSightFileLin()
-                    else
-                        call generateEnSightFileLin3D(ind_Fitrack(ind_Fi(j)))
                     end if
                 end if
             end if
@@ -1219,13 +1221,11 @@ module Optimization
             Fi_initial(ii) = Ftemp
             OV%Precoutput(ii) = OV%Precovery
         end do
-        deallocate(OV%pressure)
-        deallocate(OV%MaLocal)
-        deallocate(OV%pTamb)
+        !deallocate(OV%pressure)
+        !deallocate(OV%MaLocal)
+        !deallocate(OV%pTamb)
         ! Output: Fitness depend on user Input (objective Function)
        
-        allocate(character(len=3) :: istr)
-        write(istr, '(1f3.1)') IV%Ma
         open(19,file=newdir//'/Fitness_0.txt', form='formatted',status='unknown')
         !open(19,file=TopFolder//'/Fitness_0.txt', form='formatted',status='unknown')
         write(19,'(1I1)',advance="no") 0
@@ -1234,7 +1234,6 @@ module Optimization
             write(19,'(1f17.10)') OV%Precoutput(1)
         end if
         close(19)
-        deallocate(istr)
       
         ! Pass on Top Snapshot parameters to Nests
         ind_Fi_initial = (/ (j, j=1,IV%NoSnap) /)
@@ -2359,7 +2358,9 @@ close(29)
         call InterpolateCoefficients(tempNests, newpressure)
         ralpha = IV%AlphaInflowDirection*Pi/180
         m = (/cos(ralpha), sin(ralpha)/)  ! tangent to flow direction
-        k = (/- m(2), m(1)/)                                                ! normal of flow direction 
+        k = (/- m(2), m(1)/)                                                ! normal of flow direction
+        Lift = 0.0
+        Drag = 0.0
         do i = 2, NoIB
             
             ! pressure portion
@@ -2395,7 +2396,7 @@ close(29)
             LastLine = FileSize/175
         else
             if (IV%SystemType == 'W') then
-                LastLine = FileSize/107
+                LastLine = FileSize/106 !107
             else     
                 LastLine = FileSize/106
             end if
