@@ -7,15 +7,14 @@ module CFD
     use GenerateMesh
     use FDGD
     
-    integer(kind = 4), dimension(8) :: timestart
-    
 contains
     
-    subroutine SubCFD(Start, Ending, CN_CoordinatesArray, sizing)
+    subroutine SubCFD(vecIndex, CN_CoordinatesArray, sizing)
     
         ! Variables
         implicit none
-        integer :: Start, Ending, i, sizing
+        integer :: i, sizing
+        integer, dimension(sizing) :: vecIndex
         double precision, dimension(sizing, maxDoF) :: CN_CoordinatesArray
 
         ! Body of SubCFD
@@ -23,21 +22,23 @@ contains
         ! ****Generate Meshes**** !
         allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
-        do i = Start, Ending          
-            print *, "Generating Mesh", i, "/", Ending
+        i = 1
+        do while (i .le. size(vecIndex, dim = 1))
+            print *, "Generating Mesh", vecIndex(i), "/", vecIndex(sizing)
             RD%coord_temp = RD%coord 
-            call SubMovemesh(CN_CoordinatesArray(i - Start + 1,:))
+            call SubMovemesh(CN_CoordinatesArray(i,:))
             !Output: new coordinates - Mesh with moved boundaries based on Initial Nest
             
     !!!!! IMPLEMENT Mesh Quality Test
     
             ! Write Snapshot to File
             if (IV%NoDim == 2) then
-                call writeDatFile(i)
+                call writeDatFile(vecIndex(i))
             elseif (IV%NoDim == 3) then
-                call writepltFile(i)
-                call writebcoFile(i)
+                call writepltFile(vecIndex(i))
+                call writebcoFile(vecIndex(i))
             end if
+        i = i + 1
         end do
         deallocate(RD%coord_temp)
  
@@ -47,30 +48,35 @@ contains
        
         ! ****call 2d preprocessor and pass on input parameters**** !
         print *, 'start preprocessing'
-        do i = start, ending  
-            call preprocessing(i)  
+        i = 1
+        do while (i .le. size(vecIndex, dim = 1)) 
+            call preprocessing(vecIndex(i))
+        i = i + 1
         end do
         print *, 'finished preprocessing'
         
-        ! Store timestamp
-        call date_and_time ( values = timestart )
-        
         ! ****call 2d flite solver and pass on input parameters**** !
         print *, 'call flite 2d solver'
-        !do i = start, ending        
-        !   call solver(i)               
-        !end do
-        do i = start, ending
-            ! Determine correct String      
-            call DetermineStrLen(istr, i)
-            call WriteSolverInpFile()
-            deallocate(istr)
-        end do
-        call writeBatchFile(start, ending)
-        call Triggerfile()     ! Triggerfile for submission
-        call system('chmod a+x ./Communication2')
-        call system('./Communication2')
-        
+        if (IV%SystemType == 'Q') then
+            i = 1
+            do while (i .le. size(vecIndex, dim = 1))       
+                call solver(vecIndex(i))
+            i = i + 1
+            end do
+        else
+            i = 1
+            do while (i .le. size(vecIndex, dim = 1))
+                ! Determine correct String      
+                call DetermineStrLen(istr, vecIndex(i))
+                call WriteSolverInpFile()
+                deallocate(istr)
+                i = i + 1
+            end do
+            call writeBatchFile(vecIndex(1), vecIndex(sizing))
+            call Triggerfile()     ! Triggerfile for submission
+            call system('chmod a+x ./Communication2')
+            call system('./Communication2')
+        end if       
         print *, 'finished submitting jobs to flite 2d solver' 
         
     end subroutine SubCFD
@@ -84,7 +90,7 @@ contains
         ! Body of PostSolverCheck
         ! ****Wait & Check for FLITE Solver Output**** !
         if (IV%runOnCluster == 'Y') then
-            call Sleep2(NoFiles)
+            call Sleep(NoFiles)
         end if
         
         if (IV%NoDim == 3) then
@@ -128,7 +134,7 @@ contains
         ! Body of PostSolverCheck
         ! ****Wait & Check for FLITE Solver Output**** !
         if (IV%runOnCluster == 'Y') then
-            call Sleep2(NoFiles)
+            call Sleep(NoFiles)
         end if
         
         if (IV%NoDim == 3) then
@@ -243,7 +249,7 @@ contains
                 ! Transfer Files from Windows Machine onto Cluster
                 call transferFilesWin()            
                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
-                call Triggerfile()           ! Triggerfile for submission
+                call TriggerFileQ()           ! Triggerfile for submission
                 ! Submits Batchfile via Putty
                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'putty')
             else
@@ -273,7 +279,7 @@ contains
         else    ! AerOpt is executed on a Linux cluster
             
             if (IV%runOnCluster == 'Y') then
-                call Triggerfile()     ! Triggerfile for submission
+                call TriggerFileQ()     ! Triggerfile for submission
             else
                 call TriggerFile2()               ! Triggerfile for submission
             end if
@@ -288,64 +294,6 @@ contains
     end subroutine Solver
     
     subroutine Sleep(NoFiles)
-    
-        ! Variables
-        implicit none
-        integer :: i, NoFiles, j
-    
-        ! Body of Sleep
-        print*, 'Start Sleep'
-        jobcheck = 0
-        waitTime = 0
-        j = 1
-        do while (jobcheck==0)
-        
-            ! Wait Function
-            print*, 'Sleep', IV%Ma
-            call SleepQQ(IV%delay*1000)
-            print*, 'Wake Up - Check ', j
-            j = j + 1
-        
-            ! Check Status of Simulation by checking the existence of all error files
-
-            do i = 1, NoFiles
-
-                ! Determine correct String      
-                call DetermineStrLen(istr, i)
-                ! Creates File containing Linux commands to check for last file
-                call CheckSimStatus()
-                ! Submit File
-                if (IV%SystemType == 'W')   then
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'plink')
-                else
-                    call system('chmod a+x ./Communication2')
-                    call system('./Communication2')
-                end if
-                ! Creates File to transfer response from Windows to Linux
-                if (IV%SystemType == 'W')   then
-                    call CheckSimStatus2()
-                    call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
-                end if
-            
-                open(1, file='check2.txt',form='formatted',status='old')
-                read(1,*) jobcheck
-                close(1)
-                deallocate(istr)
-                if (jobcheck == 0) EXIT           
-            
-            end do
-        
-            waitTime = (IV%delay/3600.0) + waitTime
-            if (waitTime > IV%waitMax) then
-                STOP 'Cluster Simulation Time exceeded maximum waiting Time'
-            end if
-        
-        end do
-        print*, 'End Sleep - Jobs are finished'
-        
-    end subroutine Sleep
-    
-    subroutine Sleep2(NoFiles)
     
         ! Variables
         implicit none
@@ -365,7 +313,7 @@ contains
             call SleepQQ(IV%delay*1000)
             print*, 'Wake Up - Check ', j
             j = j + 1
-           
+          
             ! Check Status of Simulations by checking if new output files have been moved
             do i = 1, NoFiles
                 
@@ -378,24 +326,23 @@ contains
                 
                 ! Check time of files generated
                 jobcheck = 0
-                if (timestart(2) == timeend(5)) then
-                if (timestart(3) == timeend(4)) then
-                    if (timestart(5) == timeend(3)) then  
-                        if (timestart(6) == timeend(2)) then
-                            if (timestart(7) == timeend(1)) then
+                    if (OV%timestart(3) == timeend(4)) then
+                        if (OV%timestart(5) == timeend(3)) then  
+                            if (OV%timestart(6) == timeend(2)) then
+                                if (OV%timestart(7) == timeend(1)) then
+                                    jobcheck = 1
+                                elseif (OV%timestart(7) < timeend(1)) then
+                                    jobcheck = 1
+                                end if
+                            elseif (OV%timestart(6) < timeend(2)) then
                                 jobcheck = 1
                             end if
-                        elseif (timestart(6) < timeend(2)) then
+                        elseif (OV%timestart(5) < timeend(3)) then
                             jobcheck = 1
                         end if
-                    elseif (timestart(5) < timeend(3)) then
-                            jobcheck = 1
+                    elseif (OV%timestart(3) < timeend(4)) then
+                        jobcheck = 1
                     end if
-                elseif (timestart(3) < timeend(4)) then
-                            jobcheck = 1
-                elseif (timestart(2) < timeend(5)) then
-                            jobcheck = 1
-                end if
                 if (jobcheck == 0) EXIT                           
             
             end do
@@ -408,7 +355,7 @@ contains
         end do
         print*, 'End Sleep - Jobs are finished'
         
-    end subroutine Sleep2
+    end subroutine Sleep
     
     subroutine CheckforConvergence(NoFiles)
     
@@ -493,19 +440,17 @@ contains
         
         if (NoConv /= 0 .and. Iter < 3) then
             
-            !!** Re-Do diverged solutions **!!
-            do ii = 1, NoConv
-                
-                if (InitConv == 0) then
-                    call SubCFD(DivNestPos(ii), DivNestPos(ii), CS%Snapshots(DivNestPos(ii),:), 1)
-                else
-                    call SubCFD(DivNestPos(ii), DivNestPos(ii), OV%Nests(DivNestPos(ii),:), 1)    
-                end if
-                
-            end do
+            !!** Re-Do diverged solutions **!!                
+            if (InitConv == 0) then
+                call SubCFD(DivNestPos, CS%Snapshots(DivNestPos,:), NoConv)
+            else
+                call SubCFD(DivNestPos, OV%Nests(DivNestPos,:), NoConv)    
+            end if
+        
+            call Sleep(NoFiles)
             
-            call Sleep2(NoFiles)
-
+            call SubDeleteLogFiles()
+            
             call CheckforConvergenceInit(Iter, InitConv, NoFiles)
             
         end if
@@ -581,4 +526,65 @@ contains
     
     end subroutine SubDeleteLogFiles
     
+    
+    
+    
+    !subroutine Sleep(NoFiles)
+    !
+    !    ! Variables
+    !    implicit none
+    !    integer :: i, NoFiles, j
+    !
+    !    ! Body of Sleep
+    !    print*, 'Start Sleep'
+    !    jobcheck = 0
+    !    waitTime = 0
+    !    j = 1
+    !    do while (jobcheck==0)
+    !    
+    !        ! Wait Function
+    !        print*, 'Sleep', IV%Ma
+    !        call SleepQQ(IV%delay*1000)
+    !        print*, 'Wake Up - Check ', j
+    !        j = j + 1
+    !    
+    !        ! Check Status of Simulation by checking the existence of all error files
+    !
+    !        do i = 1, NoFiles
+    !
+    !            ! Determine correct String      
+    !            call DetermineStrLen(istr, i)
+    !            ! Creates File containing Linux commands to check for last file
+    !            call CheckSimStatus()
+    !            ! Submit File
+    !            if (IV%SystemType == 'W')   then
+    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'plink')
+    !            else
+    !                call system('chmod a+x ./Communication2')
+    !                call system('./Communication2')
+    !            end if
+    !            ! Creates File to transfer response from Windows to Linux
+    !            if (IV%SystemType == 'W')   then
+    !                call CheckSimStatus2()
+    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
+    !            end if
+    !        
+    !            open(1, file='check2.txt',form='formatted',status='old')
+    !            read(1,*) jobcheck
+    !            close(1)
+    !            deallocate(istr)
+    !            if (jobcheck == 0) EXIT           
+    !        
+    !        end do
+    !    
+    !        waitTime = (IV%delay/3600.0) + waitTime
+    !        if (waitTime > IV%waitMax) then
+    !            STOP 'Cluster Simulation Time exceeded maximum waiting Time'
+    !        end if
+    !    
+    !    end do
+    !    print*, 'End Sleep - Jobs are finished'
+    !    
+    !end subroutine Sleep
+    !
 end module CFD

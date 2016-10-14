@@ -59,7 +59,7 @@ module FDGD
         call CheckforIntersections(DelaunayCoordDomain, DelaunayElemDomain, intersect)
 
         ! Move Domain Nodes
-        if (intersect == 1) then
+        if (intersect == 0) then
             if (counter < NoMove) then
                 counter = counter + 1
                 call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))              
@@ -131,7 +131,7 @@ module FDGD
         call CheckforIntersections_3D(DelaunayCoordDomain, DelaunayElemDomain, intersect)
 
         ! Move Domain Nodes
-        if (intersect == 1) then
+        if (intersect == 0) then
             !if (counter < NoMove) then
             !    counter = counter + 1
             !    call RelocateMeshPoints_3D(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))              
@@ -642,7 +642,7 @@ module FDGD
         double precision, dimension(:), optional :: x, y
     
         ! Body of CheckforIntersections
-        intersect = 1
+        intersect = 0
         !NoElem = size(DelaunayElem, dim = 1)
         j = 1
         do while (DelaunayElem(j,1) /= 0)        
@@ -655,19 +655,19 @@ module FDGD
             S = 0.5*((xa*yb + ya*xc + xb*yc) - (xa*yc + ya*xb + yb*xc))
             j = j + 1
             if (S < 0) then  ! If Area negative, the order of the points has changed (DelaunayElement order) and hence an intersection of elements took place
-                print *, 'Intersection identified. Movement will be split up.'
-                !open(1, file= 'Delaunaynodes.dat', form='formatted', status = 'unknown')
-                !write(1,'(2f22.15)') transpose(DelaunayCoord)
-                !close(1)
-                !open(1, file= 'DelaunayElem.dat', form='formatted', status = 'unknown')
-                !write(1,'(3I8)') transpose(DelaunayElem)
-                !close(1)
-                !open(1, file= 'XYcoord.dat', form='formatted', status = 'unknown')
-                !do i = 1, size(x)
-                !    write(1,'(2f22.15)') x(i), y(i)
-                !end do
-                !close(1)
-                intersect = 0
+                print *, 'Intersection identified. Movement will be split up if not along boundary.'
+                open(1, file= 'Delaunaynodes.dat', form='formatted', status = 'unknown')
+                write(1,'(2f22.15)') transpose(DelaunayCoord)
+                close(1)
+                open(1, file= 'DelaunayElem.dat', form='formatted', status = 'unknown')
+                write(1,'(3I8)') transpose(DelaunayElem)
+                close(1)
+                open(1, file= 'XYcoord.dat', form='formatted', status = 'unknown')
+                do i = 1, size(x)
+                    write(1,'(2f22.15)') x(i), y(i)
+                end do
+                close(1)
+                intersect = 1
                 EXIT
             end if
         end do
@@ -686,7 +686,7 @@ module FDGD
         integer, dimension(:,:) :: DelaunayElem
     
         ! Body of CheckforIntersections
-        intersect = 1
+        intersect = 0
         NoElem = size(DelaunayElem, dim = 1)
         do j = 1, NoElem
             xa = DelaunayCoord(DelaunayElem(j,1),1)
@@ -705,7 +705,7 @@ module FDGD
             S = (1/6)*Det(A,4)
             if (S < 0) then  ! If Area negative, the order of the points has changed (DelaunayElement order) and hence an intersection of elements took place
                 print *, 'Intersection identified. Movement will be split up.'
-                intersect = 0
+                intersect = 1
                 EXIT
             end if
         end do

@@ -795,8 +795,9 @@ module Optimization
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         
         ! Evaluate Fitness of first Generation
-        !call SubCFD((/ (j, j=1,IV%NoSnap) /), CS%Snapshots, IV%NoSnap)
-        !call PostSolverCheckInit(IV%NoSnap, 0)
+        call date_and_time ( values = OV%timestart )
+        call SubCFD((/ (j, j=1,IV%NoSnap) /), CS%Snapshots, IV%NoSnap)
+        call PostSolverCheckInit(IV%NoSnap, 0)
         
         ! Extract moving initial Nests
         j = 1
@@ -868,7 +869,9 @@ module Optimization
             print *, ''
             print *, IV%Ma, IV%NoCN
             call timestamp()
-          
+            ! Store timestamp
+            call date_and_time ( values = OV%timestart )
+            
             !!****** Adaptive Sampling - Start New Jobs (first and last Fitness) *******!!
             if (OV%Gen > 2 .and. OV%Gen < IV%NoG .and. IV%AdaptSamp == .true.) then
                 
@@ -1221,9 +1224,9 @@ module Optimization
             Fi_initial(ii) = Ftemp
             OV%Precoutput(ii) = OV%Precovery
         end do
-        !deallocate(OV%pressure)
-        !deallocate(OV%MaLocal)
-        !deallocate(OV%pTamb)
+        deallocate(OV%pressure)
+        deallocate(OV%MaLocal)
+        deallocate(OV%pTamb)
         ! Output: Fitness depend on user Input (objective Function)
        
         open(19,file=newdir//'/Fitness_0.txt', form='formatted',status='unknown')

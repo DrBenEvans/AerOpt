@@ -704,7 +704,6 @@ contains
         open(1, file='Communication2', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        !write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr
         write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir
         
         if (IV%SystemType /= 'B') then
@@ -715,6 +714,27 @@ contains
         close(1)
           
     end subroutine TriggerFile
+    
+    subroutine TriggerFileQ()
+    ! Objectives: Triggerfile for Cluster Simulation & Parallelisation
+    
+        ! Variables
+        implicit none
+    
+        ! Body of TriggerFile
+        open(1, file='Communication2', form='formatted',status='unknown')
+        write(1,*) 'cd '
+        write(1,*) 'cd ..'
+        write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr 
+        
+        if (IV%SystemType /= 'B') then
+            write(1,*) 'qsub batchfile'
+        else
+            write(1,*) 'sbatch batchfile'
+        end if
+        close(1)
+          
+    end subroutine TriggerFileQ
     
     subroutine TriggerFile2()
     ! Objectives: Triggerfile for noncluster Simulation

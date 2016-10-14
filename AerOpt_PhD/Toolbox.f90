@@ -3,6 +3,7 @@ module Toolbox
     type OptimizationVariables
     
         integer, dimension(:), allocatable :: engInNodes           ! Engine inlet Nodes
+        integer(kind = 4), dimension(8) :: timestart
         integer :: Gen
         double precision :: Precovery
         double precision, dimension(:,:), allocatable :: modes, coeff, modes2, coeff2       ! Modes and Coefficient derived by the POD method

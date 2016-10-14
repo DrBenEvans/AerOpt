@@ -190,11 +190,10 @@ print *, conv
         ! Check for valid background mesh
         call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
         call CheckforIntersections(DelaunayCoordDomain, DelaunayElemDomain, intersect, x, y)
-      
+        call CheckBoundIntersections(x, y, intersect)
+        
         ! Move Domain Nodes
-! ADDED artificially 
-        NoMove = 1
-        if (intersect == 1) then
+        if (intersect == 0) then
             if (counter < NoMove) then
                 counter = counter + 1
                 call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1)) 
@@ -206,13 +205,17 @@ print *, conv
                     call PreMeshingEnd()
                 end if
             end if
-        else
+        elseif (intersect == 1) then
             RD%coord_temp(orderedBoundaryIndex,1) = xbefore
             RD%coord_temp(orderedBoundaryIndex,2) = ybefore 
             counter = 2*counter-1
-            !NoMove = NoMove*2
-            CNDisp = CNDisp/2.0 ! TO-DO only if intersection along boundary was identified
+            NoMove = NoMove*2
             call SmoothingLinear(CNDisp, NoMove, counter)
+        else
+            RD%coord_temp(orderedBoundaryIndex,1) = xbefore
+            RD%coord_temp(orderedBoundaryIndex,2) = ybefore 
+            CNDisp = CNDisp/2.0
+            call SmoothingLinear(CNDisp, NoMove, counter)            
         end if
        
     end subroutine SmoothingLinear
@@ -389,9 +392,10 @@ print *, conv
         ! Check for valid background mesh
         call getDelaunayCoordDomain(RD%Coord_temp, size(RD%Coord_temp, dim = 1), size(RD%Coord_temp, dim = 2))
         call CheckforIntersections(DelaunayCoordDomain, DelaunayElemDomain, intersect)
+        call CheckBoundIntersections(x, y, intersect)
         
         ! Move Domain Nodes
-        if (intersect == 1) then
+        if (intersect == 0) then
             if (counter < NoMove) then
                 counter = counter + 1
                 call RelocateMeshPoints(DelaunayCoordDomain, DelaunayElemDomain, AreaCoeffDomain, size(AreaCoeffDomain, dim = 1))              
@@ -406,7 +410,7 @@ print *, conv
                     deallocate(dRot)
                 end if
             end if
-        else
+        elseif (intersect == 1) then
             RD%coord_temp(orderedBoundaryIndex,1) = xbefore
             RD%coord_temp(orderedBoundaryIndex,2) = ybefore
             if (allocated(dRot) == .true.) then
@@ -415,6 +419,14 @@ print *, conv
             NoMove = NoMove*2
             counter = 2*counter-1
             call SmoothingFDGD(CNDisp, NoMove, counter)
+        else
+            RD%coord_temp(orderedBoundaryIndex,1) = xbefore
+            RD%coord_temp(orderedBoundaryIndex,2) = ybefore
+            if (allocated(dRot) == .true.) then
+                deallocate(dRot)
+            end if
+            CNDisp = CNDisp/2.0
+            call SmoothingFDGD(CNDisp, NoMove, counter)            
         end if
 
     end subroutine SmoothingFDGD
@@ -1283,5 +1295,58 @@ beta2(1) = 0.1
         normx = normx/(normy + normx)
                     
     end subroutine normXYclosed
+    
+    subroutine CheckBoundIntersections(x, y, intersect)
+        
+        ! Variables
+        implicit none
+        integer :: i, j, nibp, intersect
+        double precision :: A, B, C, Atarget, Btarget, Ctarget, detAB, detCB, detAC, xtemp, ytemp
+        double precision, dimension(:), allocatable :: x, y
+   
+        ! Body of getPressureDistribution
+        nibp = size(InnerBound)
+        
+        ! Identify intersections between target and current boundary
+        do j = 1, nibp-1
+            do i = j+2, nibp-1
+                
+                ! Calculate intersection point
+                A = y(j+1) - y(j)
+                B = x(j) - x(j+1)
+                C = A*x(j) + B*y(j)
+                
+                Atarget = y(i+1) - y(i)
+                Btarget = x(i) - x(i+1)
+                Ctarget = Atarget*x(i) + Btarget*y(i)
+                
+                detAB = A*Btarget - Atarget*B
+                detCB = C*Btarget - Ctarget*B
+                detAC = A*Ctarget - Atarget*C
+                if (abs(detAB) < abs(10e-12)) then
+                    ! Parallel
+                    xtemp = -1000
+                    ytemp = -1000
+                else
+                    ! Non-parallel
+                    xtemp = detCB/detAB
+                    ytemp = detAC/detAB
+                end if
+                
+                ! Check, if intersection point lays on the line segment considered 
+                if ((xtemp - min(x(j),x(j+1))) > -10e-12 .and. (xtemp - max(x(j),x(j+1))) < 10e-12 .and. (ytemp - min(y(j),y(j+1))) > -10e-12  .and. (ytemp - max(y(j),y(j+1))) < 10e-12)  then
+                    if ((xtemp - min(x(i),x(i+1))) > -10e-12 .and. (xtemp - max(x(i),x(i+1))) < 10e-12  .and. (ytemp - min(y(i),y(i+1))) > -10e-12  .and. (ytemp - max(y(i),y(i+1))) < 10e-12 )  then
+                        print *, 'Intersection along Boundary identified. Movement will be halfed.'
+                        intersect = 2
+                        EXIT
+                    end if
+                end if
+            end do
+            if (intersect == 2) then
+                EXIT
+            end if
+        end do
+        
+    end subroutine CheckBoundIntersections
     
     end module Smoothing
