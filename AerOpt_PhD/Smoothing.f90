@@ -136,7 +136,10 @@
             ! Number of sweeps is pre-calculated and fixed during the smoothing
             ! This is not exact, but accurate enough
             NoSweeps = floor(NoSweepsInit*(betamean/betamin)**2)
-
+if (NoSweeps > NoSweepsInit*50) then
+    print *, 'NoSweeps is too big. It will be reduced.'
+    NoSweeps = NoSweepsInit*50
+end if
             do isweep = 1, NoSweeps
                 
                 ! Calculate Second Derivative after

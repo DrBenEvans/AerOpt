@@ -769,7 +769,7 @@ module Optimization
         ! Body of SubOptimization
         print *, ''
         print *, '*************************************'
-        print *, '******    Start MCS Optmization   *******'
+        print *, '****    Start MCS Optmization   *****'
         print *, '**                                 **'
         print *, '**  written by Dr. DAVID NAUMANN   **'
         print *, '**  supervised by Dr. BEN EVANS    **'
@@ -798,7 +798,7 @@ module Optimization
         call date_and_time ( values = OV%timestart )
         call SubCFD((/ (j, j=1,IV%NoSnap) /), CS%Snapshots, IV%NoSnap)
         call PostSolverCheckInit(IV%NoSnap, 0)
-        
+       
         ! Extract moving initial Nests
         j = 1
         do i = 1, size(CS%cond)            
@@ -845,9 +845,8 @@ module Optimization
         allocate(ind_Fi(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ind_Fitrack(IV%NoNests),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        
-        
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "       
+       
         ! Write Output File for Analysis including Initial and all moved Nests of each Generation
         call writeFitnessandNestoutput()
 !! EXTRA      
@@ -857,8 +856,7 @@ module Optimization
 !            deallocate(istr)
 !        end do
 !        call writeFitnessandNestoutput()
-!        pause
-        
+       
         !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
         do G = 2, IV%NoG
         OV%Gen = G
@@ -1040,7 +1038,7 @@ module Optimization
                 end if
                 
             end do
-             
+
             ! Store moved Nests in Output Analysis File
             open(39,file=newdir//'/TopNest.txt',form='formatted',status='unknown',position='append')
             write(39, *) 'Generation', OV%Gen
@@ -1261,13 +1259,13 @@ module Optimization
         !else
             store = 1
         !end if
-        do j = 1, store                    
+       do j = 1, store                    
             if (IV%SystemType == 'W') then
-                call moveTopNestFilesWin(ind_Fi_initial(j))
+               call moveTopNestFilesWin(ind_Fi_initial(j))
                 call generateEnSightFileWin()
             else
                 call moveTopNestFilesLin(ind_Fi_initial(j))
-                if (IV%NoDim == 2) then
+               if (IV%NoDim == 2) then
                     call generateEnSightFileLin()
                 else
                     call generateEnSightFileLin3D(ind_Fi_initial(j))
@@ -2720,9 +2718,9 @@ close(29)
         
         ! Read in Target Reference Data
         nibp = size(InnerBound)
-        inquire(file=DataFolder//'/Geom_target.txt', exist = ex)
+        inquire(file=DataFolder//'/Geom_target_NACA4412.txt', exist = ex)
         if (ex == .true.) then
-            open(29,file=DataFolder//'/Geom_target.txt',form='formatted',status='old')
+            open(29,file=DataFolder//'/Geom_target_NACA4412.txt',form='formatted',status='old')
         else
             STOP "The file 'Geom_target' does not exist. Please generate!"
         end if
@@ -2969,7 +2967,7 @@ close(29)
         deallocate(RD%coord_temp)
         
         ! Calculate y(pressure coefficient)
-        p0 = 1.344037930148188 ! Soft code later, this is specific for Ma = 0.729, Re = 6.5e7, T = 255.658 and l = 1 feet
+        p0 = 1.344037930148188 !0.178569528995839  !2.857162211411720 ! For Ma = 0.5!1.344037930148188 ! Soft code later, this is specific for Ma = 0.729, Re = 6.5e7, T = 255.658 and l = 1 feet
         y = (OV%pressure(orderedBoundaryIndex, NoSnapshot)/p0 - 1)/(0.5*IV%gamma*IV%Ma**2)
           
         if (nibp > nbp_target) then

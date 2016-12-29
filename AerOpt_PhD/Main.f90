@@ -60,10 +60,11 @@ program AerOpt
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     print *, 'Create Directories'
     call CreateFolderStructure()      
-    
+   
     ! *****Create Initial Nests for the Snapshots****** ! 
     print *, 'Start LHS Sampling - Create Initial Nests'
-    call SubCreateSnapshots()    
+    call SubCreateSnapshots()
+ 
     ! Output: Initial Nests - Sampling Points for Snapshots
     allocate(character(len=3) :: istr)
     write(istr, '(1f3.1)') IV%Ma

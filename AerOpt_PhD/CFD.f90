@@ -74,8 +74,8 @@ contains
             end do
             call writeBatchFile(vecIndex(1), vecIndex(sizing))
             call Triggerfile()     ! Triggerfile for submission
-            call system('chmod a+x ./Communication2')
-            call system('./Communication2')
+            call system('chmod a+x ./Communication')
+            call system('./Communication')
         end if       
         print *, 'finished submitting jobs to flite 2d solver' 
         
@@ -248,10 +248,10 @@ contains
             if (IV%runOnCluster == 'Y') then
                 ! Transfer Files from Windows Machine onto Cluster
                 call transferFilesWin()            
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
                 call TriggerFileQ()           ! Triggerfile for submission
                 ! Submits Batchfile via Putty
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'putty')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'putty')
             else
                 print *, 'Solving Geometry', i
                 allocate(character(len=200) :: strSystem)
@@ -285,8 +285,8 @@ contains
             end if
             
             ! Submits Batchfile
-            call system('chmod a+x ./Communication2')
-            call system('./Communication2')
+            call system('chmod a+x ./Communication')
+            call system('./Communication')
                     
         end if
         deallocate(istr)
@@ -518,10 +518,10 @@ contains
         
         call DeleteLogFiles()
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
-            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
+            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
         elseif (IV%SystemType /= 'W')  then                
-            call system('chmod a+x ./Communication2')
-            call system('./Communication2')
+            call system('chmod a+x ./Communication')
+            call system('./Communication')
         end if
     
     end subroutine SubDeleteLogFiles
@@ -558,18 +558,18 @@ contains
     !            call CheckSimStatus()
     !            ! Submit File
     !            if (IV%SystemType == 'W')   then
-    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'plink')
+    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'plink')
     !            else
-    !                call system('chmod a+x ./Communication2')
-    !                call system('./Communication2')
+    !                call system('chmod a+x ./Communication')
+    !                call system('./Communication')
     !            end if
     !            ! Creates File to transfer response from Windows to Linux
     !            if (IV%SystemType == 'W')   then
     !                call CheckSimStatus2()
-    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication2', 'psftp')
+    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
     !            end if
     !        
-    !            open(1, file='check2.txt',form='formatted',status='old')
+    !            open(1, file='check.txt',form='formatted',status='old')
     !            read(1,*) jobcheck
     !            close(1)
     !            deallocate(istr)
