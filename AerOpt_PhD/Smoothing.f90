@@ -140,6 +140,7 @@ if (NoSweeps > NoSweepsInit*50) then
     print *, 'NoSweeps is too big. It will be reduced.'
     NoSweeps = NoSweepsInit*50
 end if
+
             do isweep = 1, NoSweeps
                 
                 ! Calculate Second Derivative after
@@ -357,12 +358,6 @@ print *, conv
             end do
             RD%coord_temp(orderedBoundaryIndex,1) = x
             RD%coord_temp(orderedBoundaryIndex,2) = y
-            
-!open(1, file= 'XYcoord.dat', form='formatted', status = 'unknown')
-!do isweep = 1, 258
-!    write(1,'(2f22.15)') x(isweep), y(isweep)
-!end do
-!close(1)
     
             ! Check for convergence 
             res = sqrt(sum((x(CN_indordered) - CNxsmooth)**2 + (y(CN_indordered) - CNysmooth)**2))

@@ -436,9 +436,12 @@ contains
     elseif (i < 1000) then
         allocate(character(len=3) :: istr)
         write( istr, '(I3)' )  i
-    else
+    elseif (i < 10000) then
         allocate(character(len=4) :: istr)
         write( istr, '(I4)' )  i
+    else
+        allocate(character(len=5) :: istr)
+        write( istr, '(I5)' )  i        
     end if
 
     end subroutine DetermineStrLen

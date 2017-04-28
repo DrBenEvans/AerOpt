@@ -38,8 +38,6 @@ module Optimization
         integer, dimension(:), allocatable :: ind_Fi, ReferenceAgentsIndex
         logical :: Converge, exist
         character(len=5) :: strNoSnap
-        !double precision, dimension(20, maxDOF) :: Nesting
-        !double precision, dimension(RD%np) :: newpressure
 
         allocate(NormFact(IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
@@ -61,7 +59,7 @@ module Optimization
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
         allocate(Frange(2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation " 
-        allocate(OV%converged(IV%NoNests),stat=allocateStatus)
+        allocate(OV%converged(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         ! Specific for Adaptive Sampling
         allocate(newSnapshots(2,maxDoF),stat=allocateStatus)
@@ -87,6 +85,7 @@ module Optimization
         beta = 0.0
         
         ! Evaluate Fitness of first Generation
+	    call date_and_time ( values = OV%timestart )
         call SubCFD((/ (j, j=1, IV%NoSnap) /), CS%Snapshots, IV%NoSnap)
         call PostSolverCheckInit(IV%NoSnap, 0)
         
@@ -108,20 +107,6 @@ module Optimization
         ! Extract Pressure of Snapshots
         call InitiatePressure()
         
-        ! Approximate Pressure Field of RandNest input file        
-        !open(11,file=newdir//'/RandNest.txt')
-        !read(11,'(20f17.10)') Nesting
-        !close(11)
-        !do i = 1, 20
-        !    call DetermineStrLen(istr, i)
-        !    call InterpolateCoefficients(Nesting(i,:), newPressure)
-        !    open(23,file=newdir//'/NewPressure'//istr//'.txt')
-        !    write(23,'(1f25.10)') newpressure           
-        !    close(23)
-        !    deallocate(istr)
-        !end do
-        !pause
-        
         ! Extract Initial Fitness and Transfer to general Fitness vector
         call TransferInitialFitness(Snapshots_Move)
         Fibefore = OV%Fi(1)
@@ -135,7 +120,7 @@ module Optimization
         CR = 0.9
         F = 0.8
       
-        !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
+        !!*** Loop over all DE Generations - each Generation creates new vector Agents ***!!
         do G = 2, IV%NoG
         OV%Gen = G
             print *, ''
@@ -145,7 +130,8 @@ module Optimization
             print *, ''
             print *, IV%Ma, IV%NoCN
             call timestamp()
-          
+            call date_and_time ( values = OV%timestart )
+
             !!****** Adaptive Sampling - Start New Jobs (first and last Fitness) *******!!
             if (OV%Gen > 2 .and. OV%Gen < IV%NoG .and. IV%AdaptSamp == .true.) then
                 
@@ -240,25 +226,20 @@ module Optimization
             end do
             
             if (IV%POD == .false.) then
-                
-                ! Store moved Nests in Output Analysis File for Restart
-                open(29,file=newdir//'/Neststemp.txt',form='formatted',status='unknown')
-                write(29,'(<IV%NoNests>f17.10)') OV%Nests
-                close(29)
             
                 !Generate Full Fidelity Solution      
                 call SubCFD((/ (j, j=1, IV%NoNests) /),tempAgent, IV%NoNests)          
                 ! Check ALL new Nests
                 print *, 'Generation: ', OV%Gen
-                !call PostSolverCheck(IV%NoNests, 1)
+                call PostSolverCheck(IV%NoNests, 1)
  
                 ! Evaluate Fitness of Full Fidelity Nest Solutions
-                !print *, 'Extract Pressure of Generation', OV%Gen
-                !if (IV%NoDim == 2) then
-                !    call ExtractPressure(1, IV%NoNests)
-                !elseif (IV%NoDim == 3) then
-                !    call ExtractPressure_3D(1, IV%NoNests)
-                !end if
+                print *, 'Extract Pressure of Generation', OV%Gen
+                if (IV%NoDim == 2) then
+                    call ExtractPressure(1, IV%NoNests)
+                elseif (IV%NoDim == 3) then
+                    call ExtractPressure_3D(1, IV%NoNests)
+                end if
                 do ii = 1, IV%NoNests
                     call getObjectiveFunction(.false., Ftemp, NoSnapshot=ii)
               
@@ -270,9 +251,9 @@ module Optimization
                         OV%Precoutput(ii) = OV%Precovery
                      end if
                 end do
-                !deallocate(OV%pressure)
-                !deallocate(OV%MaLocal)
-                !deallocate(OV%pTamb)
+                deallocate(OV%pressure)
+                deallocate(OV%MaLocal)
+                deallocate(OV%pTamb)
             end if
             
             !!*** Adaptive Sampling - Finish and Integrate New Jobs (first and last Fitness) ***!!
@@ -312,7 +293,7 @@ module Optimization
                 do j = 1, store                    
                     if (IV%SystemType == 'W') then
                         call moveTopNestFilesWin(ind_Fi(j))
-                        !call generateEnSightFileWin()
+                        call generateEnSightFileWin()
                     else
                         call moveTopNestFilesLin(ind_Fi(j))
                         if (IV%NoDim == 2) then
@@ -325,7 +306,7 @@ module Optimization
             else
                 if (IV%SystemType == 'W') then
                     call copyTopNestFilesWin(OV%Gen)
-                    !call generateEnSightFileWin()
+                    call generateEnSightFileWin()
                 else
                     call copyTopNestFilesLin(OV%Gen)
                     if (IV%NoDim == 2) then
@@ -364,8 +345,6 @@ module Optimization
         integer, dimension(:), allocatable :: ind_Fi, NeighboursIndex
         logical :: Converge, exist
         character(len=5) :: strNoSnap
-        !double precision, dimension(20, maxDOF) :: Nesting
-        !double precision, dimension(RD%np) :: newpressure
 
         allocate(NormFact(IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
@@ -391,7 +370,7 @@ module Optimization
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(OV%Precoutput(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(OV%converged(IV%NoNests),stat=allocateStatus)
+        allocate(OV%converged(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         
         ! Specific for Adaptive Sampling
@@ -439,20 +418,6 @@ module Optimization
         ! Extract Pressure of Snapshots
         call InitiatePressure()
         
-        ! Approximate Pressure Field of RandNest input file        
-        !open(11,file=newdir//'/RandNest.txt')
-        !read(11,'(20f17.10)') Nesting
-        !close(11)
-        !do i = 1, 20
-        !    call DetermineStrLen(istr, i)
-        !    call InterpolateCoefficients(Nesting(i,:), newPressure)
-        !    open(23,file=newdir//'/NewPressure'//istr//'.txt')
-        !    write(23,'(1f25.10)') newpressure           
-        !    close(23)
-        !    deallocate(istr)
-        !end do
-        !pause
-        
         ! Extract Initial Fitness and Transfer to general Fitness vector
         call TransferInitialFitness(Snapshots_Move)
         Fibefore = OV%Fi(1)
@@ -477,7 +442,7 @@ module Optimization
         LocalNest = OV%Nests
         F = 0.8
         
-        !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
+        !!*** Loop over all PSO Generations - each Generation creates new Particles ***!!
         do G = 2, IV%NoG
         OV%Gen = G
             print *, ''
@@ -487,7 +452,8 @@ module Optimization
             print *, ''
             print *, IV%Ma, IV%NoCN
             call timestamp()
-          
+            call date_and_time ( values = OV%timestart ) 
+
             !!****** Adaptive Sampling - Start New Jobs (first and last Fitness) *******!!
             if (OV%Gen > 2 .and. OV%Gen < IV%NoG .and. IV%AdaptSamp == .true.) then
                 
@@ -590,15 +556,15 @@ module Optimization
                 call SubCFD((/ (j, j=1, IV%NoNests) /),LocalNest, IV%NoNests)              
                 ! Check ALL new Nests
                 print *, 'Generation: ', OV%Gen
-                !call PostSolverCheck(IV%NoNests, 1)   
+                call PostSolverCheck(IV%NoNests, 1)   
  
                 ! Evaluate Fitness of Full Fidelity Nest Solutions
-                !print *, 'Extract Pressure of Generation', OV%Gen
-                !if (IV%NoDim == 2) then
-                !    call ExtractPressure(1, IV%NoNests)
-                !elseif (IV%NoDim == 3) then
-                !    call ExtractPressure_3D(1, IV%NoNests)
-                !end if
+                print *, 'Extract Pressure of Generation', OV%Gen
+                if (IV%NoDim == 2) then
+                    call ExtractPressure(1, IV%NoNests)
+                elseif (IV%NoDim == 3) then
+                    call ExtractPressure_3D(1, IV%NoNests)
+                end if
                 do ii = 1, IV%NoNests
                     call getObjectiveFunction(.false., LocalFi(ii), NoSnapshot=ii)
               
@@ -610,9 +576,9 @@ module Optimization
                         OV%Precoutput(ii) = OV%Precovery
                     end if
                 end do
-                !deallocate(OV%pressure)
-                !deallocate(OV%MaLocal)
-                !deallocate(OV%pTamb)
+                deallocate(OV%pressure)
+                deallocate(OV%MaLocal)
+                deallocate(OV%pTamb)
             end if
                     
             !!*** Adaptive Sampling - Finish and Integrate New Jobs (first and last Fitness) ***!!
@@ -736,8 +702,6 @@ module Optimization
         integer, dimension(:), allocatable :: ind_Fi, ind_Fitrack
         logical :: Converge
         character(len=5) :: strNoSnap
-        double precision, dimension(20, maxDOF) :: Nesting
-        double precision, dimension(RD%np) :: newpressure
 
         allocate(NormFact(IV%DoF),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
@@ -757,7 +721,7 @@ module Optimization
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(OV%Precoutput(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-        allocate(OV%converged(IV%NoNests),stat=allocateStatus)
+        allocate(OV%converged(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         
         ! Specific for Adaptive Sampling
@@ -817,49 +781,21 @@ module Optimization
         ! Extract Pressure of Snapshots
         call InitiatePressure()
         
-        ! For only getting Fitness/Pressure
-        !do i = 1, 20
-        !    call DetermineStrLen(istr, i)
-        !    open(23,file=newdir//'/Pressure'//istr//'.txt')
-        !    write(23,'(1f25.10)') OV%pressure(:,i)           
-        !    close(23)
-        !    deallocate(istr)
-        !end do
-        
-        !! Approximate Pressure Field of RandNest input file        
-        !open(11,file=newdir//'/RandNest.txt')
-        !read(11,'(20f17.10)') Nesting
-        !close(11)
-        !do i = 1, 20
-        !    call InterpolateCoefficients(Nesting(i,:), newPressure, newMaLocal)
-        !    open(23,file=newdir//'/NewPressure'//istr//'.txt')
-        !    write(23,'(1f25.10)') newpressure           
-        !    close(23)
-        !    deallocate(istr)
-        !end do
-        !pause
-        
         ! Extract Initial Fitness and Transfer to general Fitness vector
         call TransferInitialFitness(Snapshots_Move)
         Fibefore = OV%Fi(1)
         allocate(ind_Fi(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ind_Fitrack(IV%NoNests),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "       
-       
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "   
+    
         ! Write Output File for Analysis including Initial and all moved Nests of each Generation
         call writeFitnessandNestoutput()
-!! EXTRA      
-!        do ii = 1, 10
-!            call DetermineStrLen(istr, ii)
-!            call getObjectiveFunction(.true., OV%Fi(ii), CS%Snapshots(ii,:))
-!            deallocate(istr)
-!        end do
-!        call writeFitnessandNestoutput()
        
         !!*** Loop over all Cuckoo Generations - each Generation creates new Nests ***!!
         do G = 2, IV%NoG
         OV%Gen = G
+        ind_Fitrack = (/ (i, i=1,IV%NoNests) /)
             print *, ''
             print *, '************************'
             print *, 'Generation ', OV%Gen
@@ -920,9 +856,11 @@ module Optimization
                 end do
 
                 if (IV%POD == .true.) then
+					call DetermineStrLen(istr, ii)
                     ! calculate Objective Function via POD (Fitness, Nest Locations)
                     call getObjectiveFunction(.true., OV%Fi(ii), tempNests, ii)               
                     ! Output: ONE Fitnessvalue(Fi)
+					deallocate(istr)
                 end if
                
                 ! Embed temporary Nest into Nests
@@ -994,9 +932,6 @@ module Optimization
                     do k = 1, IV%NoNests                  
                         if (all(tempNests_move == OV%Nests_move(k,:)) .or. all(tempNests_move == TopNest_move(ceiling(k*(1-IV%Low2Top)),:))) then
                             print*, 'Nest already exists'
-                            open(39,file=newdir//'/NestDoubled.txt',form='formatted',status='unknown',position='append')
-                            write(39, *) 'Generation', OV%Gen, 'replaced'
-                            close(39)
                             ! Perform Random Walk instead                   
                             Ac = IV%Aconst/(OV%Gen**2.0)
                             call random_number(CS%rn)
@@ -1022,9 +957,11 @@ module Optimization
                 TopNest_move(ii,:) = tempNests_move
                 
                 if (IV%POD == .true.) then
+					call DetermineStrLen(istr, ii)
                     ! Update Objective Function via POD (Fitness, Nest Locations)
                     call getObjectiveFunction(.true., Ftemp, tempNests, ii)
                     ! Output: ONE Fitnessvalue(Fi)
+                    deallocate(istr)
                     
                     ! Check if new Fitness is better than a Random Top Nest, If yes replace values
                     call random_number(CS%rn)
@@ -1034,16 +971,11 @@ module Optimization
                         OV%Nests(randomNest,:) = tempNests
                         OV%Fi(randomNest) = Ftemp
                         OV%Precoutput(randomNest) = OV%Precovery
+                        ind_Fitrack(randomNest) = ii
                      end if
                 end if
                 
             end do
-
-            ! Store moved Nests in Output Analysis File
-            open(39,file=newdir//'/TopNest.txt',form='formatted',status='unknown',position='append')
-            write(39, *) 'Generation', OV%Gen
-            write(39,'(<NoTop>f17.10)') TopNest
-            close(39)
             
             if (IV%POD == .false.) then  
                 
@@ -1062,7 +994,6 @@ module Optimization
  
                 ! Evaluate Fitness of Full Fidelity Nest Solutions
                 print *, 'Extract Pressure of Generation', OV%Gen
-                ind_Fitrack = (/ (i, i=1,IV%NoNests) /)
                 if (IV%NoDim == 2) then
                     call ExtractPressure(1, IV%NoNests)
                 elseif (IV%NoDim == 3) then
@@ -1151,6 +1082,23 @@ module Optimization
                         end if
                     end if
                 end if
+	     else
+                store = 1
+                if (Fibefore /= OV%Fi(1)) then
+                    do j = 1, store                    
+                        if (IV%SystemType == 'W') then
+                            call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)))
+                        else
+                            call moveTopNestFilesLin_POD(ind_Fitrack(ind_Fi(j)))
+                        end if
+                    end do
+                else
+                    if (IV%SystemType == 'W') then
+                        call copyTopNestFilesWin(OV%Gen)
+                    else
+                        call copyTopNestFilesLin_POD(OV%Gen)
+                    end if
+                end if
             end if
             Fibefore = OV%Fi(1)
             
@@ -1207,7 +1155,7 @@ module Optimization
         integer :: ii, j, store
         double precision :: Ftemp, temp
         integer, dimension(:), allocatable :: ind_Fi_initial
-        double precision, dimension(:), allocatable :: Fi_initial
+        double precision, dimension(:), allocatable :: Fi_initial, Precoutput_temp
         double precision, dimension(:,:), allocatable :: Snapshots_Move
         
         ! Body of TransferInitialFitness
@@ -1215,12 +1163,14 @@ module Optimization
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(Fi_initial(IV%NoSnap),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
-         
+        allocate(Precoutput_temp(IV%NoSnap),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        
         ! Determine Objective Function
         do ii = 1, IV%NoSnap
             call getObjectiveFunction(.false., Ftemp, CS%Snapshots(ii,:), NoSnapshot=ii)
             Fi_initial(ii) = Ftemp
-            OV%Precoutput(ii) = OV%Precovery
+            Precoutput_temp(ii) = OV%Precovery
         end do
         deallocate(OV%pressure)
         deallocate(OV%MaLocal)
@@ -1251,7 +1201,7 @@ module Optimization
         OV%Fi = Fi_initial(1:IV%NoNests)
         OV%Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
         OV%Nests = CS%Snapshots(ind_Fi_initial(1:IV%NoNests),:)
-        OV%Precoutput = OV%Precoutput(ind_Fi_initial(1:IV%NoNests))
+        OV%Precoutput = Precoutput_temp(ind_Fi_initial(1:IV%NoNests))
 ! COMMENT    
         ! Store Files of Top 5 % fraction of Nests in TopFolder - currently just stores best Nest
         !if (nint(IV%NoNests*0.05) > 1) then
@@ -1262,11 +1212,11 @@ module Optimization
        do j = 1, store                    
             if (IV%SystemType == 'W') then
                call moveTopNestFilesWin(ind_Fi_initial(j))
-                call generateEnSightFileWin()
+               call generateEnSightFileWin()
             else
                 call moveTopNestFilesLin(ind_Fi_initial(j))
-               if (IV%NoDim == 2) then
-                    call generateEnSightFileLin()
+                if (IV%NoDim == 2) then
+                   call generateEnSightFileLin()
                 else
                     call generateEnSightFileLin3D(ind_Fi_initial(j))
                 end if
@@ -1274,6 +1224,7 @@ module Optimization
         end do
         deallocate(ind_Fi_initial)
         deallocate(Fi_initial)
+        deallocate(Precoutput_temp)
         
     end subroutine TransferInitialFitness
     
@@ -1357,11 +1308,6 @@ module Optimization
         deallocate(Vy)
         deallocate(e)
         deallocate(rho)
-        
-open(29, file=newdir//'/pTamb.txt', form='formatted',status='unknown',position='append')
-write(29,'(1I3)',advance="no") OV%Gen  
-write(29,'(<IV%NoNests>f17.10)') OV%pTamb
-close(29)
 
     end subroutine ExtractPressure
     
@@ -1944,6 +1890,7 @@ close(29)
         end if
       
         !Get Inverse of Matrix A via LAPACK Library
+		pause *, 'Ainverse does not work!'
         if (IV%Pol == .true.) then
             call dgetrf((IV%NoSnap+1), (IV%NoSnap+1), A, (IV%NoSnap+1), Ipiv, info)
             call dgetri((IV%NoSnap+1), A, (IV%NoSnap+1), Ipiv, WORK, LWORK, Info)
@@ -2046,7 +1993,9 @@ close(29)
             x = sqrt(sum(((newNest-CS%Snapshots(l,:))**2), dim = 1))
             RBFVector(l) = Multiquadratic(x, ShapeParameter)
         end do
-    
+
+		
+		newCoeff = 0.0    
         do l = 1, IV%NoSnap
             newCoeff(:,1) = newCoeff(:,1) + OV%Weights(:,l)*RBFVector(l)
         end do
@@ -2083,9 +2032,9 @@ close(29)
             CALL DGEMM('N','N',size( OV%modes2, dim = 1), size( newCoeff, dim = 2), size( OV%modes2, dim = 2),alpha,OV%modes2,size( OV%modes2, dim = 1),newCoeff,size( newCoeff, dim = 1),beta,newMalocal,size( newMalocal, dim = 1))
         end if
         
-        !open(23,file=newdir//'/NewPressure'//istr//'.txt')
-        !write(23,'(1f25.10)') newpressure           
-        !close(23)
+		open(23,file=newdir//'/POD_Pressure'//istr//'.txt')
+		write(23,'(1f25.10)') newpressure           
+		close(23)
         
     end subroutine InterpolateCoefficients
     
@@ -2187,10 +2136,6 @@ close(29)
         end do        
         ! Matmul: var1 = modes*newCoeff   newpressure = matmul(modes,newCoeff(:,1))
         CALL DGEMM('N','N',size( OV%modes, dim = 1), size( newCoeff, dim = 2), size( OV%modes, dim = 2),alpha,OV%modes,size( OV%modes, dim = 1),newCoeff,size( newCoeff, dim = 1),beta,newpressure,size( newpressure, dim = 1))
-                
-        open(23,file=newdir//'/NewPressureOld.txt')
-        write(23,'(1f25.10)') newpressure           
-        close(23)
         
     end subroutine PressInterp
     
@@ -2250,6 +2195,13 @@ close(29)
                 allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
                 if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
                 RD%coord_temp = RD%coord 
+                call SubMovemesh(tempNests)       
+                call getmaxLiftPOD(tempNests, Fi)
+                deallocate(RD%coord_temp)
+            elseif (IV%ObjectiveFunction == 6) then
+                allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
+                if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
+                RD%coord_temp = RD%coord 
                 call SubMovemesh(tempNests)
                 call getzeroLiftPOD(tempNests, Fi)
                 deallocate(RD%coord_temp)
@@ -2298,6 +2250,85 @@ close(29)
     
     end subroutine getObjectiveFunction
     
+    subroutine getmaxLiftPOD(tempNests, Fi)
+    
+        ! Variables
+        implicit none
+        double precision :: Lift, Fi, p, dx, norm, ralpha
+        double precision, dimension(2) :: n, m, k, tangent, vec1, vec2
+        integer :: intexit, i, j, NoIB
+        double precision, dimension(:,:), allocatable :: tangentArray
+        double precision, dimension(:), allocatable :: lengthArray
+        double precision, dimension(:), allocatable :: newpressure
+        double precision, dimension(maxDoF) :: tempNests
+        double precision, parameter :: pi = 3.14159265359
+  
+        ! Body of getmaxLift
+        NoIB = size(Innerbound)
+        allocate(newpressure(RD%np),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getDistortionPOD "
+        allocate(tangentArray(NoIB, IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
+        allocate(lengthArray(NoIB),stat=allocateStatus)
+        
+        ! Calculate Tangents and face lengths for each boundary point
+        tangentArray = 0.0
+        lengthArray = 0.0
+        do i = 1, RD%nbf
+            vec1 = RD%coord_temp(RD%bound(i,1),:)
+            vec2 = RD%coord_temp(RD%bound(i,2),:)
+            tangent = vec2 - vec1
+            dx = DistP2P(IV%NoDim, vec1(1), vec2(1), vec1(2), vec2(2))
+            intexit = 0
+            do j = 1, NoIB
+                if (RD%bound(i,1) == Innerbound(j)) then
+                    tangentArray(j,:) = tangentArray(j,:) + tangent
+                    lengthArray(j) = lengthArray(j) + dx
+                    intexit = intexit + 1
+                    if (intexit == 2) then
+                        EXIT
+                    end if
+                end if
+                if (RD%bound(i,2) == Innerbound(j)) then
+                    tangentArray(j,:) = tangentArray(j,:) + tangent
+                    lengthArray(j) = lengthArray(j) + dx
+                    intexit = intexit + 1
+                    if (intexit == 2) then
+                        EXIT
+                    end if
+                end if
+            end do
+        end do
+        lengthArray = lengthArray*0.5
+
+        ! normalize tangents
+        do i = 1, NoIB
+            norm = sqrt(sum(tangentArray(i,:)**2))
+            tangentArray(i,:) = tangentArray(i,:)/norm
+        end do
+
+        ! calculate Lift and Drag
+        call InterpolateCoefficients(tempNests, newpressure)
+        ralpha = IV%AlphaInflowDirection*Pi/180
+        m = (/cos(ralpha), sin(ralpha)/)  ! tangent to flow direction
+        k = (/- m(2), m(1)/)                                                ! normal of flow direction
+        Lift = 0.0
+        do i = 2, NoIB
+            
+            ! pressure portion
+            n = (/ -tangentArray(i,2), tangentArray(i,1)/)                 ! normal to tangent, pointing into the geometry
+            p = newpressure(Innerbound(i))
+            dx = lengthArray(i)
+
+            Lift = Lift - 2.0*p*sum(n*k)*dx
+
+            ! skin friction(viscosity/boundary layer) portion
+            ! later
+            
+        end do
+        Fi = Lift
+        
+    end subroutine getmaxLiftPOD
     subroutine getLiftandDragPOD(tempNests, Fi)
     
         ! Variables
@@ -2718,9 +2749,9 @@ close(29)
         
         ! Read in Target Reference Data
         nibp = size(InnerBound)
-        inquire(file=DataFolder//'/Geom_target_NACA4412.txt', exist = ex)
+        inquire(file=DataFolder//'/Geom_target.txt', exist = ex)
         if (ex == .true.) then
-            open(29,file=DataFolder//'/Geom_target_NACA4412.txt',form='formatted',status='old')
+            open(29,file=DataFolder//'/Geom_target.txt',form='formatted',status='old')
         else
             STOP "The file 'Geom_target' does not exist. Please generate!"
         end if
@@ -2934,9 +2965,9 @@ close(29)
         nibp = size(InnerBound)
 
         ! Read in Target Reference Data         
-        inquire(file=DataFolder//'/Cp_target.txt', exist = ex)
+        inquire(file=DataFolder//'/Cp_target_Onera206.txt', exist = ex)
         if (ex == .true.) then
-            open(29,file=DataFolder//'/Cp_target.txt',form='formatted',status='old')
+            open(29,file=DataFolder//'/Cp_target_Onera206.txt',form='formatted',status='old')
         else
             STOP "The file 'Cp_target' does not exist. Please generate!"
         end if
@@ -2967,7 +2998,7 @@ close(29)
         deallocate(RD%coord_temp)
         
         ! Calculate y(pressure coefficient)
-        p0 = 1.344037930148188 !0.178569528995839  !2.857162211411720 ! For Ma = 0.5!1.344037930148188 ! Soft code later, this is specific for Ma = 0.729, Re = 6.5e7, T = 255.658 and l = 1 feet
+        p0 = 0.178569528995839 !Ma2.0: 0.178569528995839  !Ma0.5: 2.857162211411720 !Ma0.729: 1.344037930148188 ! Soft code later, this is specific for Re = 6.5e7, T = 255.658 and l = 1 feet
         y = (OV%pressure(orderedBoundaryIndex, NoSnapshot)/p0 - 1)/(0.5*IV%gamma*IV%Ma**2)
           
         if (nibp > nbp_target) then
@@ -3476,11 +3507,11 @@ close(29)
         ! Body of getRosenbrock
         d = 10
         Fi = 0
-        do i = 1, 9
+        do i = 1, d-1
             Fi = Fi + ((1 - x(i))**2 + 100*(x(i+1) -  x(i)**2)**2)
         end do
         Fi = -Fi
-        OV%Precovery = abs(sqrt(sum(x**2)) - sqrt(real(d)))
+        OV%Precovery = abs(sqrt(sum(x(1:d)**2)) - sqrt(real(d)))
     
     end subroutine getRosenbrock
     
@@ -3493,13 +3524,13 @@ close(29)
         double precision, dimension(maxDoF) :: x
     
         ! Body of getDeJong
-        d = 10
+        d = 50
         Fi = 0
         do i = 1, d
             Fi = Fi + x(i)**2
         end do
         Fi = -Fi
-        OV%Precovery = abs(sqrt(sum(x**2)))
+        OV%Precovery = abs(sqrt(sum(x(1:d)**2)))
     
     end subroutine getDeJong
     
@@ -3514,7 +3545,7 @@ close(29)
         double precision, parameter :: e = 2.718281828459045
     
         ! Body of getAckley
-        d = 10
+        d = 50
         Fi = 0
         a1 = 0.0
         a2 = 0.0
@@ -3524,7 +3555,7 @@ close(29)
         end do
         Fi = -20*exp(-0.2*sqrt(a1/d)) - exp(a2/d) + (20 + e)
         Fi = -Fi
-        OV%Precovery = abs(sqrt(sum(x**2)))
+        OV%Precovery = abs(sqrt(sum(x(1:d)**2)))
     
     end subroutine getAckley
         

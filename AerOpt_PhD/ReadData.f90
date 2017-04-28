@@ -754,38 +754,6 @@ contains
                         
     end subroutine TriggerFile2
     
-    subroutine CheckSimStatus()
-    ! Objectives: writes file that checks for error files and stores response in check.txt file
-    
-        ! Variables
-        implicit none
-    
-        ! Body of CheckSimStatus
-        open(1, file='Communication', form='formatted',status='unknown')
-        write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr      
-        write(1,'(A)') '[ -e '//trim(IV%filename)//istr//'.e* ] && echo 1 > check.txt || echo 0 > check.txt'
-        write(1,'(A)') 'cd '//trim(IV%filepath)
-        write(1, '(A)') 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/check.txt check.txt'
-        close(1)
-    
-    end subroutine CheckSimStatus
-    
-    subroutine CheckSimStatus2()
-    ! Objectives: Transfers Check file to correct folder
-    
-        ! Variables
-        implicit none
-    
-        ! Body of CheckSimStatus
-        open(1, file='Communication', form='formatted',status='unknown')
-        write(1,*) 'cd '
-        write(1,*) 'cd ..'       
-        write(1,*) 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//trim(IV%filename)//istr
-        write(1,*) 'get check.txt'       
-        close(1)
-    
-    end subroutine CheckSimStatus2
-    
     subroutine TransferSolutionOutput()
     
         ! Variables
@@ -809,7 +777,7 @@ contains
         ! Variables
         implicit none
     
-        ! Body of DeleteErrorFiles
+        ! Body of DeleteLogFiles
         open(1, file='Communication', form='formatted',status='unknown')
         write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/parallel_joblog*'
         write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/error.*'
@@ -820,7 +788,19 @@ contains
         close(1)
     
     end subroutine DeletelogFiles
+
+    subroutine DeleteErrorFiles()
     
+        ! Variables
+        implicit none
+    
+        ! Body of DeleteErrorFiles
+        open(1, file='Communication', form='formatted',status='unknown')
+        write(1,'(A)') 'find '//trim(IV%filepath)//'/'//newdir//' -name "*.e*" -type f -delete'
+        write(1,'(A)') 'find '//trim(IV%filepath)//'/'//newdir//' -name "*.o*" -type f -delete'
+        close(1)
+    
+    end subroutine DeleteErrorFiles
        
     subroutine moveTopNestFilesLin(i)
 
@@ -848,6 +828,27 @@ contains
         call system('./Communication')    ! Submits Move file
         
     end subroutine moveTopNestFilesLin
+
+    subroutine moveTopNestFilesLin_POD(i)
+
+        ! Variables
+        implicit none
+        integer :: i
+        character(len=255) :: Output
+        character(len=:), allocatable :: NoGenstr
+        
+        ! Body of moveTopNestFiles
+        call DetermineStrLen(istr, i)
+        call DetermineStrLen(NoGenstr, OV%Gen) 
+        open(1, file='Communication2', form='formatted',status='unknown')
+	 write(1, '(A)') 'mv '//newdir//'/POD_Pressure'//istr//'.txt "'//newdir//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
+        close(1)
+        deallocate(istr)
+        deallocate(NoGenstr)
+        call system('chmod a+x Communication2')
+        call system('./Communication2')    ! Submits Move file
+       
+    end subroutine moveTopNestFilesLin_POD
     
     subroutine moveTopNestFilesWin(i)
 
@@ -900,6 +901,27 @@ contains
         call system('./Communication')    ! Submits Move file
         
     end subroutine copyTopNestFilesLin
+
+    subroutine copyTopNestFilesLin_POD(i)
+
+        ! Variables
+        implicit none
+        integer :: i
+        character(len=:), allocatable :: NoGenstr
+        
+        ! Body of moveTopNestFiles
+        call DetermineStrLen(istr, i-1)
+        call DetermineStrLen(NoGenstr, i)
+
+        open(1, file='Communication2', form='formatted',status='unknown') 
+	 write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/POD_Pressure'//istr//'.txt "'//newdir//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
+        close(1)
+        deallocate(istr)
+        deallocate(NoGenstr)
+        call system('chmod a+x Communication2')
+        call system('./Communication2')    ! Submits Move file
+        
+    end subroutine copyTopNestFilesLin_POD
     
     subroutine copyTopNestFilesWin(i)
 
@@ -1055,4 +1077,4 @@ contains
         
     end subroutine writeFitnessandNestoutput
     
-end module ReadData
+    end module ReadData

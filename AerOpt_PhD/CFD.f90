@@ -121,7 +121,7 @@ contains
         call CheckforConvergence(NoFiles)
         print*, 'All Solutions checked for convergence'
         
-        call SubDeleteLogFiles()
+        call SubDeleteFiles()
         
     end subroutine PostSolverCheck
     
@@ -166,7 +166,7 @@ contains
         call CheckforConvergenceInit(i, InitConv, NoFiles)
         print*, 'All Solutions converged'
         
-        call SubDeleteLogFiles()
+        call SubDeleteFiles()
         
     end subroutine PostSolverCheckInit
     
@@ -449,7 +449,7 @@ contains
         
             call Sleep(NoFiles)
             
-            call SubDeleteLogFiles()
+            call SubDeleteFiles()
             
             call CheckforConvergenceInit(Iter, InitConv, NoFiles)
             
@@ -509,14 +509,18 @@ contains
             
     end subroutine FileCheckConvergence
     
-    subroutine SubDeleteLogFiles()
+    subroutine SubDeleteFiles()
     
         ! Variables
         implicit none
         
         ! Body of SubDeleteErrorFiles
         
-        call DeleteLogFiles()
+        if (IV%SystemType == 'B') then
+            call DeleteLogFiles()
+        else
+            call DeleteErrorFiles()
+        end if
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
             call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
         elseif (IV%SystemType /= 'W')  then                
@@ -524,7 +528,7 @@ contains
             call system('./Communication')
         end if
     
-    end subroutine SubDeleteLogFiles
+    end subroutine SubDeleteFiles
     
     
     

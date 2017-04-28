@@ -157,10 +157,10 @@ contains
         maxDoF = 4*IV%NoCN			! 3 dimensions & angular motion per node
         
         ! Number of Nests per Generation 
-        IV%NoNests = 10*IV%DoF     
-        if (IV%NoNests > IV%NoSnap .or. IV%POD == .false.) then
-            IV%NoNests = IV%NoSnap
-        end if
+        !IV%NoNests = 10*IV%DoF     
+        !if (IV%NoNests > IV%NoSnap .or. IV%POD == .false.) then
+        !    IV%NoNests = IV%NoSnap
+        !end if
         
         ! Path for PreProcessor
         if (IV%SystemType == 'Q' .or. IV%SystemType == 'B') then

@@ -55,6 +55,7 @@ contains
         do i = 1, 1000
             call LHS(Snaptemp, IV%NoSnap, IV%NoCN)
             
+            ! Optimize for minimal maximum Distance
             newscore = score(Snaptemp)
             if (newscore > bestscore) then
                 CS%Snapshots = Snaptemp
