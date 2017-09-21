@@ -1890,7 +1890,7 @@ module Optimization
         end if
       
         !Get Inverse of Matrix A via LAPACK Library
-		pause *, 'Ainverse does not work!'
+		STOP 'Ainverse does not work!'
         if (IV%Pol == .true.) then
             call dgetrf((IV%NoSnap+1), (IV%NoSnap+1), A, (IV%NoSnap+1), Ipiv, info)
             call dgetri((IV%NoSnap+1), A, (IV%NoSnap+1), Ipiv, WORK, LWORK, Info)
