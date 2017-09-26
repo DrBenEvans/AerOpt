@@ -28,7 +28,7 @@ comment :
 	echo " "
 
 ifort : COMP = ifort
-ifort : FLAGS += -r8 -O3 -static -static-intel -mkl -I$(MKL_INC)/em64t/lp64 -I$(MKL_INC)/include
+ifort : FLAGS += -r8 -O3 -static -static-intel -mkl -I$(MKL_INC)/em64t/lp64 -I$(MKL_INC)/include -check all,noarg_temp_created
 ifort : $(OBJECTS)
 	$(COMP) $(FLAGS) $(OBJECTS) -o $(TARGET) -L$(MKL_LIB) -Wl, -mkl -lpthread -lm
 
