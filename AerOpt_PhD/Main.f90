@@ -45,7 +45,7 @@ program AerOpt
     allocate(character(len=1) :: istr)
     write( istr, '(I1)' )  IV%NoDim
     
-    newdir = 'AerOpt'//istr//'D_'//IV%version//'_'//date(3:8)//'_'//time(1:4)
+    newdir = 'AerOpt'//istr//'D_'//IV%version//'_'//date(3:8)//'_'//time
     deallocate(istr)
     
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
