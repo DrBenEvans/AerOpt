@@ -884,8 +884,14 @@ contains
        ! Variables
         implicit none
         character(len=:), allocatable :: NoGenstr
-    
+        LOGICAL :: exe_exists
+
         ! Body of generateEnSightFile
+        inquire(file=trim(IV%filepath)//'/Executables/engen_2D', exist=exe_exists)
+        if(.not.exe_exists) then
+            return
+        end if
+
         call DetermineStrLen(NoGenstr, OV%Gen)
         call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_1.dat '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
         call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_1.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
@@ -940,8 +946,14 @@ contains
        ! Variables
         implicit none
         character(len=:), allocatable :: NoGenstr
+        logical :: exe_exists
     
         ! Body of generateEnSightFile
+        inquire(file=trim(IV%filepath)//'/Executables/engen_2D', exist=exe_exists)
+        if(.not.exe_exists) then
+            return
+        end if
+
         call DetermineStrLen(NoGenstr, OV%Gen)
         open(1, file= 'Communication', form='formatted',status='unknown')
         write(1,'(A)') trim(IV%filename)//NoGenstr//'.dat'
