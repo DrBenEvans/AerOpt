@@ -32,7 +32,7 @@ module Optimization
         ! Variables
         implicit none
         double precision :: Ftemp, Fopt, temp, Fibefore, CR, F
-        integer :: i, j, k, l, ii, randInt, store, G, c
+        integer :: i, j, k, l, ii, randInt, G, c
         double precision, dimension(:), allocatable :: NormFact, Fcompare, Frange
         double precision, dimension(:,:), allocatable :: Snapshots_Move, newSnapshots, tempAgent_Move, tempAgent
         integer, dimension(:), allocatable :: ind_Fi, ReferenceAgentsIndex
@@ -287,35 +287,20 @@ module Optimization
             ! write Nest and Fitness Output into File
             call writeFitnessandNestoutput()
             
-            ! Store Files of Top 5 % fraction of Nests in TopFolder
-            store = 1
-            if (Fibefore /= OV%Fi(1)) then
-                do j = 1, store                    
-                    if (IV%SystemType == 'W') then
-                        call moveTopNestFilesWin(ind_Fi(j))
-                        call generateEnSightFileWin()
-                    else
-                        call moveTopNestFilesLin(ind_Fi(j))
-                        if (IV%NoDim == 2) then
-                            call generateEnSightFileLin()
-                        else
-                            call generateEnSightFileLin3D(ind_Fi(j))
-                        end if
-                    end if
-                end do
-            else
+            ! Store Files of all nests
+            do j = 1, IV%NoNests
                 if (IV%SystemType == 'W') then
-                    call copyTopNestFilesWin(OV%Gen)
+                    call moveTopNestFilesWin(ind_Fi(j), j)
                     call generateEnSightFileWin()
                 else
-                    call copyTopNestFilesLin(OV%Gen)
+                    call moveTopNestFilesLin(ind_Fi(j),j)
                     if (IV%NoDim == 2) then
                         call generateEnSightFileLin()
                     else
                         call generateEnSightFileLin3D(ind_Fi(j))
                     end if
                 end if
-            end if
+            end do
             Fibefore = OV%Fi(1)
             
         end do
@@ -339,7 +324,7 @@ module Optimization
         ! Variables
         implicit none
         double precision :: Fopt, temp, Fibefore, control, W, rn1, rn2, F
-        integer :: i, j, k, l, ii, store, G, c, minNeighbourSize, NeighbourhoodSize
+        integer :: i, j, k, l, ii, G, c, minNeighbourSize, NeighbourhoodSize
         double precision, dimension(:), allocatable :: NormFact, Fcompare, Neighbourbest, LocalFi, Wrange
         double precision, dimension(:,:), allocatable :: Snapshots_Move, newSnapshots, LocalNest, LocalNest_Move, PSOvelocity
         integer, dimension(:), allocatable :: ind_Fi, NeighboursIndex
@@ -644,35 +629,20 @@ module Optimization
                 Neighbourhoodsize = minval((/(Neighbourhoodsize + minNeighbourSize),(IV%NoNests-1)/))
             end if
             
-            !Store Files of Top 5 % fraction of Nests in TopFolder
-            store = 1
-            if (Fibefore /= OV%Fi(1)) then
-                do j = 1, store                    
-                    if (IV%SystemType == 'W') then
-                        call moveTopNestFilesWin(ind_Fi(j))
-                        !call generateEnSightFileWin()
-                    else
-                        call moveTopNestFilesLin(ind_Fi(j))
-                        if (IV%NoDim == 2) then
-                            call generateEnSightFileLin()
-                        else
-                            call generateEnSightFileLin3D(ind_Fi(j))
-                        end if
-                    end if
-                end do
-            else
+            !Store all nests
+            do j = 1, IV%NoNests
                 if (IV%SystemType == 'W') then
-                    call copyTopNestFilesWin(OV%Gen)
+                    call moveTopNestFilesWin(ind_Fi(j), j)
                     !call generateEnSightFileWin()
                 else
-                    call copyTopNestFilesLin(OV%Gen)
+                    call moveTopNestFilesLin(ind_Fi(j),j)
                     if (IV%NoDim == 2) then
                         call generateEnSightFileLin()
                     else
                         call generateEnSightFileLin3D(ind_Fi(j))
                     end if
-               end if
-            end if
+                end if
+            end do
             Fibefore = OV%Fi(1)
             
         end do
@@ -696,7 +666,7 @@ module Optimization
         ! Variables
         implicit none
         double precision :: Ac, Ftemp, Fopt, temp, Fibefore
-        integer :: i, j, k, l, ii, NoSteps, NoTop, NoDiscard, randomNest, store, G
+        integer :: i, j, k, l, ii, NoSteps, NoTop, NoDiscard, randomNest, G
         double precision, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fcompare, newMaLocal
         double precision, dimension(:,:), allocatable :: Snapshots_Move, newSnapshots, TopNest, TopNest_Move
         integer, dimension(:), allocatable :: ind_Fi, ind_Fitrack
@@ -1054,51 +1024,27 @@ module Optimization
             
             ! Store Files of Top 5 % fraction of Nests in TopFolder
             if (IV%POD == .false.) then          
-                store = 1
-                if (Fibefore /= OV%Fi(1)) then
-                    do j = 1, store                    
-                        if (IV%SystemType == 'W') then
-                            call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)))
-                            call generateEnSightFileWin()
-                        else
-                            call moveTopNestFilesLin(ind_Fitrack(ind_Fi(j)))
-                            if (IV%NoDim == 2) then
-                                call generateEnSightFileLin()
-                            else
-                                call generateEnSightFileLin3D(ind_Fitrack(ind_Fi(j)))
-                            end if
-                        end if
-                    end do
-                else
+                do j = 1, IV%NoNests
                     if (IV%SystemType == 'W') then
-                        call copyTopNestFilesWin(OV%Gen)
+                        call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)), j)
                         call generateEnSightFileWin()
                     else
-                        call copyTopNestFilesLin(OV%Gen)
+                        call moveTopNestFilesLin(ind_Fitrack(ind_Fi(j)), j)
                         if (IV%NoDim == 2) then
                             call generateEnSightFileLin()
                         else
                             call generateEnSightFileLin3D(ind_Fitrack(ind_Fi(j)))
                         end if
                     end if
-                end if
-	     else
-                store = 1
-                if (Fibefore /= OV%Fi(1)) then
-                    do j = 1, store                    
-                        if (IV%SystemType == 'W') then
-                            call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)))
-                        else
-                            call moveTopNestFilesLin_POD(ind_Fitrack(ind_Fi(j)))
-                        end if
-                    end do
-                else
+                end do
+	        else
+                do j = 1, IV%NoNests
                     if (IV%SystemType == 'W') then
-                        call copyTopNestFilesWin(OV%Gen)
+                        call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)), j)
                     else
-                        call copyTopNestFilesLin_POD(OV%Gen)
+                        call moveTopNestFilesLin_POD(ind_Fitrack(ind_Fi(j)))
                     end if
-                end if
+                end do
             end if
             Fibefore = OV%Fi(1)
             
@@ -1152,7 +1098,7 @@ module Optimization
     
         ! Variables
         implicit none
-        integer :: ii, j, store
+        integer :: ii, j
         double precision :: Ftemp, temp
         integer, dimension(:), allocatable :: ind_Fi_initial
         double precision, dimension(:), allocatable :: Fi_initial, Precoutput_temp
@@ -1202,19 +1148,13 @@ module Optimization
         OV%Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
         OV%Nests = CS%Snapshots(ind_Fi_initial(1:IV%NoNests),:)
         OV%Precoutput = Precoutput_temp(ind_Fi_initial(1:IV%NoNests))
-! COMMENT    
-        ! Store Files of Top 5 % fraction of Nests in TopFolder - currently just stores best Nest
-        !if (nint(IV%NoNests*0.05) > 1) then
-        !    store = nint(IV%NoNests*0.05)
-        !else
-            store = 1
-        !end if
-       do j = 1, store                    
+
+        do j = 1, IV%NoNests
             if (IV%SystemType == 'W') then
-               call moveTopNestFilesWin(ind_Fi_initial(j))
+               call moveTopNestFilesWin(ind_Fi_initial(j), j)
                call generateEnSightFileWin()
             else
-                call moveTopNestFilesLin(ind_Fi_initial(j))
+                call moveTopNestFilesLin(ind_Fi_initial(j),j)
                 if (IV%NoDim == 2) then
                    call generateEnSightFileLin()
                 else

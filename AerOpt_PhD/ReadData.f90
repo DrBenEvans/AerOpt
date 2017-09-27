@@ -802,24 +802,26 @@ contains
     
     end subroutine DeleteErrorFiles
        
-    subroutine moveTopNestFilesLin(i)
+    subroutine moveTopNestFilesLin(i, idx)
 
         ! Variables
         implicit none
-        integer :: i
+        integer :: i, idx
         character(len=255) :: Output
         character(len=:), allocatable :: NoGenstr
+        character(len=:), allocatable :: indexStr
         
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i)
         call DetermineStrLen(NoGenstr, OV%Gen) 
+        call DetermineStrLen(indexStr, idx) 
         open(1, file='Communication', form='formatted',status='unknown')
-        write(1, '(A)') 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk"'
-        write(1, '(A)') 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
+        write(1, '(A)') 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
+        write(1, '(A)') 'mv '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
         if (IV%NoDim == 2) then
-            write(1, '(A)') 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.dat"'
+            write(1, '(A)') 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
         else
-            write(1, '(A)') 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.plt"'
+            write(1, '(A)') 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.plt"'
         end if
         close(1)
         deallocate(istr)
@@ -850,21 +852,23 @@ contains
        
     end subroutine moveTopNestFilesLin_POD
     
-    subroutine moveTopNestFilesWin(i)
+    subroutine moveTopNestFilesWin(i, idx)
 
         ! Variables
         implicit none
-        integer :: i
+        integer :: i, idx
         character(len=:), allocatable :: NoGenstr
+        character(len=:), allocatable :: indexStr
         
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i)
         call DetermineStrLen(NoGenstr, OV%Gen)
+        call DetermineStrLen(indexStr, idx) 
         open(1, file='Communication.bat', form='formatted',status='unknown')
-        write(1, '(A)') 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk"'
-        write(1, '(A)') 'move '//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.rsd"'
+        write(1, '(A)') 'move '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
+        write(1, '(A)') 'move '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
         if (IV%NoDim == 2) then
-            write(1, '(A)') 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.dat "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.dat"'
+            write(1, '(A)') 'move '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
         else
             write(1, '(A)') 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.plt "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.plt"'
         end if
@@ -875,81 +879,6 @@ contains
         
     end subroutine moveTopNestFilesWin
     
-    subroutine copyTopNestFilesLin(i)
-
-        ! Variables
-        implicit none
-        integer :: i
-        character(len=:), allocatable :: NoGenstr
-        
-        ! Body of moveTopNestFiles
-        call DetermineStrLen(istr, i-1)
-        call DetermineStrLen(NoGenstr, i)
-        
-        open(1, file='Communication', form='formatted',status='unknown')        
-        write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk"'
-        write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
-        if (IV%NoDim == 2) then
-            write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.dat "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.dat"'
-        else
-            write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.plt "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.plt"'
-        end if
-        close(1)
-        deallocate(istr)
-        deallocate(NoGenstr)
-        call system('chmod a+x Communication')
-        call system('./Communication')    ! Submits Move file
-        
-    end subroutine copyTopNestFilesLin
-
-    subroutine copyTopNestFilesLin_POD(i)
-
-        ! Variables
-        implicit none
-        integer :: i
-        character(len=:), allocatable :: NoGenstr
-        
-        ! Body of moveTopNestFiles
-        call DetermineStrLen(istr, i-1)
-        call DetermineStrLen(NoGenstr, i)
-
-        open(1, file='Communication2', form='formatted',status='unknown') 
-	 write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/POD_Pressure'//istr//'.txt "'//newdir//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
-        close(1)
-        deallocate(istr)
-        deallocate(NoGenstr)
-        call system('chmod a+x Communication2')
-        call system('./Communication2')    ! Submits Move file
-        
-    end subroutine copyTopNestFilesLin_POD
-    
-    subroutine copyTopNestFilesWin(i)
-
-        ! Variables
-        implicit none
-        integer :: i
-        character(len=255) :: Output
-        character(len=:), allocatable :: NoGenstr
-        
-        ! Body of moveTopNestFiles
-        call DetermineStrLen(istr, i-1)
-        call DetermineStrLen(NoGenstr, i)
-        
-        open(1, file='Communication.bat', form='formatted',status='unknown')        
-        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk"'
-        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.rsd"'
-        if (IV%NoDim == 2) then
-            write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.dat "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.dat"'
-        else
-            write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.plt "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.plt"'
-        end if
-        close(1)
-        deallocate(istr)
-        deallocate(NoGenstr)
-        call system('Communication.bat >nul 2>&1')    ! Submits create directory file
-        
-    end subroutine copyTopNestFilesWin
-    
     subroutine generateEnSightFileLin()
     
        ! Variables
@@ -958,8 +887,8 @@ contains
     
         ! Body of generateEnSightFile
         call DetermineStrLen(NoGenstr, OV%Gen)
-        call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.dat '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
-        call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
+        call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_1.dat '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
+        call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_1.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
         open(1, file= 'Communication', form='formatted',status='unknown')
         write(1,'(A)') trim(IV%filename)//NoGenstr
         write(1,'(A)') trim(IV%filename)//NoGenstr
@@ -1024,8 +953,8 @@ contains
         write(1,'(A)') '1017'
         close(1)
         open(1, file= 'Communication.bat', form='formatted',status='unknown')
-        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.dat "'//trim(IV%filename)//NoGenstr//'.dat"'
-        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk "'//trim(IV%filename)//NoGenstr//'.resp"'
+        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_1.dat "'//trim(IV%filename)//NoGenstr//'.dat"'
+        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_1.unk "'//trim(IV%filename)//NoGenstr//'.resp"'
         write(1,'(A)') 'Executables\engen_2D < Communication >nul 2>&1'
         write(1,'(A)') 'move *ENSIGHT* '//newdir//'\'//TopFolder
         write(1,'(A)') 'del '//trim(IV%filename)//NoGenstr//'.dat'
