@@ -990,19 +990,15 @@ contains
         allocate(character(len=3) :: istr)
         write(istr, '(1f3.1)') IV%Ma
         
-        !call DetermineStrLen(istr, Gen)        
-        !open(19,file=TopFolder//'/Fitness_'//istr//'.txt',form='formatted',status='new')
-        
         inquire(file=trim(IV%SimulationName)//'/Nests'//istr//'.txt', exist = ex)       
         if (ex == .true.) then
-            open(19,file=trim(IV%SimulationName)//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append') ! Comment for GUI
+            open(19,file=trim(IV%SimulationName)//'/FitnessAll.txt',form='formatted',status='old',position='append') ! Comment for GUI
             open(29,file=trim(IV%SimulationName)//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
         else
             open(29,file=trim(IV%SimulationName)//'/Nests'//istr//'.txt', form='formatted',status='new')
             write(29, *) 'Snapshots'
             write(29,'(<IV%NoSnap>f17.10)') CS%Snapshots
-            open(19,file=trim(IV%SimulationName)//'/Fitness'//istr//'.txt', form='formatted',status='new')                   ! Comment for GUI
-            write(19,*) 'Fitness'
+            open(19,file=trim(IV%SimulationName)//'/FitnessAll.txt', form='formatted',status='new')                   ! Comment for GUI
         end if
         
         ! Store moved Nests in Output Analysis File
