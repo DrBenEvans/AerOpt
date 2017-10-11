@@ -172,7 +172,7 @@ contains
         call createDirectories()
         if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine          
             if (IV%RunOnCluster == 'Y') then
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')   ! Submits create directory file
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'psftp')   ! Submits create directory file
             end if
             call system('Communication')    ! Submits create directory file
         else

@@ -43,6 +43,7 @@ module InputData
         character(len=256) :: filepath  ! I/O filepath for communication
         character(len=256) :: SimulationName    ! base run directory
         character :: runOnCluster       ! Run On Cluster or Run on Engine?
+        character(len=256) :: clusterAddress
         character :: SystemType         ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)    
         character(len=20) :: UserName   ! Putty Username - Cluster: egnaumann
         character(len=20) :: Password   ! Putty Password
@@ -126,6 +127,7 @@ contains
         IV%MeshFileName = 'Mesh'        ! Input file Mesh name
         IV%filepath = '/eng/cvcluster/egnaumann/AerOpt_3D'
         IV%runOnCluster = 'Y'           ! Run On Cluster or Run on Engine?
+        IV%clusterAddress = 'encluster.swan.ac.uk'
         IV%SystemType = 'Q'             ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)
         IV%UserName = 'egnaumann'       ! Putty Username - Cluster: egnaumann
         IV%Password = 'Fleur666'        ! Putty Password

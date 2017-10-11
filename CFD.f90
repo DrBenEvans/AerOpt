@@ -102,7 +102,7 @@ contains
             do i = 1, NoFiles
                 call DetermineStrLen(istr, i)
                 call TransferSolutionOutput()
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
                 strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
                 call system(trim(strSystem))
                 strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
@@ -146,7 +146,7 @@ contains
             do i = 1, NoFiles
                 call DetermineStrLen(istr, i)
                 call TransferSolutionOutput()
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
                 strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
                 call system(trim(strSystem))
                 strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
@@ -248,19 +248,20 @@ contains
             if (IV%runOnCluster == 'Y') then
                 ! Transfer Files from Windows Machine onto Cluster
                 call transferFilesWin()            
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'psftp')
                 call TriggerFileQ()           ! Triggerfile for submission
                 ! Submits Batchfile via Putty
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'putty')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'putty')
             else
                 print *, 'Solving Geometry', i
                 allocate(character(len=200) :: strSystem)
-                strSystem = pathSolver//' < '//trim(IV%SimulationName)//'/'//InFolder//'\'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh >nul 2>&1'
-                call system(trim(strSystem))
-                strSystem = 'move '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk"'
-                call system(trim(strSystem))
-                strSystem = 'move '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
-                call system(trim(strSystem))
+                
+                strSystem = pathSolver//' < '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\SolverInput'//istr//'.sh > SolverOutput.sh'
+                call system(strSystem)
+                strSystem = 'move '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk" >nul'
+                call system(strSystem)
+                strSystem = 'move '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd" >nul'
+                call system(strSystem)
                 deallocate (strSystem)
             end if 
               
@@ -522,7 +523,7 @@ contains
             call DeleteErrorFiles()
         end if
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
-            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
+            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'psftp')
         elseif (IV%SystemType /= 'W')  then                
             call system('chmod a+x ./Communication')
             call system('./Communication')
@@ -562,7 +563,7 @@ contains
     !            call CheckSimStatus()
     !            ! Submit File
     !            if (IV%SystemType == 'W')   then
-    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'plink')
+    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'plink')
     !            else
     !                call system('chmod a+x ./Communication')
     !                call system('./Communication')
@@ -570,7 +571,7 @@ contains
     !            ! Creates File to transfer response from Windows to Linux
     !            if (IV%SystemType == 'W')   then
     !                call CheckSimStatus2()
-    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
+    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'psftp')
     !            end if
     !        
     !            open(1, file='check.txt',form='formatted',status='old')

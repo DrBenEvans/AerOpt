@@ -446,23 +446,23 @@ contains
 
     end subroutine DetermineStrLen
 
-    subroutine communicateWin2Lin(Username, Password, fname, channel)
+    subroutine communicateWin2Lin(Username, Password, clusterAddress, fname, channel)
 
     ! Variables
     implicit none
     integer :: IntSystem
-    character(len=*) :: Username, Password, fname, channel
+    character(len=*) :: Username, Password, clusterAddress, fname, channel
     character(len=:), allocatable :: strSyst
 
     ! Body of communicateWin2Lin
     if (channel == 'psftp') then
         IntSystem = 74 + len(Username) + len(Password) + len(fname)
         allocate(character(len=IntSystem) :: strSyst)
-        strSyst = '"C:\Program Files (x86)\WinSCP\PuTTY\psftp" '//UserName//'@encluster.swan.ac.uk -pw '//Password//' -b '//fname
+        strSyst = '"Executables\psftp.exe" '//UserName//'@'//clusterAddress//' -pw '//Password//' -b '//fname
     else
         IntSystem = 79 + len(Username) + len(Password) + len(fname)
         allocate(character(len=IntSystem) :: strSyst)
-        strSyst = '"C:\Program Files (x86)\WinSCP\PuTTY\'//channel//'" -ssh '//UserName//'@encluster.swan.ac.uk -pw '//Password//' -m '//fname
+        strSyst = '"Executables\'//channel//'.exe" -ssh '//UserName//'@'//clusterAddress//' -pw '//Password//' -m '//fname
     end if
     call system(strSyst)
 
