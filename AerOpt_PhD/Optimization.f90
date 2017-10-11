@@ -533,7 +533,7 @@ module Optimization
             if (IV%POD == .false.) then
                 
                 ! Store moved Nests in Output Analysis File for Restart
-                open(29,file=newdir//'/Neststemp.txt',form='formatted',status='unknown')
+                open(29,file=trim(IV%SimulationName)//'/Neststemp.txt',form='formatted',status='unknown')
                 write(29,'(<IV%NoNests>f17.10)') OV%Nests
                 close(29)
             
@@ -950,7 +950,7 @@ module Optimization
             if (IV%POD == .false.) then  
                 
                 ! Store moved Nests in Output Analysis File
-                open(29,file=newdir//'/Neststemp.txt',form='formatted',status='unknown')
+                open(29,file=trim(IV%SimulationName)//'/Neststemp.txt',form='formatted',status='unknown')
                 write(29,'(<IV%NoNests>f17.10)') OV%Nests
                 close(29)
             
@@ -1123,7 +1123,7 @@ module Optimization
         deallocate(OV%pTamb)
         ! Output: Fitness depend on user Input (objective Function)
        
-        open(19,file=newdir//'/Fitness_0.txt', form='formatted',status='unknown')
+        open(19,file=trim(IV%SimulationName)//'/Fitness_0.txt', form='formatted',status='unknown')
         !open(19,file=TopFolder//'/Fitness_0.txt', form='formatted',status='unknown')
         write(19,'(1I1)',advance="no") 0
         write(19,'(1f25.10)',advance="no") Fi_initial(1)
@@ -1207,7 +1207,7 @@ module Optimization
             ! Determine correct String number
             call DetermineStrLen(istr, i)
            
-            open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='formatted',status='old')     
+            open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='formatted',status='old')     
             read(11, *) Output  ! index, rho, Vx, Vy, Vz, e
             
             k = 0
@@ -1286,7 +1286,7 @@ module Optimization
             ! Determine correct String number
             call DetermineStrLen(istr, i)
            
-            open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='unformatted',status='old')     
+            open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='unformatted',status='old')     
             read(11) nop
             if (RD%np /= nop) then
                 STOP 'ERROR: .unk file does not correspond with .plt file. Check file transfer'
@@ -1299,7 +1299,7 @@ module Optimization
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy + Vz*Vz) 
             
             close(11)
-                !open(11, file=newdir//'/'//OutFolder//'/pressure'//istr//'.txt', form='formatted',status='unknown')
+                !open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/pressure'//istr//'.txt', form='formatted',status='unknown')
                 !write(11,'(1F25.15)') pressure(:,i)
                 !close(11)
             deallocate(istr)
@@ -1362,14 +1362,14 @@ module Optimization
         
         !!** TESTING **!!    
         !Output: Modes and Coefficients of POD       
-        !open(23,file=newdir//'/Coefficients.txt')
+        !open(23,file=trim(IV%SimulationName)//'/Coefficients.txt')
         !write(23,'(<IV%NoSnap>f20.7)') coeff           
         !close(23)
-        !open(23,file=newdir//'/Modes.txt')
+        !open(23,file=trim(IV%SimulationName)//'/Modes.txt')
         !write(23,'(10f13.10)') modes(:,1:10)           
         !close(23)
         !pressure2(:,2) = matmul(modes,coeff(:,2))
-        !open(23,file=newdir//'/Pressure_Reconstruct.txt')
+        !open(23,file=trim(IV%SimulationName)//'/Pressure_Reconstruct.txt')
         !write(23,'(1f25.10)') pressure2(:,2)           
         !close(23)
         
@@ -1880,10 +1880,10 @@ module Optimization
             
         end do
         
-        !open(23,file=newdir//'/Weights.txt')
+        !open(23,file=trim(IV%SimulationName)//'/Weights.txt')
         !write(23,'(10f55.10)') OV%Weights(1:10,:)           
         !close(23)
-        !open(23,file=newdir//'/Polynomial.txt')
+        !open(23,file=trim(IV%SimulationName)//'/Polynomial.txt')
         !write(23,'(1f25.10)') OV%PolCoeff           
         !close(23)
         
@@ -1972,7 +1972,7 @@ module Optimization
             CALL DGEMM('N','N',size( OV%modes2, dim = 1), size( newCoeff, dim = 2), size( OV%modes2, dim = 2),alpha,OV%modes2,size( OV%modes2, dim = 1),newCoeff,size( newCoeff, dim = 1),beta,newMalocal,size( newMalocal, dim = 1))
         end if
         
-		open(23,file=newdir//'/POD_Pressure'//istr//'.txt')
+		open(23,file=trim(IV%SimulationName)//'/POD_Pressure'//istr//'.txt')
 		write(23,'(1f25.10)') newpressure           
 		close(23)
         
@@ -2361,7 +2361,7 @@ module Optimization
        
         ! Body of getLiftandDrag
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
         if (IV%NoDim == 3) then
@@ -2474,7 +2474,7 @@ module Optimization
        
         ! Body of getzeroLift
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
         if (IV%NoDim == 3) then
@@ -2508,7 +2508,7 @@ module Optimization
        
         ! Body of getLiftandDrag
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
         if (IV%NoDim == 3) then
@@ -2543,7 +2543,7 @@ module Optimization
        
         ! Body of getzeroLift
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
         if (IV%NoDim == 3) then
@@ -2577,7 +2577,7 @@ module Optimization
        
         ! Body of getzeroLift
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
         if (IV%NoDim == 3) then
@@ -3392,7 +3392,7 @@ module Optimization
                 
         allocate(character(len=3) :: istr)
         write(istr, '(1f3.1)') IV%Ma
-        open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
+        open(19,file=trim(IV%SimulationName)//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
         if (ConvA(1) == 1) then ! If converged check fitness
             call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 1))
             write(19,'(1I3, 1f17.10)',advance="no") 0, Ftemp

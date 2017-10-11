@@ -40,14 +40,6 @@ program AerOpt
     ! Automatically generates a random initial number based on time and date
     call RANDOM_SEED
     
-    ! Get Time and Date for File and Folder Name creation
-    call DATE_AND_TIME(date, time)
-    allocate(character(len=1) :: istr)
-    write( istr, '(I1)' )  IV%NoDim
-    
-    newdir = 'AerOpt'//istr//'D_'//IV%version//'_'//date(3:8)//'_'//time
-    deallocate(istr)
-    
     ! ****Read Input Data(Fine Mesh, Coarse Mesh, CP Coordinates, Influence Box/Rectangle (IB)**** !
     print *, 'Start Read Data'
     if (IV%NoDim == 2) then
@@ -68,7 +60,7 @@ program AerOpt
     ! Output: Initial Nests - Sampling Points for Snapshots
     allocate(character(len=3) :: istr)
     write(istr, '(1f3.1)') IV%Ma
-    open(29, file=newdir//'/Snapshots'//istr//'.txt', form='formatted',status='unknown')
+    open(29, file=trim(IV%SimulationName)//'/Snapshots'//istr//'.txt', form='formatted',status='unknown')
     deallocate(istr)
     write(29, *) 'Snapshots'   
     write(29,'(<IV%NoSnap>f17.10)') CS%Snapshots
