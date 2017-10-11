@@ -440,11 +440,11 @@ contains
             write(1,'(A)') trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'    ! Result filename
             write(1,'(A)') trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'    ! Residual Filename
         elseif (IV%SystemType == 'W' .or. IV%SystemType == 'L') then
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp'            ! Control Filename
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
+            write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//'.inp'            ! Control Filename
+            write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
             write(1,'(A)') '' !trim(IV%SimulationName), '/', InFolder, '/', trim(IV%filename), istr, '.unk'     ! Start-up File = previous Result File
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'     ! Result filename
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
+            write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk'     ! Result filename
+            write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
         end if
         close(1)
     
