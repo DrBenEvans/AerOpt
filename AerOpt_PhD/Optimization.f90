@@ -1226,7 +1226,9 @@ module Optimization
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) 
             
             ! Local Mach number non-dimensional
-            OV%MaLocal(:,(i - Start + 1)) = sqrt(Vx(OV%engInNodes)**2 + Vy(OV%engInNodes)**2)/(sqrt(IV%gamma*OV%pressure(OV%engInNodes,(i - Start + 1))/rho(OV%engInNodes)))
+            if(allocated(OV%engInNodes)) then
+                OV%MaLocal(:,(i - Start + 1)) = sqrt(Vx(OV%engInNodes)**2 + Vy(OV%engInNodes)**2)/(sqrt(IV%gamma*OV%pressure(OV%engInNodes,(i - Start + 1))/rho(OV%engInNodes)))
+            end if
             
             
 ! ambient pressure calculated based on Reynolds number and Ma and input Temperature            
