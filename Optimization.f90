@@ -2357,7 +2357,7 @@ module Optimization
     
         ! Variables
         implicit none
-        integer :: FileSize, LastLine, NoSnapshot, j
+        integer :: NoSnapshot, j, io
         double precision, dimension(8) :: Input      
         double precision :: Lift, Drag, Fi
        
@@ -2365,23 +2365,20 @@ module Optimization
         call DetermineStrLen(istr, NoSnapshot)
         open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
-        inquire(11, size = FileSize)           
-        if (IV%NoDim == 3) then
-            LastLine = FileSize/175
-        else
-            if (IV%SystemType == 'W') then
-                LastLine = FileSize/106 !107
-            else     
-                LastLine = FileSize/106
-            end if
-        end if
-            
+        
         ! Read until last line
-        do j = 1, (LastLine - 1)
-            read(11, *) Input
+        do
+            read(11, *, IOSTAT=io) Input
+            if(io > 0) then
+                STOP 'FILE INPUT ERROR'
+                exit
+            else if (io < 0) then
+                exit
+            end if
         end do
-        read(11, *) Input
+        
         close(11)
+        
         Lift = Input(3)
         Drag = Input(4)
         Fi = Lift/Drag
