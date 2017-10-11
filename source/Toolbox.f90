@@ -445,7 +445,7 @@ contains
     end if
 
     end subroutine DetermineStrLen
-
+    
     subroutine communicateWin2Lin(Username, Password, clusterAddress, fname, channel)
 
     ! Variables

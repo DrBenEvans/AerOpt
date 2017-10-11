@@ -57,26 +57,12 @@ contains
         
         ! ****call 2d flite solver and pass on input parameters**** !
         print *, 'call flite 2d solver'
-        if (IV%SystemType == 'Q') then
-            i = 1
-            do while (i .le. size(vecIndex, dim = 1))       
-                call solver(vecIndex(i))
-            i = i + 1
-            end do
-        else
-            i = 1
-            do while (i .le. size(vecIndex, dim = 1))
-                ! Determine correct String      
-                call DetermineStrLen(istr, vecIndex(i))
-                call WriteSolverInpFile()
-                deallocate(istr)
-                i = i + 1
-            end do
-            call writeBatchFile(vecIndex(1), vecIndex(sizing))
-            call Triggerfile()     ! Triggerfile for submission
-            call system('chmod a+x ./Communication')
-            call system('./Communication')
-        end if       
+        i = 1
+        do while (i .le. size(vecIndex, dim = 1))       
+            call solver(vecIndex(i))
+        i = i + 1
+        end do
+        
         print *, 'finished submitting jobs to flite 2d solver' 
         
     end subroutine SubCFD

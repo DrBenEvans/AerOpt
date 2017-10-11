@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VisualStudioProject ProjectCreator="Intel Fortran" Keyword="Console Application" Version="11.0" ProjectIdGuid="{C4C8E495-63C9-4211-BA2A-210F6E74EE26}">
+	<Platforms>
+		<Platform Name="Win32"/></Platforms>
+	<Configurations>
+		<Configuration Name="Debug|Win32">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" GenerateDebugInformation="true" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Release|Win32">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" RuntimeLibrary="rtMultiThreadedDLL"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration></Configurations>
+	<Files>
+		<Filter Name="libs">
+		<File RelativePath=".\libs\BLAS.lib"/>
+		<File RelativePath=".\libs\LAPACK.lib"/></Filter>
+		<Filter Name="source" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+		<File RelativePath=".\source\CFD.f90"/>
+		<File RelativePath=".\source\CreateSnapshots.f90"/>
+		<File RelativePath=".\source\FDGD.f90"/>
+		<File RelativePath=".\source\GenerateMesh.f90"/>
+		<File RelativePath=".\source\InputData.f90"/>
+		<File RelativePath=".\source\Main.f90"/>
+		<File RelativePath=".\source\Optimization.f90"/>
+		<File RelativePath=".\source\ReadData.f90"/>
+		<File RelativePath=".\source\Smoothing.f90"/>
+		<File RelativePath=".\source\Toolbox.f90"/></Filter></Files>
+	<Globals/></VisualStudioProject>

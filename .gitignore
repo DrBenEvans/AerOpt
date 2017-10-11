@@ -1,2 +1,9 @@
 *.o
+*.obj
+*.exe
+*.exe.intermediate.manifest
+*.htm
 *.mod
+Debug/
+Release/
+.vs

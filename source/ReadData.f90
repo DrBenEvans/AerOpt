@@ -163,25 +163,6 @@ contains
     
     end subroutine SubReadData_3D
     
-    subroutine CreateFolderStructure()
-    
-        ! Variables
-        implicit none
-    
-        ! Body of CreateFolderStructure
-        call createDirectories()
-        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine          
-            if (IV%RunOnCluster == 'Y') then
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'psftp')   ! Submits create directory file
-            end if
-            call system('Communication')    ! Submits create directory file
-        else
-            call system('chmod a+x ./Communication')    
-            call system('./Communication')    ! Submits create directory file     
-        end if  
-    
-    end subroutine CreateFolderStructure
-    
     subroutine writeDatFile(ii)
     !Objective: Create Outputfile of each Snapshot as Input for the Pre Processor
     
@@ -646,8 +627,6 @@ contains
         else
             open(1, file='Communication', form='formatted',status='unknown')
         end if
-        write(1,*) 'cd '
-        write(1,*) 'cd ..'
         write(1,'(A)') 'cd '//trim(IV%filepath)
         write(1,*) 'mkdir ', trim(IV%SimulationName)
         write(1,*) 'cd ', trim(IV%SimulationName)
@@ -661,6 +640,13 @@ contains
             deallocate(istr)
         end do
         close(1)
+        
+        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine          
+            call system('Communication')    ! Submits create directory file
+        else
+            call system('chmod a+x ./Communication')    
+            call system('./Communication')    ! Submits create directory file     
+        end if 
     
     end subroutine createDirectories
     
@@ -674,23 +660,14 @@ contains
         
         ! Body of createDirectories
         call getcwd(currentDir)
+        
         open(1, file='Communication', form='formatted',status='unknown')
-        write(1,*) 'cd '
-        write(1,*) 'cd ..'
-        write(1,*) 'cd ', trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder
+        
         ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster
-        write(1, '(A)') 'put "'//trim(currentDir)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/SolverInput'//istr//'.sh"'
-        if (IV%NoDim == 2) then
-            write(1, '(A)') 'put "'//trim(currentDir)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol"'
-        elseif (IV%NoDim == 2) then
-            do i = 1, IV%NoProcessors
-                call DetermineStrLen(istr, i)
-                write(1, '(A)') 'put "'//trim(currentDir)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol_'//istr//'"'
-                deallocate(istr)
-            end do
-        end if
-        write(1, '(A)') 'put "'//trim(currentDir)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//'.inp"'
-        write(1, '(A)') 'put "'//trim(currentDir)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/batchfile.sh"'
+        write(1, '(A)') 'mkdir "'//trim(IV%clusterPath)//'"'
+        write(1, '(A)') 'mkdir "'//trim(IV%clusterPath)//'/'//trim(IV%SimulationName)//'/"'
+        write(1, '(A)') 'cd "'//trim(IV%clusterPath)//'/'//trim(IV%SimulationName)//'/"'
+        write(1, '(A)') 'put -r "'//trim(currentDir)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/"'
         close(1)
     
     end subroutine transferFilesWin
@@ -727,9 +704,7 @@ contains
     
         ! Body of TriggerFile
         open(1, file='Communication', form='formatted',status='unknown')
-        write(1,*) 'cd '
-        write(1,*) 'cd ..'
-        write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr 
+        write(1,'(A)') 'cd '//trim(IV%clusterPath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr 
         
         if (IV%SystemType /= 'B') then
             write(1,*) 'qsub batchfile'
