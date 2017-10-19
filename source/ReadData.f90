@@ -843,17 +843,17 @@ contains
         call DetermineStrLen(NoGenstr, OV%Gen)
         call DetermineStrLen(indexStr, idx) 
         open(1, file='Communication.bat', form='formatted',status='unknown')
-        write(1, '(A)') 'move '//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
-        write(1, '(A)') 'move '//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
+        write(1, '(A)') 'move "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk" "'//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
+        write(1, '(A)') 'move "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd" "'//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
         if (IV%NoDim == 2) then
-            write(1, '(A)') 'move '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
+            write(1, '(A)') 'move "'//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.dat" "'//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
         else
-            write(1, '(A)') 'move '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.plt "'//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.plt"'
+            write(1, '(A)') 'move "'//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.plt" "'//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.plt"'
         end if
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
-        call system('Communication.bat >nul 2>&1')    ! Submits create directory file
+        call system('Communication.bat')    ! Submits create directory file
         
     end subroutine moveTopNestFilesWin
     
