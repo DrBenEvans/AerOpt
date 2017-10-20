@@ -187,7 +187,6 @@ contains
             
         end if
         print *, 'Preprocessing Geometry', i
-        print *, ' '
         call system(trim(strSystem))   ! System operating command called to activate fortran 
         if (IV%NoDim == 3) then
             if (IV%SystemType == 'W') then
