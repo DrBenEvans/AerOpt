@@ -1,0 +1,67 @@
+&inputVariables
+!! ambient Parameters
+IV%Ma = 0.5							! Mach number
+IV%Tamb = 303.15					! ambient Temperature [K]
+IV%Pamb = 101325					! ambient Pressure [Pa]
+IV%R = 287                  		! specific gas constant
+IV%gamma = 1.4                  	! Ratio of specific heats
+IV%Re = 0.0							! Reynoldsnumber
+
+!! Control Node(CN) Values
+IV%xrange = 0.05 0.05 0.05 0.05 0.5 0.05 0.05 -0.05 -0.05 -0.05 -0.05 -0.05 -0.05 -0.05			! Maximum horizontal displacement of Control Nodes
+IV%yrange = 0.1 0.1 0.1 0.1 0.1 0.1 0.1 -0.1 -0.1 -0.1 -0.1 -0.1 -0.1 -0.1			! Maximum vertical displacement of Control Nodes 
+IV%zrange = 0.00					! Maximum lateral displacement of Control Nodes  
+IV%smoothfactor = 0.1 0.1 0.1 0.1 0.0 0.1 0.1	! Level of smoothing at each CN
+IV%angle = 0						! Angle of Attack Input for rotative motion - in [degrees]
+IV%Cnconnecttrans = 0				! allows to connect translative Control Node displacements, e.g. CNconnect(5) = 3 - CN 5 is connected to movement of CN 3
+
+!! Optimisation parameters
+IV%Low2Top = 0.75					! Fraction of Low to Top Cuckoo Nests
+IV%NoSnap = 20						! Number of Snapshots (POD) 
+IV%NoCN = 7							! Number of Control Points 
+IV%NoDim = 2						! Number of Dimensions in Space 
+IV%DoF = 14							! Degrees of freedom in the system 
+IV%NoG = 20							! Number of Generations 
+IV%NoLeviSteps = 100 		    	! Number of Levy walks per movement 
+IV%ObjectiveFunction = 1        	! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - max Lift, 4 - min Drag, 5 - max Downforce, 6 - min Lift
+IV%constrain = .True.				! Constrain: Include boundaries of design space for Levy Walk - 1:Yes 0:no
+IV%Aconst = 0.01					! Levy Flight parameter (determined emperically)
+
+!! Solver parameters
+IV%engFMF = 1.0						! engines Front Mass Flow(Solver variable)
+IV%AlphaInflowDirection = 0.0		! Angle/Direction of Flow within the Solver(0: Left to Right, 180: Right to Left)
+IV%YawInflowAngle = 0.0
+IV%turbulencemodel = 0				! Turbulence Model applied in Solver: 1 = Spalart-Allmaras, 2=K-epsilon, 3=SST
+IV%NoIter = -3    			       	! Convergence Rate
+IV%NoProcessors = 1					! Number of Processors to use per CFD simulation in 3D
+IV%delay = 60    			        ! Sleep Time between check for Simulation Results in second
+IV%waitMax = 48						! maximum waiting time in hours
+IV%maxit = 50000                	! maximum Number of Iterations to reach convergence in Solver
+
+!! Parameters for Mesh Deformation
+IV%MeshMovement = 1					! Type of Mesh Movement - choices: 1 - 'Linear with Smoothing' , 2 - 'FDGD with Smoothing' , 3 - 'RBF' , 4 - 'FDGD', 5 - 'Linear'
+IV%Meshtest = .true.				! If .true., the program pauses after the Mesh Generation process. Good for only checking Meshes!
+IV%NoDelBP = 4
+IV%shapeenclosed = .true.      		! Open or closed boundary?
+IV%smoothconvergence = -3             ! Rate of convergence for Mesh smoothing
+
+!! ROM parameters
+IV%AdaptSamp = .FALSE.          	! Adaptive Sampling - T: Active
+IV%POD = .false.		            ! Activation of POD - TRUE is ACTIVE
+IV%multiquadric = .true.        			! using multiquadratic RBF function for POD
+IV%Pol = .true.                 			! Application of Polynomial?
+IV%meanP = .true.					! apply mean Pressure?
+IV%NoPOMod = -1						! No of POD Modes considered 
+
+!! Strings
+IV%MeshFileName = 'Mesh_DC3'
+IV%filename = 'Geometry'				! I/O file of initial Meshes for FLITE solver
+IV%filepath = '/eng/cvcluster/egnaumann/AerOpt_3D'
+IV%runOnCluster = 'Y'				! Run On Cluster or Run on Engine?
+IV%SystemType = 'Q'					! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)
+
+!! Login Information
+IV%UserName = 'egnaumann'   			! Putty Username - Cluster: egnaumann
+IV%Password = 'Fleur666'       			! Putty Password
+IV%version = '3.1' 
+/

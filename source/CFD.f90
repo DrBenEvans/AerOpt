@@ -20,8 +20,8 @@ contains
         ! Body of SubCFD
       
         ! ****Generate Meshes**** !
-        allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
+ !       allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
+ !       if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
         i = 1
         do while (i .le. size(vecIndex, dim = 1))
             print *, "Generating Mesh", vecIndex(i), "/", vecIndex(sizing)
@@ -40,7 +40,8 @@ contains
             end if
         i = i + 1
         end do
-        deallocate(RD%coord_temp)
+        print *, 'Done'
+        !deallocate(RD%coord_temp)
  
         if (IV%Meshtest == .true.) then
           pause
@@ -57,12 +58,26 @@ contains
         
         ! ****call 2d flite solver and pass on input parameters**** !
         print *, 'call flite 2d solver'
-        i = 1
-        do while (i .le. size(vecIndex, dim = 1))       
-            call solver(vecIndex(i))
-        i = i + 1
-        end do
-        
+        if (IV%SystemType == 'Q') then
+            i = 1
+            do while (i .le. size(vecIndex, dim = 1))       
+                call solver(vecIndex(i))
+            i = i + 1
+            end do
+        else
+            i = 1
+            do while (i .le. size(vecIndex, dim = 1))
+                ! Determine correct String      
+                call DetermineStrLen(istr, vecIndex(i))
+                call WriteSolverInpFile()
+                deallocate(istr)
+                i = i + 1
+            end do
+            call writeBatchFile(vecIndex(1), vecIndex(sizing))
+            call Triggerfile()     ! Triggerfile for submission
+            call system('chmod a+x ./Communication')
+            call system('./Communication')
+        end if       
         print *, 'finished submitting jobs to flite 2d solver' 
         
     end subroutine SubCFD
@@ -88,10 +103,10 @@ contains
             do i = 1, NoFiles
                 call DetermineStrLen(istr, i)
                 call TransferSolutionOutput()
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
-                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
+                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
                 call system(trim(strSystem))
-                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
+                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
                 call system(trim(strSystem))                
                 deallocate(istr)
             end do
@@ -132,10 +147,10 @@ contains
             do i = 1, NoFiles
                 call DetermineStrLen(istr, i)
                 call TransferSolutionOutput()
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
-                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
+                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
                 call system(trim(strSystem))
-                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
+                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
                 call system(trim(strSystem))                
                 deallocate(istr)
             end do
@@ -177,24 +192,25 @@ contains
         if (IV%SystemType == 'W') then
 ! Parallelise by sending as Job?             
             allocate(character(len=100) :: strSystem)
-            strSystem = pathPrePro//' < '//trim(IV%SimulationName)//'\'//InFolder//'/PreprocessingInput.txt >nul 2>&1'
+            strSystem = pathPrePro//' < '//newdir//'\'//InFolder//'/PreprocessingInput.txt >nul 2>&1'
             
         else
             
             ! write command (for Linux)
             allocate(character(len=100) :: strSystem)
-            strSystem = pathPrepro//' < '//trim(IV%SimulationName)//'/'//InFolder//'/PreprocessingInput.txt > /dev/null'
+            strSystem = pathPrepro//' < '//newdir//'/'//InFolder//'/PreprocessingInput.txt > /dev/null'
             
         end if
         print *, 'Preprocessing Geometry', i
+        print *, ' '
         call system(trim(strSystem))   ! System operating command called to activate fortran 
         if (IV%NoDim == 3) then
             if (IV%SystemType == 'W') then
-                call system('move '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
-                call system('move '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
+                call system('move '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
+                call system('move '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
             else
-                call system('mv '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
-                call system('mv '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
+                call system('mv '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
+                call system('mv '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
             end if
         end if
         deallocate (istr)
@@ -233,20 +249,19 @@ contains
             if (IV%runOnCluster == 'Y') then
                 ! Transfer Files from Windows Machine onto Cluster
                 call transferFilesWin()            
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'psftp')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
                 call TriggerFileQ()           ! Triggerfile for submission
                 ! Submits Batchfile via Putty
-                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'putty')
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'putty')
             else
                 print *, 'Solving Geometry', i
                 allocate(character(len=200) :: strSystem)
-                
-                strSystem = pathSolver//' < '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\SolverInput'//istr//'.sh > SolverOutput.sh'
-                call system(strSystem)
-                strSystem = 'move '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk" >nul'
-                call system(strSystem)
-                strSystem = 'move '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd" >nul'
-                call system(strSystem)
+                strSystem = pathSolver//' < '//newdir//'/'//InFolder//'\'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh >nul 2>&1'
+                call system(trim(strSystem))
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk"'
+                call system(trim(strSystem))
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+                call system(trim(strSystem))
                 deallocate (strSystem)
             end if 
               
@@ -254,11 +269,11 @@ contains
             
 		    print *, 'Solving Geometry', i
             allocate(character(len=200) :: strSystem)
-            strSystem = pathSolver//' < '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh > /dev/null'
+            strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh > /dev/null'
             call system(trim(strSystem))
-            strSystem = 'mv '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
+            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
             call system(trim(strSystem))
-            strSystem = 'mv '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
+            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
             call system(trim(strSystem))
             deallocate (strSystem)
             
@@ -306,7 +321,7 @@ contains
                 ! Extract last modification time to check if file has been newly moved
                 fileinfo = 0
                 call DetermineStrLen(istr, i)
-                call stat(trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', fileinfo)
+                call stat(trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', fileinfo)
                 call ltime(fileinfo(10), timeend)
                 deallocate(istr)
                 
@@ -461,7 +476,7 @@ contains
         call DetermineStrLen(istr, NoFile)
             
         ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
-        open(1, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")     
+        open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")     
         inquire(1, size = FileSize) 
         if (IV%NoDim == 3) then
             LastLine = FileSize/175
@@ -508,7 +523,7 @@ contains
             call DeleteErrorFiles()
         end if
         if (IV%SystemType == 'W' .and. IV%runOnCluster == 'Y')   then    ! AerOpt is executed from a Windows machine           
-            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'psftp')
+            call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
         elseif (IV%SystemType /= 'W')  then                
             call system('chmod a+x ./Communication')
             call system('./Communication')
@@ -548,7 +563,7 @@ contains
     !            call CheckSimStatus()
     !            ! Submit File
     !            if (IV%SystemType == 'W')   then
-    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'plink')
+    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'plink')
     !            else
     !                call system('chmod a+x ./Communication')
     !                call system('./Communication')
@@ -556,7 +571,7 @@ contains
     !            ! Creates File to transfer response from Windows to Linux
     !            if (IV%SystemType == 'W')   then
     !                call CheckSimStatus2()
-    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'Communication', 'psftp')
+    !                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')
     !            end if
     !        
     !            open(1, file='check.txt',form='formatted',status='old')

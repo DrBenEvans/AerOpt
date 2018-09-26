@@ -41,8 +41,8 @@ module FDGD
         integer :: i, intersect, NoMove, counter
         
         ! Move Control Nodes
-        call RelocateCN(NestDisp, NoMove, counter)
-        
+        call RelocateCN2(NestDisp, NoMove, counter)
+       
         ! Move Boundary Nodes
         call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1))       
         !call CheckforIntersections()        
@@ -76,7 +76,7 @@ module FDGD
             end if
         else          
             zeros = 0.0
-            call RelocateCN(zeros, NoMove, counter)
+            call RelocateCN2(zeros, NoMove, counter)
             call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1))  
             counter = 2*counter-1
             NoMove = NoMove*2
@@ -87,6 +87,27 @@ module FDGD
         end if
 
     end subroutine SubFDGD
+
+    subroutine RelocateCN2(NestDisp, NoMove, counter)
+    
+        ! Variables
+        implicit none
+        double precision, dimension(maxDoF) :: NestDisp
+        integer :: i
+        integer :: counter
+	integer :: NoMove
+
+        ! Relocate CN (Control Nodes) applying rotative and translative motion
+        do i = 1, IV%NoCN
+            DelaunayCoordBound(i,1) = RD%Coord(InnerBound(CN_ind(i)),1) + (real(counter)/NoMove)*NestDisp(i)
+            DelaunayCoordBound(i,2) = RD%Coord(InnerBound(CN_ind(i)),2) + (real(counter)/NoMove)*NestDisp(i+IV%NoCN)
+            if (IV%CNconnecttrans(i) /= 0) then
+                DelaunayCoordBound(i,1) = RD%Coord(InnerBound(CN_ind(i)),1) + (real(counter)/NoMove)*NestDisp(IV%CNconnecttrans(i))
+                DelaunayCoordBound(i,2) = RD%Coord(InnerBound(CN_ind(i)),2) + (real(counter)/NoMove)*NestDisp(IV%CNconnecttrans(i)+IV%NoCN)
+            end if
+        end do
+    
+    end subroutine RelocateCN2
     
     recursive subroutine SubFDGD_3D(NestDisp, NoMove, counter)
     
@@ -216,12 +237,17 @@ module FDGD
         call getDelaunayCoordBound()
 
         ! Further preparation work
-        call OrderBoundary()
-
+        if (IV%MeshMovement/=4) then
+          call OrderBoundary()
+        end if
         call getDelaunayElem2(DelaunayElemBound, size(DelaunayElemBound, dim = 1), size(DelaunayElemBound, dim = 2), DelaunayCoordBound)
 
-        call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
-
+        if (IV%MeshMovement/=4) then
+          call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
+        else
+          call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound,InnerBound, size(InnerBound), AreaCoeffBound)
+        end if
+!
         ! Preparation for Domain Movement
         print *, 'Get all Boundary Nodes for Delaunay Triangulation in FDGD'
         allocate(DelaunayCoordDomain(RD%nbf,IV%NoDim),stat=allocateStatus)
@@ -287,14 +313,22 @@ module FDGD
         implicit none
 
         ! Body of PreMeshing
-        DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord_temp(orderedBoundaryIndex(CN_indordered),:)
+        if (IV%MeshMovement /= 4) then
+           DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord_temp(orderedBoundaryIndex(CN_indordered),:)
+        else
+           DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord_temp(InnerBound(CN_ind),:)
+        end if
         !deallocate(DelaunayElemBound,stat=allocateStatus)
         !if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         deallocate(AreaCoeffBound,stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         call getDelaunayElem2(DelaunayElemBound, size(DelaunayElemBound, dim = 1), size(DelaunayElemBound, dim = 2), DelaunayCoordBound)
-        call getAreaCoefficients2(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
-
+        
+        if (IV%MeshMovement /= 4) then
+          call getAreaCoefficients2(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
+        else
+          call getAreaCoefficients2(DelaunayCoordBound, DelaunayElemBound,InnerBound, size(InnerBound), AreaCoeffBound)
+        end if
     end subroutine PreMeshingBoundary
     
     subroutine PreMeshingEnd()
@@ -304,14 +338,22 @@ module FDGD
         integer, dimension(:), allocatable ::  DomainIndex
     
         ! Body of PreMeshing
-        DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(orderedBoundaryIndex(CN_indordered),:)
+        if (IV%MeshMovement /= 4) then
+          DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(orderedBoundaryIndex(CN_indordered),:)
+        else
+          DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(InnerBound(CN_ind),:)
+        end if
         !deallocate(DelaunayElemBound,stat=allocateStatus)
         !if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         deallocate(AreaCoeffBound,stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         call getDelaunayElem2(DelaunayElemBound, size(DelaunayElemBound, dim = 1), size(DelaunayElemBound, dim = 2), DelaunayCoordBound)
-        call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
-
+        
+        if (IV%MeshMovement /= 4) then
+           call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
+        else
+           call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound,InnerBound, size(InnerBound), AreaCoeffBound)
+        end if
         ! Preparation for Domain Movement
         call getDelaunayCoordDomain(RD%Coord, size(RD%Coord, dim = 1), size(RD%Coord, dim = 2))
         !deallocate(DelaunayElemDomain,stat=allocateStatus)
@@ -465,7 +507,6 @@ module FDGD
         ! Variables
         implicit none
         double precision :: xa, ya, za, xb, yb, zb, xc, yc, zc, xd, yd, zd, xp, yp, zp, S1, S2, S3, S4, S, e1, e2, e3, e4
-        double precision :: one
         integer :: NoNodesMove, i, j, NoP
         integer, dimension(NoP) :: RowIndex
         double precision, dimension(:,:), allocatable :: AreaCoeff
@@ -495,30 +536,30 @@ module FDGD
                 xd = DelaunayCoord(DelaunayElem(j,4),1)
                 yd = DelaunayCoord(DelaunayElem(j,4),2)
                 zd = DelaunayCoord(DelaunayElem(j,4),3)
-                A(1,:) = (/ xa, ya, za, one /)
-                A(2,:) = (/ xb, yb, zb, one /)
-                A(3,:) = (/ xc, yc, zc, one /)
-                A(4,:) = (/ xd, yd, zd, one /)
+                A(1,:) = (/ xa, ya, za, 1/)
+                A(2,:) = (/ xb, yb, zb, 1/)
+                A(3,:) = (/ xc, yc, zc, 1/)
+                A(4,:) = (/ xd, yd, zd, 1/)
                 S = (1.0/6.0)*Det(A,4)
-                A(1,:) = (/ xp, yp, zp, one /)
-                A(2,:) = (/ xb, yb, zb, one /)
-                A(3,:) = (/ xc, yc, zc, one /)
-                A(4,:) = (/ xd, yd, zd, one /)
+                A(1,:) = (/ xp, yp, zp, 1/)
+                A(2,:) = (/ xb, yb, zb, 1/)
+                A(3,:) = (/ xc, yc, zc, 1/)
+                A(4,:) = (/ xd, yd, zd, 1/)
                 S1 = (1.0/6.0)*Det(A,4)
-                A(1,:) = (/ xa, ya, za, one /)
-                A(2,:) = (/ xp, yp, zp, one /)
-                A(3,:) = (/ xc, yc, zc, one /)
-                A(4,:) = (/ xd, yd, zd, one /)
+                A(1,:) = (/ xa, ya, za, 1/)
+                A(2,:) = (/ xp, yp, zp, 1/)
+                A(3,:) = (/ xc, yc, zc, 1/)
+                A(4,:) = (/ xd, yd, zd, 1/)
                 S2 = (1.0/6.0)*Det(A,4)
-                A(1,:) = (/ xa, ya, za, one /)
-                A(2,:) = (/ xb, yb, zb, one /)
-                A(3,:) = (/ xp, yp, zp, one /)
-                A(4,:) = (/ xd, yd, zd, one /)
+                A(1,:) = (/ xa, ya, za, 1/)
+                A(2,:) = (/ xb, yb, zb, 1/)
+                A(3,:) = (/ xp, yp, zp, 1/)
+                A(4,:) = (/ xd, yd, zd, 1/)
                 S3 = (1.0/6.0)*Det(A,4)
-                A(1,:) = (/ xa, ya, za, one /)
-                A(2,:) = (/ xb, yb, zb, one /)
-                A(3,:) = (/ xc, yc, zc, one /)
-                A(4,:) = (/ xp, yp, zp, one /)
+                A(1,:) = (/ xa, ya, za, 1/)
+                A(2,:) = (/ xb, yb, zb, 1/)
+                A(3,:) = (/ xc, yc, zc, 1/)
+                A(4,:) = (/ xp, yp, zp, 1/)
                 S4 = (1.0/6.0)*Det(A,4)
                 e1 = S1/S
                 e2 = S2/S
@@ -663,11 +704,6 @@ module FDGD
                 open(1, file= 'DelaunayElem.dat', form='formatted', status = 'unknown')
                 write(1,'(3I8)') transpose(DelaunayElem)
                 close(1)
-                open(1, file= 'XYcoord.dat', form='formatted', status = 'unknown')
-                do i = 1, size(x)
-                    write(1,'(2f22.15)') x(i), y(i)
-                end do
-                close(1)
                 intersect = 1
                 EXIT
             end if
@@ -681,7 +717,6 @@ module FDGD
         ! Variables
         implicit none
         double precision :: xa, ya, za, xb, yb, zb, xc, yc, zc, xd, yd, zd, S
-        double precision :: one
         integer :: j, NoElem, intersect
         double precision, dimension(:,:) :: DelaunayCoord
         double precision, dimension(4,4) :: A
@@ -700,10 +735,10 @@ module FDGD
             xc = DelaunayCoord(DelaunayElem(j,3),1)
             yc = DelaunayCoord(DelaunayElem(j,3),2)
             zc = DelaunayCoord(DelaunayElem(j,3),3)
-            A(1,:) = (/ xa, ya, za, one /)
-            A(2,:) = (/ xb, yb, zb, one /)
-            A(3,:) = (/ xc, yc, zc, one /)
-            A(4,:) = (/ xd, yd, zd, one /)
+            A(1,:) = (/ xa, ya, za, 1/)
+            A(2,:) = (/ xb, yb, zb, 1/)
+            A(3,:) = (/ xc, yc, zc, 1/)
+            A(4,:) = (/ xd, yd, zd, 1/)
             S = (1/6)*Det(A,4)
             if (S < 0) then  ! If Area negative, the order of the points has changed (DelaunayElement order) and hence an intersection of elements took place
                 print *, 'Intersection identified. Movement will be split up.'

@@ -1,0 +1,53 @@
+&inputVariables
+IV%Ma = 0.5						! Mach number
+IV%Tamb = 303.15					! ambient Temperature [K]
+IV%Pamb = 101325					! ambient Pressure [Pa]
+IV%R = 287                  			! specific gas constant
+IV%gamma = 1.4                  			! Ratio of specific heats
+IV%Re = 0.0					! Reynoldsnumber
+IV%xmax = 0.00					! Maximum horizontal displacement of Control Nodes
+IV%ymax = 0.20					! Maximum vertical displacement of Control Nodes 
+IV%zmax = 0.00					! Maximum lateral displacement of Control Nodes  
+IV%smoothfactor = 0.1 0.1
+IV%engFMF = 1.0					! engines Front Mass Flow(Solver variable)
+IV%AlphaInflowDirection = 0.0			! Angle/Direction of Flow within the Solver(0: Left to Right, 180: Right to Left)
+IV%turbulencemodel = 0				! Turbulence Model applied in Solver
+IV%Top2Low = 0.75					! Fraction of Top to Low Cuckoo Nests
+IV%NoSnap = 20					! Number of Snapshots (POD) 
+IV%NoCN = 2						! Number of Control Points 
+IV%NoDim = 2						! Number of Dimensions in Space 
+IV%NoG = 100						! Number of Generations 
+IV%NoPOMod = -1					! No of POD Modes considered 
+IV%NoLeviSteps = 100 		        	! Number of Levy walks per movement 
+IV%NoIter = -3    			           	! Convergence Rate
+IV%delay = 300    			           	! Sleep Time between check for Simulation Results in second
+IV%constrain = .True.				! Constrain: Include boundaries of design space for Levy Walk - 1:Yes 0:no
+IV%AdaptSamp = .FALSE.          			! Adaptive Sampling - T: Active
+IV%waitMax = 48					! maximum waiting time in hours
+IV%maxit = 30000                			! maximum Number of Iterations to reach convergence in Solver
+IV%Aconst = 0.01					! Levy Flight parameter (determined emperically)
+IV%POD = .false.		                    	! Activation of POD - TRUE is ACTIVE
+IV%NoDelBP = 4
+IV%samemovement = .false.
+IV%alpha = 10.0                    			! For Aerofoil Angle of Attack Test - in [degrees]
+IV%ObjectiveFunction = 3        			! What is the optimisation target? 1 - Lift/Drag, 2 - Distortion, 3 - zero Lift Optimisation
+
+! Test Parameters for Mesh Deformation
+IV%MeshMovement = 1					! Type of Mesh Movement - choices: 2 - 'RBF' or 1 - 'FDGD'
+IV%Meshtest = .false.				! If .true., the program pauses after the Mesh Generation process. Good for only checking Meshes!
+
+! TEST POD
+IV%multiquadric = .true.        			! using multiquadratic RBF function for POD
+IV%Pol = .true.                 			! Application of Polynomial?
+IV%meanP = .true.					! apply mean Pressure?
+
+! Strings
+IV%filename = 'Snapshot'				! I/O file of initial Meshes for FLITE solver
+IV%runOnCluster = 'N'				! Run On Cluster or Run on Engine?
+IV%SystemType = 'W'					! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)
+
+! Login Information
+IV%UserName = 'egnaumann'   			! Putty Username - Cluster: egnaumann
+IV%Password = 'Juliana'       			! Putty Password
+IV%version = '2.7' 
+/

@@ -32,7 +32,7 @@ module Optimization
         ! Variables
         implicit none
         double precision :: Ftemp, Fopt, temp, Fibefore, CR, F
-        integer :: i, j, k, l, ii, randInt, G, c
+        integer :: i, j, k, l, ii, randInt, store, G, c
         double precision, dimension(:), allocatable :: NormFact, Fcompare, Frange
         double precision, dimension(:,:), allocatable :: Snapshots_Move, newSnapshots, tempAgent_Move, tempAgent
         integer, dimension(:), allocatable :: ind_Fi, ReferenceAgentsIndex
@@ -287,20 +287,35 @@ module Optimization
             ! write Nest and Fitness Output into File
             call writeFitnessandNestoutput()
             
-            ! Store Files of all nests
-            do j = 1, IV%NoNests
+            ! Store Files of Top 5 % fraction of Nests in TopFolder
+            store = 1
+            if (Fibefore /= OV%Fi(1)) then
+                do j = 1, store                    
+                    if (IV%SystemType == 'W') then
+                        call moveTopNestFilesWin(ind_Fi(j))
+                        call generateEnSightFileWin()
+                    else
+                        call moveTopNestFilesLin(ind_Fi(j))
+                        if (IV%NoDim == 2) then
+                            call generateEnSightFileLin()
+                        else
+                            call generateEnSightFileLin3D(ind_Fi(j))
+                        end if
+                    end if
+                end do
+            else
                 if (IV%SystemType == 'W') then
-                    call moveTopNestFilesWin(ind_Fi(j), j)
+                    call copyTopNestFilesWin(OV%Gen)
                     call generateEnSightFileWin()
                 else
-                    call moveTopNestFilesLin(ind_Fi(j),j)
+                    call copyTopNestFilesLin(OV%Gen)
                     if (IV%NoDim == 2) then
                         call generateEnSightFileLin()
                     else
                         call generateEnSightFileLin3D(ind_Fi(j))
                     end if
                 end if
-            end do
+            end if
             Fibefore = OV%Fi(1)
             
         end do
@@ -324,7 +339,7 @@ module Optimization
         ! Variables
         implicit none
         double precision :: Fopt, temp, Fibefore, control, W, rn1, rn2, F
-        integer :: i, j, k, l, ii, G, c, minNeighbourSize, NeighbourhoodSize
+        integer :: i, j, k, l, ii, store, G, c, minNeighbourSize, NeighbourhoodSize
         double precision, dimension(:), allocatable :: NormFact, Fcompare, Neighbourbest, LocalFi, Wrange
         double precision, dimension(:,:), allocatable :: Snapshots_Move, newSnapshots, LocalNest, LocalNest_Move, PSOvelocity
         integer, dimension(:), allocatable :: ind_Fi, NeighboursIndex
@@ -533,7 +548,7 @@ module Optimization
             if (IV%POD == .false.) then
                 
                 ! Store moved Nests in Output Analysis File for Restart
-                open(29,file=trim(IV%SimulationName)//'/Neststemp.txt',form='formatted',status='unknown')
+                open(29,file=newdir//'/Neststemp.txt',form='formatted',status='unknown')
                 write(29,'(<IV%NoNests>f17.10)') OV%Nests
                 close(29)
             
@@ -629,20 +644,35 @@ module Optimization
                 Neighbourhoodsize = minval((/(Neighbourhoodsize + minNeighbourSize),(IV%NoNests-1)/))
             end if
             
-            !Store all nests
-            do j = 1, IV%NoNests
+            !Store Files of Top 5 % fraction of Nests in TopFolder
+            store = 1
+            if (Fibefore /= OV%Fi(1)) then
+                do j = 1, store                    
+                    if (IV%SystemType == 'W') then
+                        call moveTopNestFilesWin(ind_Fi(j))
+                        !call generateEnSightFileWin()
+                    else
+                        call moveTopNestFilesLin(ind_Fi(j))
+                        if (IV%NoDim == 2) then
+                            call generateEnSightFileLin()
+                        else
+                            call generateEnSightFileLin3D(ind_Fi(j))
+                        end if
+                    end if
+                end do
+            else
                 if (IV%SystemType == 'W') then
-                    call moveTopNestFilesWin(ind_Fi(j), j)
+                    call copyTopNestFilesWin(OV%Gen)
                     !call generateEnSightFileWin()
                 else
-                    call moveTopNestFilesLin(ind_Fi(j),j)
+                    call copyTopNestFilesLin(OV%Gen)
                     if (IV%NoDim == 2) then
                         call generateEnSightFileLin()
                     else
                         call generateEnSightFileLin3D(ind_Fi(j))
                     end if
-                end if
-            end do
+               end if
+            end if
             Fibefore = OV%Fi(1)
             
         end do
@@ -666,7 +696,7 @@ module Optimization
         ! Variables
         implicit none
         double precision :: Ac, Ftemp, Fopt, temp, Fibefore
-        integer :: i, j, k, l, ii, NoSteps, NoTop, NoDiscard, randomNest, G
+        integer :: i, j, k, l, ii, NoSteps, NoTop, NoDiscard, randomNest, store, G
         double precision, dimension(:), allocatable :: NormFact, tempNests_Move, dist, tempNests, Fcompare, newMaLocal
         double precision, dimension(:,:), allocatable :: Snapshots_Move, newSnapshots, TopNest, TopNest_Move
         integer, dimension(:), allocatable :: ind_Fi, ind_Fitrack
@@ -753,7 +783,10 @@ module Optimization
         
         ! Extract Initial Fitness and Transfer to general Fitness vector
         call TransferInitialFitness(Snapshots_Move)
+        PRINT*,'1. I GET HERE'
+        PRINT*,'OV%Fi(1)=',OV%Fi(1)
         Fibefore = OV%Fi(1)
+        PRINT*,'2. I GET HERE'
         allocate(ind_Fi(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ind_Fitrack(IV%NoNests),stat=allocateStatus)
@@ -950,7 +983,7 @@ module Optimization
             if (IV%POD == .false.) then  
                 
                 ! Store moved Nests in Output Analysis File
-                open(29,file=trim(IV%SimulationName)//'/Neststemp.txt',form='formatted',status='unknown')
+                open(29,file=newdir//'/Neststemp.txt',form='formatted',status='unknown')
                 write(29,'(<IV%NoNests>f17.10)') OV%Nests
                 close(29)
             
@@ -1024,27 +1057,51 @@ module Optimization
             
             ! Store Files of Top 5 % fraction of Nests in TopFolder
             if (IV%POD == .false.) then          
-                do j = 1, IV%NoNests
+                store = 1
+                if (Fibefore /= OV%Fi(1)) then
+                    do j = 1, store                    
+                        if (IV%SystemType == 'W') then
+                            call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)))
+                            call generateEnSightFileWin()
+                        else
+                            call moveTopNestFilesLin(ind_Fitrack(ind_Fi(j)))
+                            if (IV%NoDim == 2) then
+                                call generateEnSightFileLin()
+                            else
+                                call generateEnSightFileLin3D(ind_Fitrack(ind_Fi(j)))
+                            end if
+                        end if
+                    end do
+                else
                     if (IV%SystemType == 'W') then
-                        call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)), j)
+                        call copyTopNestFilesWin(OV%Gen)
                         call generateEnSightFileWin()
                     else
-                        call moveTopNestFilesLin(ind_Fitrack(ind_Fi(j)), j)
+                        call copyTopNestFilesLin(OV%Gen)
                         if (IV%NoDim == 2) then
                             call generateEnSightFileLin()
                         else
                             call generateEnSightFileLin3D(ind_Fitrack(ind_Fi(j)))
                         end if
                     end if
-                end do
-	        else
-                do j = 1, IV%NoNests
+                end if
+	     else
+                store = 1
+                if (Fibefore /= OV%Fi(1)) then
+                    do j = 1, store                    
+                        if (IV%SystemType == 'W') then
+                            call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)))
+                        else
+                            call moveTopNestFilesLin_POD(ind_Fitrack(ind_Fi(j)))
+                        end if
+                    end do
+                else
                     if (IV%SystemType == 'W') then
-                        call moveTopNestFilesWin(ind_Fitrack(ind_Fi(j)), j)
+                        call copyTopNestFilesWin(OV%Gen)
                     else
-                        call moveTopNestFilesLin_POD(ind_Fitrack(ind_Fi(j)))
+                        call copyTopNestFilesLin_POD(OV%Gen)
                     end if
-                end do
+                end if
             end if
             Fibefore = OV%Fi(1)
             
@@ -1098,7 +1155,7 @@ module Optimization
     
         ! Variables
         implicit none
-        integer :: ii, j
+        integer :: ii, j, store
         double precision :: Ftemp, temp
         integer, dimension(:), allocatable :: ind_Fi_initial
         double precision, dimension(:), allocatable :: Fi_initial, Precoutput_temp
@@ -1123,7 +1180,7 @@ module Optimization
         deallocate(OV%pTamb)
         ! Output: Fitness depend on user Input (objective Function)
        
-        open(19,file=trim(IV%SimulationName)//'/Fitness_0.txt', form='formatted',status='unknown')
+        open(19,file=newdir//'/Fitness_0.txt', form='formatted',status='unknown')
         !open(19,file=TopFolder//'/Fitness_0.txt', form='formatted',status='unknown')
         write(19,'(1I1)',advance="no") 0
         write(19,'(1f25.10)',advance="no") Fi_initial(1)
@@ -1144,17 +1201,26 @@ module Optimization
             ind_Fi_initial(j) = ind_Fi_initial(IV%NoSnap-j+1)
             ind_Fi_initial(IV%NoSnap-j+1) = temp
         end do
+        PRINT*,'Fi_initial=',Fi_initial
+        PRINT*,'IV%NoNests=',IV%NoNests
         OV%Fi = Fi_initial(1:IV%NoNests)
+        PRINT*,'OV%Fi=',OV%Fi
         OV%Nests_Move = Snapshots_Move(ind_Fi_initial(1:IV%NoNests),:)
         OV%Nests = CS%Snapshots(ind_Fi_initial(1:IV%NoNests),:)
         OV%Precoutput = Precoutput_temp(ind_Fi_initial(1:IV%NoNests))
-
-        do j = 1, IV%NoNests
+! COMMENT    
+        ! Store Files of Top 5 % fraction of Nests in TopFolder - currently just stores best Nest
+        !if (nint(IV%NoNests*0.05) > 1) then
+        !    store = nint(IV%NoNests*0.05)
+        !else
+            store = 1
+        !end if
+       do j = 1, store                    
             if (IV%SystemType == 'W') then
-               call moveTopNestFilesWin(ind_Fi_initial(j), j)
+               call moveTopNestFilesWin(ind_Fi_initial(j))
                call generateEnSightFileWin()
             else
-                call moveTopNestFilesLin(ind_Fi_initial(j),j)
+                call moveTopNestFilesLin(ind_Fi_initial(j))
                 if (IV%NoDim == 2) then
                    call generateEnSightFileLin()
                 else
@@ -1207,7 +1273,7 @@ module Optimization
             ! Determine correct String number
             call DetermineStrLen(istr, i)
            
-            open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='formatted',status='old')     
+            open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='formatted',status='old')     
             read(11, *) Output  ! index, rho, Vx, Vy, Vz, e
             
             k = 0
@@ -1226,9 +1292,7 @@ module Optimization
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy) 
             
             ! Local Mach number non-dimensional
-            if(allocated(OV%engInNodes)) then
-                OV%MaLocal(:,(i - Start + 1)) = sqrt(Vx(OV%engInNodes)**2 + Vy(OV%engInNodes)**2)/(sqrt(IV%gamma*OV%pressure(OV%engInNodes,(i - Start + 1))/rho(OV%engInNodes)))
-            end if
+            OV%MaLocal(:,(i - Start + 1)) = sqrt(Vx(OV%engInNodes)**2 + Vy(OV%engInNodes)**2)/(sqrt(IV%gamma*OV%pressure(OV%engInNodes,(i - Start + 1))/rho(OV%engInNodes)))
             
             
 ! ambient pressure calculated based on Reynolds number and Ma and input Temperature            
@@ -1288,7 +1352,7 @@ module Optimization
             ! Determine correct String number
             call DetermineStrLen(istr, i)
            
-            open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='unformatted',status='old')     
+            open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk', form='unformatted',status='old')     
             read(11) nop
             if (RD%np /= nop) then
                 STOP 'ERROR: .unk file does not correspond with .plt file. Check file transfer'
@@ -1301,7 +1365,7 @@ module Optimization
             ! Old Bernoulli Equation to calculate non-dimensional pressure:  pressure(:,i) = e + (1.0/2.0)*(IV%Ma**2)*rho*(Vx*Vx + Vy*Vy + Vz*Vz) 
             
             close(11)
-                !open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/pressure'//istr//'.txt', form='formatted',status='unknown')
+                !open(11, file=newdir//'/'//OutFolder//'/pressure'//istr//'.txt', form='formatted',status='unknown')
                 !write(11,'(1F25.15)') pressure(:,i)
                 !close(11)
             deallocate(istr)
@@ -1364,14 +1428,14 @@ module Optimization
         
         !!** TESTING **!!    
         !Output: Modes and Coefficients of POD       
-        !open(23,file=trim(IV%SimulationName)//'/Coefficients.txt')
+        !open(23,file=newdir//'/Coefficients.txt')
         !write(23,'(<IV%NoSnap>f20.7)') coeff           
         !close(23)
-        !open(23,file=trim(IV%SimulationName)//'/Modes.txt')
+        !open(23,file=newdir//'/Modes.txt')
         !write(23,'(10f13.10)') modes(:,1:10)           
         !close(23)
         !pressure2(:,2) = matmul(modes,coeff(:,2))
-        !open(23,file=trim(IV%SimulationName)//'/Pressure_Reconstruct.txt')
+        !open(23,file=newdir//'/Pressure_Reconstruct.txt')
         !write(23,'(1f25.10)') pressure2(:,2)           
         !close(23)
         
@@ -1882,10 +1946,10 @@ module Optimization
             
         end do
         
-        !open(23,file=trim(IV%SimulationName)//'/Weights.txt')
+        !open(23,file=newdir//'/Weights.txt')
         !write(23,'(10f55.10)') OV%Weights(1:10,:)           
         !close(23)
-        !open(23,file=trim(IV%SimulationName)//'/Polynomial.txt')
+        !open(23,file=newdir//'/Polynomial.txt')
         !write(23,'(1f25.10)') OV%PolCoeff           
         !close(23)
         
@@ -1974,7 +2038,7 @@ module Optimization
             CALL DGEMM('N','N',size( OV%modes2, dim = 1), size( newCoeff, dim = 2), size( OV%modes2, dim = 2),alpha,OV%modes2,size( OV%modes2, dim = 1),newCoeff,size( newCoeff, dim = 1),beta,newMalocal,size( newMalocal, dim = 1))
         end if
         
-		open(23,file=trim(IV%SimulationName)//'/POD_Pressure'//istr//'.txt')
+		open(23,file=newdir//'/POD_Pressure'//istr//'.txt')
 		write(23,'(1f25.10)') newpressure           
 		close(23)
         
@@ -2357,28 +2421,31 @@ module Optimization
     
         ! Variables
         implicit none
-        integer :: NoSnapshot, j, io
+        integer :: FileSize, LastLine, NoSnapshot, j
         double precision, dimension(8) :: Input      
         double precision :: Lift, Drag, Fi
        
         ! Body of getLiftandDrag
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
-        
-        ! Read until last line
-        do
-            read(11, *, IOSTAT=io) Input
-            if(io > 0) then
-                STOP 'FILE INPUT ERROR'
-                exit
-            else if (io < 0) then
-                exit
+        inquire(11, size = FileSize)           
+        if (IV%NoDim == 3) then
+            LastLine = FileSize/175
+        else
+            if (IV%SystemType == 'W') then
+                LastLine = FileSize/106 !107
+            else     
+                LastLine = FileSize/106
             end if
+        end if
+            
+        ! Read until last line
+        do j = 1, (LastLine - 1)
+            read(11, *) Input
         end do
-        
+        read(11, *) Input
         close(11)
-        
         Lift = Input(3)
         Drag = Input(4)
         Fi = Lift/Drag
@@ -2473,7 +2540,7 @@ module Optimization
        
         ! Body of getzeroLift
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
         if (IV%NoDim == 3) then
@@ -2507,7 +2574,7 @@ module Optimization
        
         ! Body of getLiftandDrag
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
         if (IV%NoDim == 3) then
@@ -2542,7 +2609,7 @@ module Optimization
        
         ! Body of getzeroLift
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
         if (IV%NoDim == 3) then
@@ -2576,7 +2643,7 @@ module Optimization
        
         ! Body of getzeroLift
         call DetermineStrLen(istr, NoSnapshot)
-        open(11, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
+        open(11, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted',status='old')
         deallocate(istr)
         inquire(11, size = FileSize)           
         if (IV%NoDim == 3) then
@@ -3391,7 +3458,7 @@ module Optimization
                 
         allocate(character(len=3) :: istr)
         write(istr, '(1f3.1)') IV%Ma
-        open(19,file=trim(IV%SimulationName)//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
+        open(19,file=newdir//'/Fitness'//istr//'.txt',form='formatted',status='old',position='append')
         if (ConvA(1) == 1) then ! If converged check fitness
             call getObjectiveFunction(.false., Ftemp, NoSnapshot=(IV%NoSnap + 1))
             write(19,'(1I3, 1f17.10)',advance="no") 0, Ftemp
