@@ -549,7 +549,7 @@ contains
             write(1,'(A)') '#maximum job time in D-HH:MM'
             write(1,'(A)') '#SBATCH -t '//strwait//':00:00'
             write(1,'(A)') '#SBATCH --mem-per-cpu=4000'
-            write(1,'(A)') 'module purge'
+            write(1,'(A)') 'module load hpcw'
             write(1,'(A)') 'module load parallel'
             write(1,'(A)') 'srun="srun -n1 -N1 --exclusive"'
             if (start /= 1) then
