@@ -2910,7 +2910,7 @@ module Optimization
         if (ex == .true.) then
             open(29,file=DataFolder//'/Cp_target_Onera206.txt',form='formatted',status='old')
         else
-            STOP "The file 'Cp_target' does not exist. Please generate!"
+            STOP "The file 'Cp_target_Onera206.txt' does not exist. Please generate!"
         end if
 
         read(29,*) nbp_target
@@ -3136,7 +3136,7 @@ module Optimization
         if (ex == .true.) then
             open(29,file=DataFolder//'/Cp_target.txt',form='formatted',status='old')
         else
-            STOP "The file 'Cp_target' does not exist. Please generate!"
+            STOP "The file 'Cp_target.txt' does not exist. Please generate!"
         end if
 
         read(29,*) nbp_target
