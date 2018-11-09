@@ -783,10 +783,8 @@ module Optimization
         
         ! Extract Initial Fitness and Transfer to general Fitness vector
         call TransferInitialFitness(Snapshots_Move)
-        PRINT*,'1. I GET HERE'
         PRINT*,'OV%Fi(1)=',OV%Fi(1)
         Fibefore = OV%Fi(1)
-        PRINT*,'2. I GET HERE'
         allocate(ind_Fi(IV%NoNests),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Optimisation "
         allocate(ind_Fitrack(IV%NoNests),stat=allocateStatus)
@@ -1309,11 +1307,11 @@ module Optimization
                 
         end do
         print *,'Pressure of .unk files extracted'
-        deallocate(Output)
-        deallocate(Vx)
-        deallocate(Vy)
-        deallocate(e)
-        deallocate(rho)
+  !      deallocate(Output)
+  !      deallocate(Vx)
+  !      deallocate(Vy)
+  !      deallocate(e)
+  !      deallocate(rho)
 
     end subroutine ExtractPressure
     
@@ -2970,26 +2968,6 @@ module Optimization
         ! Body of getPressureDistribution
         nibp = size(InnerBound)
 
-        ! Read in Target Reference Data         
-        inquire(file=DataFolder//'/Cp_target_Onera206.txt', exist = ex)
-        if (ex == .true.) then
-            open(29,file=DataFolder//'/Cp_target_Onera206.txt',form='formatted',status='old')
-        else
-            STOP "The file 'Cp_target_Onera206.txt' does not exist. Please generate!"
-        end if
-
-        read(29,*) nbp_target
-        allocate(ind_target(nbp_target),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
-        allocate(xtarget(nbp_target),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
-        allocate(Cptarget(nbp_target),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
-        do i = 1, nbp_target
-            read(29,*) xtarget(i), Cptarget(i)
-        end do
-        close(29)
-       
         ! Allocate Arrays
         allocate(ind(nibp),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
@@ -2998,10 +2976,33 @@ module Optimization
         allocate(y(nibp),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
 
+        ! Read in Target Reference Data         
+        inquire(file=DataFolder//'/Cp_target_Onera206.txt', exist = ex)
+        if (ex == .true.) then
+            open(29,file=DataFolder//'/Cp_target_Onera206.txt',form='formatted',status='old')
+        else
+            STOP "The file 'Cp_target_Onera206.txt' does not exist. Please generate!"
+        end if
+       
+        ! Read the target pressure coefficient distribution
+        read(29,*) nbp_target
+        print*,'nbp_target=',nbp_target
+        allocate(ind_target(nbp_target),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(xtarget(nbp_target),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        allocate(Cptarget(nbp_target),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
+        
+        do i=1,nbp_target
+          read(29,*) xtarget(i),Cptarget(i)
+        enddo
+        close(29)
+
         ! Extract x coordinate
         call readDatFile(NoSnapshot)
         x = RD%coord_temp(orderedBoundaryIndex,1)
-        deallocate(RD%coord_temp)
+        ! deallocate(RD%coord_temp)
         
         ! Calculate y(pressure coefficient)
         p0 = 0.178569528995839 !Ma2.0: 0.178569528995839  !Ma0.5: 2.857162211411720 !Ma0.729: 1.344037930148188 ! Soft code later, this is specific for Re = 6.5e7, T = 255.658 and l = 1 feet
@@ -3012,11 +3013,10 @@ module Optimization
         else
             maxbp = nbp_target
         end if
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
         allocate(xintersect(maxbp),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getPressureDistribution"
         allocate(yintersect(maxbp),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in MoveMesh "
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in getPressureDistribution "
         
         ! Identify intersections between target and current boundary
         k = 0
