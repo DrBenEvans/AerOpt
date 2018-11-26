@@ -2914,11 +2914,11 @@ module Optimization
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in Pressure Distribution "
 
         ! Read in Target Reference Data         
-        inquire(file=DataFolder//'/Cp_target_Onera206.txt', exist = ex)
+        inquire(file=DataFolder//'/AIRFOIL_PRESSURE_COEF.txt', exist = ex)
         if (ex == .true.) then
-            open(29,file=DataFolder//'/Cp_target_Onera206.txt',form='formatted',status='old')
+            open(29,file=DataFolder//'/AIRFOIL_PRESSURE_COEF.txt',form='formatted',status='old')
         else
-            STOP "The file 'Cp_target_Onera206.txt' does not exist. Please generate!"
+            STOP "The file 'AIRFOIL_PRESSURE_COEF.txt' does not exist. Please generate!"
         end if
        
         ! Read the target pressure coefficient distribution
@@ -2942,7 +2942,7 @@ module Optimization
         ! deallocate(RD%coord_temp)
         
         ! Calculate y(pressure coefficient)
-        p0 = 0.178569528995839 !Ma2.0: 0.178569528995839  !Ma0.5: 2.857162211411720 !Ma0.729: 1.344037930148188 ! Soft code later, this is specific for Re = 6.5e7, T = 255.658 and l = 1 feet
+        p0 = 4.48 !Ma2.0: 0.178569528995839  !Ma0.5: 2.857162211411720 !Ma0.729: 1.344037930148188 ! Soft code later, this is specific for Re = 6.5e7, T = 255.658 and l = 1 feet
         y = (OV%pressure(orderedBoundaryIndex, NoSnapshot)/p0 - 1)/(0.5*IV%gamma*IV%Ma**2)
           
         if (nibp > nbp_target) then
