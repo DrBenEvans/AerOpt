@@ -4,6 +4,7 @@
 *.exe.intermediate.manifest
 *.htm
 *.mod
+source/*.dat
 Debug/
 Release/
 .vs
