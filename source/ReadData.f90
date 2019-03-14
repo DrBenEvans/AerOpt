@@ -420,12 +420,18 @@ contains
             write(1,*) ' '
             write(1,'(A)') trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'    ! Result filename
             write(1,'(A)') trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'    ! Residual Filename
-        elseif (IV%SystemType == 'W' .or. IV%SystemType == 'L') then
+        elseif (IV%SystemType == 'W') then
             write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//'.inp'            ! Control Filename
             write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
             write(1,'(A)') '' !trim(IV%SimulationName), '/', InFolder, '/', trim(IV%filename), istr, '.unk'     ! Start-up File = previous Result File
             write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk'     ! Result filename
             write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
+        elseif (IV%SystemType == 'L') then
+            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp'            ! Control Filename
+            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
+            write(1,'(A)') '' !trim(IV%SimulationName), '/', InFolder, '/', trim(IV%filename), istr, '.unk'     ! Start-up File = previous Result File
+            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'     ! Result filename
+            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
         end if
         close(1)
     
@@ -487,7 +493,7 @@ contains
         ! Create Read File for Solver
         open(1, file=trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/run.inp', form='formatted',status='unknown')
             write(1,'(A)') trim(IV%filename)//istr
-        close(1)
+        close(1)        
     
     end subroutine WriteSolverInpFile_3D
 
@@ -528,6 +534,7 @@ contains
             write(1,'(A)') '#maximum job time in D-HH:MM'
             write(1,'(A)') '#SBATCH -t '//strwait//':00:00'
             write(1,'(A)') '#SBATCH --mem-per-cpu=4000'
+            write(1,'(A)') '#SBATCH --account='//trim(IV%Account)
             write(1,'(A)') 'module purge'
             write(1,'(A)') 'module load parallel'
             write(1,'(A)') 'srun="srun -n1 -N1 --exclusive"'
@@ -705,6 +712,7 @@ contains
         ! Body of TriggerFile
         open(1, file='Communication', form='formatted',status='unknown')
         write(1,'(A)') 'cd '//trim(IV%clusterPath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr 
+        write(1,'(A)') 'cd ../..' 
         
         if (IV%SystemType /= 'B') then
             write(1,*) 'qsub batchfile'

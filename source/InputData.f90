@@ -59,6 +59,7 @@ module InputData
         logical :: POD
 		logical :: meanP
         logical ::  shapeenclosed       ! Closed or open boundary?
+        character(len=20) :: Account    ! Group account for slurm
     
     end type InputVariablesData
     
@@ -131,6 +132,7 @@ contains
         IV%runOnCluster = 'Y'           ! Run On Cluster or Run on Engine?
         IV%clusterAddress = 'encluster.swan.ac.uk'
         IV%SystemType = 'Q'             ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)
+        IV%Account = 'scwXXXX'          ! Group account for slurm
         IV%UserName = 'egnaumann'       ! Putty Username - Cluster: egnaumann
         IV%Password = 'Fleur666'        ! Putty Password
         IV%version = '3.0'
