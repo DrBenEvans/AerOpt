@@ -544,6 +544,7 @@ contains
                 write(1,'(A)') 'parallel="parallel -N 1 --delay .2 -j $SLURM_NTASKS --joblog parallel_joblog --resume"'
             end if
             write(1,'(A)') '$parallel "$srun --input='//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//'{1}'//'/SolverInput'//'{1}'//'.sh '//pathSolver//'" ::: {'//strStart//'..'//strEnd//'}'
+            write(1, '(A)') ' sleep 1 '
             write(1,'(A)') ' '
             do i = start, ending
                 call DetermineStrLen(istring, i)
