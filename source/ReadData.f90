@@ -539,9 +539,9 @@ contains
             write(1,'(A)') 'module load parallel'
             write(1,'(A)') 'srun="srun -n1 -N1 --exclusive"'
             if (start /= 1) then
-                write(1,'(A)') 'parallel="parallel -N 1 --delay .2 -j $SLURM_NTASKS --joblog parallel_joblog2 --resume"'
+                write(1,'(A)') 'parallel="parallel -N 1 --delay .2 -j $SLURM_NTASKS"'
             else
-                write(1,'(A)') 'parallel="parallel -N 1 --delay .2 -j $SLURM_NTASKS --joblog parallel_joblog --resume"'
+                write(1,'(A)') 'parallel="parallel -N 1 --delay .2 -j $SLURM_NTASKS"'
             end if
             write(1,'(A)') '$parallel "$srun --input='//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//'{1}'//'/SolverInput'//'{1}'//'.sh '//pathSolver//'" ::: {'//strStart//'..'//strEnd//'}'
             write(1, '(A)') ' sleep 1 '
