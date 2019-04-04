@@ -802,19 +802,19 @@ contains
         call DetermineStrLen(istr, i)
         call DetermineStrLen(NoGenstr, OV%Gen) 
         call DetermineStrLen(indexStr, idx) 
-        open(1, file='Communication', form='formatted',status='unknown')
-        write(1, '(A)') 'mv '//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
-        write(1, '(A)') 'mv '//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
+        open(1, file='Communication'//indexStr, form='formatted',status='unknown')
+        write(1, '(A)') 'cp '//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
+        write(1, '(A)') 'cp '//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
         if (IV%NoDim == 2) then
-            write(1, '(A)') 'mv '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
+            write(1, '(A)') 'cp '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
         else
-            write(1, '(A)') 'mv '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.plt"'
+            write(1, '(A)') 'cp '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.plt"'
         end if
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
-        call system('chmod a+x Communication')
-        call system('./Communication')    ! Submits Move file
+        call system('chmod a+x Communication'//indexStr)
+        call system('./Communication'//indexStr)    ! Submits Move file
         
     end subroutine moveTopNestFilesLin
 

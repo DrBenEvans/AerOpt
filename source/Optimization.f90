@@ -293,6 +293,8 @@ module Optimization
                     call moveTopNestFilesWin(ind_Fi(j), j)
                     call generateEnSightFileWin()
                 else
+                    ! ind_Fi does not always contain all nests. Some are
+                    ! repeated
                     call moveTopNestFilesLin(ind_Fi(j),j)
                     if (IV%NoDim == 2) then
                         call generateEnSightFileLin()
