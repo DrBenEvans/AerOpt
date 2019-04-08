@@ -237,12 +237,17 @@ module FDGD
         call getDelaunayCoordBound()
 
         ! Further preparation work
-        call OrderBoundary()
-
+        if (IV%MeshMovement/=4) then
+          call OrderBoundary()
+        end if
         call getDelaunayElem2(DelaunayElemBound, size(DelaunayElemBound, dim = 1), size(DelaunayElemBound, dim = 2), DelaunayCoordBound)
 
-        call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
-
+        if (IV%MeshMovement/=4) then
+          call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
+        else
+          call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound,InnerBound, size(InnerBound), AreaCoeffBound)
+        end if
+!
         ! Preparation for Domain Movement
         print *, 'Get all Boundary Nodes for Delaunay Triangulation in FDGD'
         allocate(DelaunayCoordDomain(RD%nbf,IV%NoDim),stat=allocateStatus)
@@ -308,14 +313,22 @@ module FDGD
         implicit none
 
         ! Body of PreMeshing
-        DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord_temp(orderedBoundaryIndex(CN_indordered),:)
+        if (IV%MeshMovement /= 4) then
+           DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord_temp(orderedBoundaryIndex(CN_indordered),:)
+        else
+           DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord_temp(InnerBound(CN_ind),:)
+        end if
         !deallocate(DelaunayElemBound,stat=allocateStatus)
         !if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         deallocate(AreaCoeffBound,stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         call getDelaunayElem2(DelaunayElemBound, size(DelaunayElemBound, dim = 1), size(DelaunayElemBound, dim = 2), DelaunayCoordBound)
-        call getAreaCoefficients2(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
-
+        
+        if (IV%MeshMovement /= 4) then
+          call getAreaCoefficients2(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
+        else
+          call getAreaCoefficients2(DelaunayCoordBound, DelaunayElemBound,InnerBound, size(InnerBound), AreaCoeffBound)
+        end if
     end subroutine PreMeshingBoundary
     
     subroutine PreMeshingEnd()
@@ -325,14 +338,22 @@ module FDGD
         integer, dimension(:), allocatable ::  DomainIndex
     
         ! Body of PreMeshing
-        DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(orderedBoundaryIndex(CN_indordered),:)
+        if (IV%MeshMovement /= 4) then
+          DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(orderedBoundaryIndex(CN_indordered),:)
+        else
+          DelaunayCoordBound(1:IV%NoCN,:) = RD%Coord(InnerBound(CN_ind),:)
+        end if
         !deallocate(DelaunayElemBound,stat=allocateStatus)
         !if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         deallocate(AreaCoeffBound,stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in FDGD"
         call getDelaunayElem2(DelaunayElemBound, size(DelaunayElemBound, dim = 1), size(DelaunayElemBound, dim = 2), DelaunayCoordBound)
-        call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
-
+        
+        if (IV%MeshMovement /= 4) then
+           call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound, orderedBoundaryIndex, size(orderedBoundaryIndex), AreaCoeffBound)
+        else
+           call getAreaCoefficients(DelaunayCoordBound, DelaunayElemBound,InnerBound, size(InnerBound), AreaCoeffBound)
+        end if
         ! Preparation for Domain Movement
         call getDelaunayCoordDomain(RD%Coord, size(RD%Coord, dim = 1), size(RD%Coord, dim = 2))
         !deallocate(DelaunayElemDomain,stat=allocateStatus)
