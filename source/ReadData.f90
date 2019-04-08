@@ -693,11 +693,22 @@ contains
         
         open(1, file='Communication', form='formatted',status='unknown')
         
+        write(1,*) 'cd '
+        write(1,*) 'cd ..'
+        write(1,*) 'cd ', trim(IV%filepath)//'/'//newdir//'/'//InFolder
         ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster
-        write(1, '(A)') 'mkdir "'//trim(IV%clusterPath)//'"'
-        write(1, '(A)') 'mkdir "'//trim(IV%clusterPath)//'/'//newdir//'/"'
-        write(1, '(A)') 'cd "'//trim(IV%clusterPath)//'/'//newdir//'/"'
-        write(1, '(A)') 'put -r "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/"'
+        write(1, '(A)') 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/SolverInput'//istr//'.sh"'
+        if (IV%NoDim == 2) then
+            write(1, '(A)') 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol"'
+        elseif (IV%NoDim == 2) then
+            do i = 1, IV%NoProcessors
+                call DetermineStrLen(istr, i)
+                write(1, '(A)') 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'.sol_'//istr//'"'
+                deallocate(istr)
+            end do
+        end if
+        write(1, '(A)') 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//'.inp"'
+        write(1, '(A)') 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/batchfile.sh"'
         close(1)
     
     end subroutine transferFilesWin
@@ -734,7 +745,7 @@ contains
     
         ! Body of TriggerFile
         open(1, file='Communication', form='formatted',status='unknown')
-        write(1,'(A)') 'cd '//trim(IV%clusterPath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr 
+        write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr 
         write(1,'(A)') 'cd ../..' 
         
         if (IV%SystemType /= 'B') then
