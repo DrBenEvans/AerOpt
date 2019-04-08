@@ -41,8 +41,8 @@ module FDGD
         integer :: i, intersect, NoMove, counter
         
         ! Move Control Nodes
-        call RelocateCN(NestDisp, NoMove, counter)
-        
+        call RelocateCN2(NestDisp, NoMove, counter)
+       
         ! Move Boundary Nodes
         call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1))       
         !call CheckforIntersections()        
@@ -76,7 +76,7 @@ module FDGD
             end if
         else          
             zeros = 0.0
-            call RelocateCN(zeros, NoMove, counter)
+            call RelocateCN2(zeros, NoMove, counter)
             call RelocateMeshPoints(DelaunayCoordBound, DelaunayElemBound, AreaCoeffBound, size(AreaCoeffBound, dim = 1))  
             counter = 2*counter-1
             NoMove = NoMove*2
@@ -87,6 +87,27 @@ module FDGD
         end if
 
     end subroutine SubFDGD
+
+    subroutine RelocateCN2(NestDisp, NoMove, counter)
+    
+        ! Variables
+        implicit none
+        double precision, dimension(maxDoF) :: NestDisp
+        integer :: i
+        integer :: counter
+	integer :: NoMove
+
+        ! Relocate CN (Control Nodes) applying rotative and translative motion
+        do i = 1, IV%NoCN
+            DelaunayCoordBound(i,1) = RD%Coord(InnerBound(CN_ind(i)),1) + (real(counter)/NoMove)*NestDisp(i)
+            DelaunayCoordBound(i,2) = RD%Coord(InnerBound(CN_ind(i)),2) + (real(counter)/NoMove)*NestDisp(i+IV%NoCN)
+            if (IV%CNconnecttrans(i) /= 0) then
+                DelaunayCoordBound(i,1) = RD%Coord(InnerBound(CN_ind(i)),1) + (real(counter)/NoMove)*NestDisp(IV%CNconnecttrans(i))
+                DelaunayCoordBound(i,2) = RD%Coord(InnerBound(CN_ind(i)),2) + (real(counter)/NoMove)*NestDisp(IV%CNconnecttrans(i)+IV%NoCN)
+            end if
+        end do
+    
+    end subroutine RelocateCN2
     
     recursive subroutine SubFDGD_3D(NestDisp, NoMove, counter)
     
