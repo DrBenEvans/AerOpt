@@ -657,6 +657,8 @@ contains
         else
             open(1, file='Communication', form='formatted',status='unknown')
         end if
+        write(1,*) 'cd '
+        write(1,*) 'cd ..'
         write(1,'(A)') 'cd '//trim(IV%filepath)
         write(1,*) 'mkdir ', newdir
         write(1,*) 'cd ', newdir
