@@ -104,9 +104,9 @@ contains
                 call DetermineStrLen(istr, i)
                 call TransferSolutionOutput()
                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
-                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
+                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
                 call system(trim(strSystem))
-                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
+                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
                 call system(trim(strSystem))                
                 deallocate(istr)
             end do
@@ -148,9 +148,9 @@ contains
                 call DetermineStrLen(istr, i)
                 call TransferSolutionOutput()
                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), trim(IV%clusterAddress), 'FileCreateDir.scr', 'psftp')   ! Submits transfersolution Output file                              
-                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
+                strSystem = 'move '//trim(IV%filename)//istr//'.unk "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
                 call system(trim(strSystem))
-                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
+                strSystem = 'move '//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
                 call system(trim(strSystem))                
                 deallocate(istr)
             end do
@@ -192,24 +192,24 @@ contains
         if (IV%SystemType == 'W') then
 ! Parallelise by sending as Job?             
             allocate(character(len=100) :: strSystem)
-            strSystem = pathPrePro//' < '//trim(IV%SimulationName)//'\'//InFolder//'/PreprocessingInput.txt >nul 2>&1'
+            strSystem = pathPrePro//' < '//newdir//'\'//InFolder//'/PreprocessingInput.txt >nul 2>&1'
             
         else
             
             ! write command (for Linux)
             allocate(character(len=100) :: strSystem)
-            strSystem = pathPrepro//' < '//trim(IV%SimulationName)//'/'//InFolder//'/PreprocessingInput.txt > /dev/null'
+            strSystem = pathPrepro//' < '//newdir//'/'//InFolder//'/PreprocessingInput.txt > /dev/null'
             
         end if
         print *, 'Preprocessing Geometry', i
         call system(trim(strSystem))   ! System operating command called to activate fortran 
         if (IV%NoDim == 3) then
             if (IV%SystemType == 'W') then
-                call system('move '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
-                call system('move '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
+                call system('move '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
+                call system('move '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
             else
-                call system('mv '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
-                call system('mv '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
+                call system('mv '//trim(IV%filepath)//'/plotreg.reg "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg"')
+                call system('mv '//trim(IV%filepath)//'/base.plt "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt"')
             end if
         end if
         deallocate (istr)
@@ -255,13 +255,12 @@ contains
             else
                 print *, 'Solving Geometry', i
                 allocate(character(len=200) :: strSystem)
-                
-                strSystem = pathSolver//' < '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\SolverInput'//istr//'.sh > SolverOutput.sh'
-                call system(strSystem)
-                strSystem = 'move '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk" >nul'
-                call system(strSystem)
-                strSystem = 'move '//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd" >nul'
-                call system(strSystem)
+                strSystem = pathSolver//' < '//newdir//'/'//InFolder//'\'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh >nul 2>&1'
+                call system(trim(strSystem))
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk"'
+                call system(trim(strSystem))
+                strSystem = 'move '//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd"'
+                call system(trim(strSystem))
                 deallocate (strSystem)
             end if 
               
@@ -269,11 +268,11 @@ contains
             
 		    print *, 'Solving Geometry', i
             allocate(character(len=200) :: strSystem)
-            strSystem = pathSolver//' < '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh > /dev/null'
+            strSystem = pathSolver//' < '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh > /dev/null'
             call system(trim(strSystem))
-            strSystem = 'mv '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
+            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk"'
             call system(trim(strSystem))
-            strSystem = 'mv '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
+            strSystem = 'mv '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd"'
             call system(trim(strSystem))
             deallocate (strSystem)
             
@@ -321,7 +320,7 @@ contains
                 ! Extract last modification time to check if file has been newly moved
                 fileinfo = 0
                 call DetermineStrLen(istr, i)
-                call stat(trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', fileinfo)
+                call stat(trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', fileinfo)
                 call ltime(fileinfo(10), timeend)
                 deallocate(istr)
                 
@@ -476,7 +475,7 @@ contains
         call DetermineStrLen(istr, NoFile)
             
         ! Open .rsd file to check, if the last line contains 'Nan' solutions, which would mean convergence fail
-        open(1, file=trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")     
+        open(1, file=newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd', form='formatted', STATUS="OLD")     
         inquire(1, size = FileSize) 
         if (IV%NoDim == 3) then
             LastLine = FileSize/175

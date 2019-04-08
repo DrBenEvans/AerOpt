@@ -175,7 +175,7 @@ contains
         ! Determine correct String      
         call DetermineStrLen(istr, ii) 
         
-        open(99, file= trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
+        open(99, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
         write(99,*) 2
         write(99,*) 'clean'
         write(99,*) 'David Naumann'
@@ -215,7 +215,7 @@ contains
         
         ! Determine correct String      
         call DetermineStrLen(istr, ii) 
-        open(1, file= trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
+        open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
         read(1,*) NoHeadLines
         do i = 1, NoHeadLines
             read(1,*) container
@@ -268,7 +268,7 @@ contains
         ! Determine correct String      
         call DetermineStrLen(istr, ii) 
         
-        open(1, file= trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt', form='unformatted',status='unknown')    
+        open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt', form='unformatted',status='unknown')    
         write(1) RD%ne, RD%np, RD%nbf
         write(1) RD%connec
         write(1) RD%coord_temp
@@ -287,7 +287,7 @@ contains
         ! Body of writebcoFile
         ! Determine correct String      
         call DetermineStrLen(istr, ii) 
-        call system('cp '//DataFolder//'/'//trim(IV%Meshfilename)//'.bco '//'"'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.bco"')
+        call system('cp '//DataFolder//'/'//trim(IV%Meshfilename)//'.bco '//'"'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.bco"')
         deallocate(istr)
     
     end subroutine writebcoFile
@@ -299,13 +299,13 @@ contains
         implicit none
     
         ! Body of PreProInpFile
-        open(11, file=trim(IV%SimulationName)//'/'//InFolder//'/PreprocessingInput.txt', form='formatted',status='unknown')        
-        write(11,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat'  ! Name of Input file
+        open(11, file=newdir//'/'//InFolder//'/PreprocessingInput.txt', form='formatted',status='unknown')        
+        write(11,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat'  ! Name of Input file
         write(11,*) 'f'                                     ! Hybrid Mesh?
         write(11,*) 1                                       ! Number of Grids
         write(11,*) 0                                       ! Directionality Parameters
         write(11,*) 0                                       ! Visualization Modes
-        write(11,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'  ! Output File name
+        write(11,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'  ! Output File name
         close(11)
     
     end subroutine PreProInpFile
@@ -317,8 +317,8 @@ contains
         implicit none
     
         ! Body of PreProInpFile
-        open(11, file=trim(IV%SimulationName)//'/'//InFolder//'/PreprocessingInput.txt', form='formatted',status='unknown')        
-        write(11,*) trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr  ! Name of Input files
+        open(11, file=newdir//'/'//InFolder//'/PreprocessingInput.txt', form='formatted',status='unknown')        
+        write(11,*) newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr  ! Name of Input files
         if (IV%Re == 0.0) then
             write(11,*) 1                       ! Inviscid
         else
@@ -364,7 +364,7 @@ contains
         
         
         ! Create Input File for Solver
-        open(5, file=trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp', form='formatted',status='unknown')
+        open(5, file=newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp', form='formatted',status='unknown')
         write(5,*) '&inputVariables'
         write(5,*) 'ivd%numberOfMGIterations = ' ,strNI , ','
         write(5,*) 'ivd%alpha = ' ,trim(strAlpha), ','
@@ -406,7 +406,7 @@ contains
         close(5)
         
         ! Create Read File for Solver
-        open(1, file=trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh', form='formatted',status='unknown')
+        open(1, file=newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh', form='formatted',status='unknown')
         if (IV%SystemType == 'B') then
             write(1,*) InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp'            ! Control Filename
             write(1,*) InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
@@ -414,24 +414,24 @@ contains
             write(1,*) InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'     ! Result filename
             write(1,*) InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
         elseif (IV%SystemType == 'Q' .or. IV%RunOnCluster == 'Y') then
-            write(1,'(A)') trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp'    ! Control Filename
-            write(1,'(A)') trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'    ! Solution Filename
-            !write(1,'(A)') '' trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk'    ! Start-up File = previous Result File
+            write(1,'(A)') trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp'    ! Control Filename
+            write(1,'(A)') trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'    ! Solution Filename
+            !write(1,'(A)') '' trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk'    ! Start-up File = previous Result File
             write(1,*) ' '
-            write(1,'(A)') trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'    ! Result filename
-            write(1,'(A)') trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'    ! Residual Filename
+            write(1,'(A)') trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'    ! Result filename
+            write(1,'(A)') trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'    ! Residual Filename
         elseif (IV%SystemType == 'W') then
-            write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//'.inp'            ! Control Filename
-            write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
-            write(1,'(A)') '' !trim(IV%SimulationName), '/', InFolder, '/', trim(IV%filename), istr, '.unk'     ! Start-up File = previous Result File
-            write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk'     ! Result filename
-            write(1,'(A)') trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
+            write(1,'(A)') newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//'.inp'            ! Control Filename
+            write(1,'(A)') newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
+            write(1,'(A)') '' !newdir, '/', InFolder, '/', trim(IV%filename), istr, '.unk'     ! Start-up File = previous Result File
+            write(1,'(A)') newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.unk'     ! Result filename
+            write(1,'(A)') newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
         elseif (IV%SystemType == 'L') then
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp'            ! Control Filename
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
-            write(1,'(A)') '' !trim(IV%SimulationName), '/', InFolder, '/', trim(IV%filename), istr, '.unk'     ! Start-up File = previous Result File
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'     ! Result filename
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
+            write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp'            ! Control Filename
+            write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'      ! Computation Filename
+            write(1,'(A)') '' !newdir, '/', InFolder, '/', trim(IV%filename), istr, '.unk'     ! Start-up File = previous Result File
+            write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'     ! Result filename
+            write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
         end if
         close(1)
     
@@ -463,10 +463,10 @@ contains
         write( strProcessors, '(I3)' )  IV%NoProcessors      
         
         ! Create Input File for Solver
-        open(5, file=trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.inp', form='formatted',status='unknown')
+        open(5, file=newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.inp', form='formatted',status='unknown')
         write(5,*) '&inputVariables'
         write(5,*) 'ivd%numberOfProcesses = ',trim(strProcessors) , ','
-        write(5,'(A)') 'ivd%dataDirectory = "'//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/"'
+        write(5,'(A)') 'ivd%dataDirectory = "'//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/"'
         write(5,*) 'ivd%flowType = 0,'                              ! 0 = steady, 1 = unsteady, requires different types of objective functions
         write(5,*) 'ivd%numberOfMGIterations = ' ,strNI , ','
         write(5,*) 'ivd%alpha = ' ,trim(strAlpha), ','
@@ -491,7 +491,7 @@ contains
         close(5)
         
         ! Create Read File for Solver
-        open(1, file=trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/run.inp', form='formatted',status='unknown')
+        open(1, file=newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/run.inp', form='formatted',status='unknown')
             write(1,'(A)') trim(IV%filename)//istr
         close(1)        
     
@@ -511,7 +511,7 @@ contains
         call DetermineStrLen(strProc, IV%NoProcessors)
         call DetermineStrLen(strwait, IV%waitmax)  
         if (IV%SystemType /= 'B') then
-            open(1, file= trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/batchfile', form='formatted',status='unknown')
+            open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/batchfile', form='formatted',status='unknown')
             write(1,*) '#PBS -N ' ,trim(IV%filename), istr
             write(1,*) '#PBS -q oh'
             write(1,*) '#PBS -l nodes=', strProc
@@ -519,13 +519,13 @@ contains
             write(1,*) '#PBS -l mem=1gb'
             write(1,*) '#PBS -m bea'
             write(1,*) '#PBS -M 717761@swansea.ac.uk'
-            write(1,'(A)') pathSolver//' < '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh > out'
+            write(1,'(A)') pathSolver//' < '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh > out'
             write(1,*) 'cd ..'
             write(1,*) 'cd ..'
-            write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder// '/'//trim(IV%filename)//istr//'.rsd'
-            write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk'
+            write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder// '/'//trim(IV%filename)//istr//'.rsd'
+            write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk'
         else
-            open(1, file= trim(IV%SimulationName)//'/batchfile', form='formatted',status='unknown')
+            open(1, file= newdir//'/batchfile', form='formatted',status='unknown')
             write(1,'(A)') '#!/bin/bash --login'
             write(1,'(A)') '#SBATCH --job-name=GeomBatch'
             write(1,'(A)') '#SBATCH -o output.%J'
@@ -544,13 +544,13 @@ contains
             else
                 write(1,'(A)') 'parallel="parallel -N 1 --delay .2 -j $SLURM_NTASKS"'
             end if
-            write(1,'(A)') '$parallel "$srun --input='//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//'{1}'//'/SolverInput'//'{1}'//'.sh '//pathSolver//'" ::: {'//strStart//'..'//strEnd//'}'
+            write(1,'(A)') '$parallel "$srun --input='//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//'{1}'//'/SolverInput'//'{1}'//'.sh '//pathSolver//'" ::: {'//strStart//'..'//strEnd//'}'
             write(1, '(A)') ' sleep 1 '
             write(1,'(A)') ' '
             do i = start, ending
                 call DetermineStrLen(istring, i)
-                write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istring//'/'//trim(IV%filename)//istring//'.rsd '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istring//'.rsd'
-                write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istring//'/'//trim(IV%filename)//istring//'.unk '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istring//'.unk'
+                write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istring//'/'//trim(IV%filename)//istring//'.rsd '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istring//'.rsd'
+                write(1,'(A)') 'mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istring//'/'//trim(IV%filename)//istring//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istring//'.unk'
                 deallocate(istring)
             end do
         end if
@@ -568,7 +568,7 @@ contains
         call DetermineStrLen(strProc, IV%NoProcessors)
         call DetermineStrLen(strwait, IV%waitmax)
         call DetermineStrLen(strMemory, IV%Memory)
-        open(1, file= trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/batchfile', form='formatted',status='unknown')  
+        open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/batchfile', form='formatted',status='unknown')  
         if (IV%SystemType /= 'B') then
             write(1,*) '#PBS -N ' ,trim(IV%filename), istr
             write(1,*) '#PBS -q oh'
@@ -577,7 +577,7 @@ contains
             write(1,*) '#PBS -l mem='//strMemory//'gb'
             write(1,*) '#PBS -m bea'
             write(1,*) '#PBS -M 717761@swansea.ac.uk'
-            write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr
+            write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr
             write(1,'(A)') 'mpiexec '//pathSolver
         else
             write(1,*) '#BSUB -J ' ,trim(IV%filename), istr
@@ -586,7 +586,7 @@ contains
             !write(1,*) '#BSUB -q <enter a queue>'
             write(1,*) '#BSUB -n '//strProc
             write(1,*) '#BSUB -W '//strwait//':00'
-            write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr
+            write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr
             write(1,'(A)') 'mpirun -machinefile $LSB_DJOB_HOSTFILE -n '//strProc//' '//pathSolver
             !write(1,*) '#BSUB -n 1'
             !#BSUB -R "span[ptile=12]"
@@ -606,15 +606,15 @@ contains
         do i = 1, IV%NoNests
             call DetermineStrLen(istr, i)
             open(1, file= 'Communication', form='formatted',status='unknown')
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg'
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.res'
-            write(1,'(A)') trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'
+            write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/plotreg.reg'
+            write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.res'
+            write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk'
             write(1,'(A)') 'f'
             write(1,'(A)') 'f'
             close(1)
             call system(trim(IV%filepath)//'/Executables/makeplot < Communication > /dev/null')
-            call system('mv '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd')
-            call system('mv '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk')
+            call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd')
+            call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk')
             deallocate(istr)
         end do
         
@@ -637,8 +637,8 @@ contains
             open(1, file='Communication', form='formatted',status='unknown')
         end if
         write(1,'(A)') 'cd '//trim(IV%filepath)
-        write(1,*) 'mkdir ', trim(IV%SimulationName)
-        write(1,*) 'cd ', trim(IV%SimulationName)
+        write(1,*) 'mkdir ', newdir
+        write(1,*) 'cd ', newdir
         write(1,*) 'mkdir ', InFolder
         write(1,*) 'mkdir ', OutFolder
         write(1,*) 'mkdir ', TopFolder
@@ -674,9 +674,9 @@ contains
         
         ! Put Commmands to Transfer Data from Input_Data Folder on Windows to created Input Folder on Cluster
         write(1, '(A)') 'mkdir "'//trim(IV%clusterPath)//'"'
-        write(1, '(A)') 'mkdir "'//trim(IV%clusterPath)//'/'//trim(IV%SimulationName)//'/"'
-        write(1, '(A)') 'cd "'//trim(IV%clusterPath)//'/'//trim(IV%SimulationName)//'/"'
-        write(1, '(A)') 'put -r "'//trim(currentDir)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/"'
+        write(1, '(A)') 'mkdir "'//trim(IV%clusterPath)//'/'//newdir//'/"'
+        write(1, '(A)') 'cd "'//trim(IV%clusterPath)//'/'//newdir//'/"'
+        write(1, '(A)') 'put -r "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/"'
         close(1)
     
     end subroutine transferFilesWin
@@ -693,7 +693,7 @@ contains
         if (IV%SystemType == 'Q') then
             write(1,*) 'cd '
             write(1,*) 'cd ..'
-            write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//trim(IV%SimulationName)
+            write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir
 
             if (IV%SystemType /= 'B') then
                 write(1,*) 'qsub batchfile'
@@ -713,7 +713,7 @@ contains
     
         ! Body of TriggerFile
         open(1, file='Communication', form='formatted',status='unknown')
-        write(1,'(A)') 'cd '//trim(IV%clusterPath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr 
+        write(1,'(A)') 'cd '//trim(IV%clusterPath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr 
         write(1,'(A)') 'cd ../..' 
         
         if (IV%SystemType /= 'B') then
@@ -753,7 +753,7 @@ contains
         open(1, file='Communication', form='formatted',status='unknown')
         write(1,*) 'cd '
         write(1,*) 'cd ..'
-        write(1,*) 'cd '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//OutFolder
+        write(1,*) 'cd '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder
         write(1, '(A)') 'get '//trim(IV%filename)//istr//'.unk' ! Put Commmands to Transfer Data from Output_Data Folder on Linux to Output_Folder on Windows
         write(1, '(A)') 'get '//trim(IV%filename)//istr//'.rsd'
         close(1)
@@ -767,12 +767,12 @@ contains
     
         ! Body of DeleteLogFiles
         open(1, file='Communication', form='formatted',status='unknown')
-        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/parallel_joblog*'
-        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/error.*'
-        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/output.*'
-        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/error.*'
-        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/output.*'
-        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/parallel_joblog*'
+        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/parallel_joblog*'
+        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/error.*'
+        write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/output.*'
+        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/error.*'
+        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/output.*'
+        write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/parallel_joblog*'
         close(1)
     
     end subroutine DeletelogFiles
@@ -784,8 +784,8 @@ contains
     
         ! Body of DeleteErrorFiles
         open(1, file='Communication', form='formatted',status='unknown')
-        write(1,'(A)') 'find '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//' -name "*.e*" -type f -delete'
-        write(1,'(A)') 'find '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//' -name "*.o*" -type f -delete'
+        write(1,'(A)') 'find '//trim(IV%filepath)//'/'//newdir//' -name "*.e*" -type f -delete'
+        write(1,'(A)') 'find '//trim(IV%filepath)//'/'//newdir//' -name "*.o*" -type f -delete'
         close(1)
     
     end subroutine DeleteErrorFiles
@@ -804,12 +804,12 @@ contains
         call DetermineStrLen(NoGenstr, OV%Gen) 
         call DetermineStrLen(indexStr, idx) 
         open(1, file='Communication'//indexStr, form='formatted',status='unknown')
-        write(1, '(A)') 'cp '//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
-        write(1, '(A)') 'cp '//trim(IV%SimulationName)//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
+        write(1, '(A)') 'cp '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
+        write(1, '(A)') 'cp '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
         if (IV%NoDim == 2) then
-            write(1, '(A)') 'cp '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
+            write(1, '(A)') 'cp '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
         else
-            write(1, '(A)') 'cp '//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt "'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.plt"'
+            write(1, '(A)') 'cp '//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.plt"'
         end if
         close(1)
         deallocate(istr)
@@ -831,7 +831,7 @@ contains
         call DetermineStrLen(istr, i)
         call DetermineStrLen(NoGenstr, OV%Gen) 
         open(1, file='Communication2', form='formatted',status='unknown')
-	 write(1, '(A)') 'mv '//trim(IV%SimulationName)//'/POD_Pressure'//istr//'.txt "'//trim(IV%SimulationName)//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
+	 write(1, '(A)') 'mv '//newdir//'/POD_Pressure'//istr//'.txt "'//newdir//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
@@ -853,12 +853,12 @@ contains
         call DetermineStrLen(NoGenstr, OV%Gen)
         call DetermineStrLen(indexStr, idx) 
         open(1, file='Communication.bat', form='formatted',status='unknown')
-        write(1, '(A)') 'move "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk" "'//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
-        write(1, '(A)') 'move "'//trim(IV%SimulationName)//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd" "'//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
+        write(1, '(A)') 'move "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk" "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
+        write(1, '(A)') 'move "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd" "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
         if (IV%NoDim == 2) then
-            write(1, '(A)') 'move "'//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.dat" "'//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
+            write(1, '(A)') 'move "'//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.dat" "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.dat"'
         else
-            write(1, '(A)') 'move "'//trim(IV%SimulationName)//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.plt" "'//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.plt"'
+            write(1, '(A)') 'move "'//newdir//'\'//InFolder//'\'//trim(IV%filename)//istr//'\'//trim(IV%filename)//istr//'.plt" "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.plt"'
         end if
         close(1)
         deallocate(istr)
@@ -881,8 +881,8 @@ contains
         end if
 
         call DetermineStrLen(NoGenstr, OV%Gen)
-        call system('cp '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_1.dat '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
-        call system('cp '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_1.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
+        call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_1.dat '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
+        call system('cp '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_1.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
         open(1, file= 'Communication', form='formatted',status='unknown')
         write(1,'(A)') trim(IV%filename)//NoGenstr
         write(1,'(A)') trim(IV%filename)//NoGenstr
@@ -893,7 +893,7 @@ contains
         write(1,'(A)') '1017'
         close(1)
         call system(trim(IV%filepath)//'/Executables/engen_2D < Communication > /dev/null')
-        call system('mv *ENSIGHT* '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//TopFolder)
+        call system('mv *ENSIGHT* '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder)
         call system('rm '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
         call system('rm '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
         deallocate(NoGenstr)       
@@ -910,8 +910,8 @@ contains
         ! Body of generateEnSightFile
         call DetermineStrLen(NoGenstr, OV%Gen)
         call DetermineStrLen(istr, i)
-        call system('mv '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.plt')
-        call system('mv '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.unk')
+        call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/base.plt '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.plt')
+        call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.unk')
         open(1, file= 'Communication', form='formatted',status='unknown')
         write(1,'(A)') trim(IV%filename)//NoGenstr
   ! Always hybrid?
@@ -922,9 +922,9 @@ contains
         write(1,'(A)') '1017'
         close(1)
         call system(trim(IV%filepath)//'/Executables/engen_3D < Communication > /dev/null')
-        call system('mv *ENSIGHT* '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//TopFolder)
+        call system('mv *ENSIGHT* '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder)
         call system('rm '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.plt')
-        call system('mv '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//trim(IV%SimulationName)//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk ')
+        call system('mv '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk ')
         deallocate(NoGenstr)       
         
     end subroutine generateEnSightFileLin3D
@@ -953,10 +953,10 @@ contains
         write(1,'(A)') '1017'
         close(1)
         open(1, file= 'Communication.bat', form='formatted',status='unknown')
-        write(1, '(A)') 'copy '//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_1.dat "'//trim(IV%filename)//NoGenstr//'.dat"'
-        write(1, '(A)') 'copy '//trim(IV%SimulationName)//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_1.unk "'//trim(IV%filename)//NoGenstr//'.resp"'
+        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_1.dat "'//trim(IV%filename)//NoGenstr//'.dat"'
+        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_1.unk "'//trim(IV%filename)//NoGenstr//'.resp"'
         write(1,'(A)') 'Executables\engen_2D < Communication >nul 2>&1'
-        write(1,'(A)') 'move *ENSIGHT* '//trim(IV%SimulationName)//'\'//TopFolder
+        write(1,'(A)') 'move *ENSIGHT* '//newdir//'\'//TopFolder
         write(1,'(A)') 'del '//trim(IV%filename)//NoGenstr//'.dat'
         write(1,'(A)') 'del '//trim(IV%filename)//NoGenstr//'.resp'
         close(1)
@@ -975,15 +975,15 @@ contains
         allocate(character(len=3) :: istr)
         write(istr, '(1f3.1)') IV%Ma
         
-        inquire(file=trim(IV%SimulationName)//'/Nests'//istr//'.txt', exist = ex)       
+        inquire(file=newdir//'/Nests'//istr//'.txt', exist = ex)       
         if (ex == .true.) then
-            open(19,file=trim(IV%SimulationName)//'/FitnessAll.txt',form='formatted',status='old',position='append') ! Comment for GUI
-            open(29,file=trim(IV%SimulationName)//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
+            open(19,file=newdir//'/FitnessAll.txt',form='formatted',status='old',position='append') ! Comment for GUI
+            open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
         else
-            open(29,file=trim(IV%SimulationName)//'/Nests'//istr//'.txt', form='formatted',status='new')
+            open(29,file=newdir//'/Nests'//istr//'.txt', form='formatted',status='new')
             write(29, *) 'Snapshots'
             write(29,'(<IV%NoSnap>f17.10)') CS%Snapshots
-            open(19,file=trim(IV%SimulationName)//'/FitnessAll.txt', form='formatted',status='new')                   ! Comment for GUI
+            open(19,file=newdir//'/FitnessAll.txt', form='formatted',status='new')                   ! Comment for GUI
         end if
         
         ! Store moved Nests in Output Analysis File
