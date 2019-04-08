@@ -51,6 +51,8 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         allocate(RD%coord(RD%np,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+        allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
+        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         allocate(RD%bound(RD%nbf,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         allocate(RD%boundtype(RD%nbf),stat=allocateStatus)
@@ -249,8 +251,8 @@ contains
         ! Read in Header parameters and allocate arrays
         read(1,*)        
         read(1,*)
-        allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
+     !   allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
+     !   if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
          
         ! Connectivities
         allocate(Input(NoColumns1),stat=allocateStatus)
