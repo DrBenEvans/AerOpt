@@ -1,48 +1,64 @@
-# Start of the makefile
+#Compilers and flags
 
-# Defining variables
-#ifneq (,$(filter Windows%,$(OS)))
-ifeq ($(OS),Windows_NT)
-EXT = .exe
-else
-EXT =
-endif
-TARGET = AerOpt$(EXT)
-OBJECTS = Toolbox.o  InputData.o  ReadData.o  CreateSnapshots.o  FDGD.o Smoothing.o  GenerateMesh.o  CFD.o  Optimization.o  Main.o
+MF	= ifort
+MC	= cc
+ML	= ar
+RM	= rm
+MKL_INC = ${MKLROOT}/include
+MKL_LIB = ${MKLROOT}/lib/intel64
 
-# Find all sources
-#SOURCES:=$(wildcard *.f90)
-# Make targets out of them
-#OBJECTS:=$(SOURCES:%.f90=%.o) #NOTE Order is important sometimes
+FFLAGS	=  -r8 -O3 -mkl=sequential -I$(MKL_INC)/intel64/lp64 
+CFLAGS	=  -r8 -O3 
+#FFLAGS	= -g 
+#CFLAGS	= -g 
+LFLAGS	= crv
 
-# Set default output
-default :
+#C and Fortran Object Files
+FOBJS	=  Toolbox.o  InputData.o  ReadData.o  CreateSnapshots.o FDGD.o  Smoothing.o  GenerateMesh.o  CFD.o  Optimization.o  Main.o
+
+OBJS	=  $(FOBJS) 
+
+#Compile and link
+
+default:
 	make -s comment
-comment :
-	echo " "
-	echo "   Makefile for mgns2d        "
-	echo "   -------------------------- "
-	echo "   clean  to remove object files "
-	echo "   ifort  to compile and link with intel compiler"
-	echo "   gfort  to compile and link with gfortran compiler"
-	echo " "
 
-ifort : COMP = ifort
-ifort : FLAGS += -r8 -O3 -static -static-intel -mkl -I$(MKL_INC)/em64t/lp64 -I$(MKL_INC)/include -check all,noarg_temp_created
-ifort : $(OBJECTS)
-	$(COMP) $(FLAGS) $(OBJECTS) -o $(TARGET) -L$(MKL_LIB) -Wl, -mkl -lpthread -lm
+all:  $(OBJS)
+	$(MF) $(FFLAGS) -o AerOpt_v3.5 $(OBJS) -L$(MKL_LIB) \
+		$(MKL_LIB)/libmkl_blas95_lp64.a -Wl,--start-group $(MKL_LIB)/libmkl_intel_lp64.a $(MKL_LIB)/libmkl_core.a $(MKL_LIB)/libmkl_sequential.a -Wl,--end-group -lpthread -lm
 
-gfort : COMP = gfortran
-gfort : FLAGS = -fdefault-real-8 -O3 -static -static-libgfortran
-gfort : $(OBJECTS)
-	$(COMP) $(FLAGS) $(OBJECTS) -o $(TARGET)
-
-# List of object files
-%.o : %.f90
-	$(COMP) $(FLAGS) -c $<
-
-# Cleaning everything
-clean :
+comment:
+		echo " "
+		echo "   Makefile for AerOpt       "
+		echo "   ------------------------- "
+		echo "    clean  to remove object files "              
+		echo "    all    to compile and link "
+		echo " "
+		
+clean:
 	find .. -name '*.o' -delete
-	find .. -name '*.mod' -delete
-# End of the makefile
+
+Toolbox.o:
+	$(MF) $(FFLAGS) -c Toolbox.f90
+InputData.o:
+	$(MF) $(FFLAGS) -c InputData.f90
+ReadData.o:
+	$(MF) $(FFLAGS) -c ReadData.f90
+CreateSnapshots.o:
+	$(MF) $(FFLAGS) -c CreateSnapshots.f90
+FDGD.o:
+	$(MF) $(FFLAGS) -c FDGD.f90
+Smoothing.o:
+	$(MF) $(FFLAGS) -c Smoothing.f90
+GenerateMesh.o:
+	$(MF) $(FFLAGS) -c GenerateMesh.f90
+CFD.o:
+	$(MF) $(FFLAGS) -c CFD.f90
+Optimization.o:
+	$(MF) $(FFLAGS) -c Optimization.f90
+Main.o:
+	$(MF) $(FFLAGS) -c Main.f90
+#::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::#
+
+
+
