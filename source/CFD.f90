@@ -20,8 +20,8 @@ contains
         ! Body of SubCFD
       
         ! ****Generate Meshes**** !
-        allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
-        if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
+ !       allocate(RD%coord_temp(RD%np,IV%nodim),stat=allocateStatus)
+ !       if(allocateStatus/=0) STOP "ERROR: Not enough memory in Main "
         i = 1
         do while (i .le. size(vecIndex, dim = 1))
             print *, "Generating Mesh", vecIndex(i), "/", vecIndex(sizing)
@@ -40,7 +40,8 @@ contains
             end if
         i = i + 1
         end do
-        deallocate(RD%coord_temp)
+        print *, 'Done'
+        !deallocate(RD%coord_temp)
  
         if (IV%Meshtest == .true.) then
           pause
