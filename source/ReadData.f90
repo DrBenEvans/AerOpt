@@ -901,6 +901,81 @@ contains
         
     end subroutine moveTopNestFilesWin
     
+    subroutine copyTopNestFilesLin(i)
+
+        ! Variables
+        implicit none
+        integer :: i
+        character(len=:), allocatable :: NoGenstr
+        
+        ! Body of moveTopNestFiles
+        call DetermineStrLen(istr, i-1)
+        call DetermineStrLen(NoGenstr, i)
+        
+        open(1, file='Communication', form='formatted',status='unknown')        
+        write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk"'
+        write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
+        if (IV%NoDim == 2) then
+            write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.dat "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.dat"'
+        else
+            write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.plt "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.plt"'
+        end if
+        close(1)
+        deallocate(istr)
+        deallocate(NoGenstr)
+        call system('chmod a+x Communication')
+        call system('./Communication')    ! Submits Move file
+        
+    end subroutine copyTopNestFilesLin
+
+    subroutine copyTopNestFilesLin_POD(i)
+
+        ! Variables
+        implicit none
+        integer :: i
+        character(len=:), allocatable :: NoGenstr
+        
+        ! Body of moveTopNestFiles
+        call DetermineStrLen(istr, i-1)
+        call DetermineStrLen(NoGenstr, i)
+
+        open(1, file='Communication2', form='formatted',status='unknown') 
+	 write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/POD_Pressure'//istr//'.txt "'//newdir//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
+        close(1)
+        deallocate(istr)
+        deallocate(NoGenstr)
+        call system('chmod a+x Communication2')
+        call system('./Communication2')    ! Submits Move file
+        
+    end subroutine copyTopNestFilesLin_POD
+    
+    subroutine copyTopNestFilesWin(i)
+
+        ! Variables
+        implicit none
+        integer :: i
+        character(len=255) :: Output
+        character(len=:), allocatable :: NoGenstr
+        
+        ! Body of moveTopNestFiles
+        call DetermineStrLen(istr, i-1)
+        call DetermineStrLen(NoGenstr, i)
+        
+        open(1, file='Communication.bat', form='formatted',status='unknown')        
+        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk"'
+        write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.rsd"'
+        if (IV%NoDim == 2) then
+            write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.dat "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.dat"'
+        else
+            write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.plt "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.plt"'
+        end if
+        close(1)
+        deallocate(istr)
+        deallocate(NoGenstr)
+        call system('Communication.bat >nul 2>&1')    ! Submits create directory file
+        
+    end subroutine copyTopNestFilesWin
+    
     subroutine generateEnSightFileLin()
     
        ! Variables
