@@ -877,6 +877,7 @@ contains
         ! Body of generateEnSightFile
         inquire(file=trim(IV%filepath)//'/Executables/engen_2D', exist=exe_exists)
         if(.not.exe_exists) then
+            print 'Warning: Executables/engen_2D does not exist: skipping generate EnSight files'
             return
         end if
 
@@ -939,6 +940,7 @@ contains
         ! Body of generateEnSightFile
         inquire(file=trim(IV%filepath)//'/Executables/engen_2D', exist=exe_exists)
         if(.not.exe_exists) then
+            print 'Warning: Executables/engen_2D does not exist: skipping generate EnSight files'
             return
         end if
 
