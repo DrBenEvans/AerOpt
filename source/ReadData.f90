@@ -163,6 +163,25 @@ contains
     
     end subroutine SubReadData_3D
     
+    subroutine CreateFolderStructure()
+    
+        ! Variables
+        implicit none
+    
+        ! Body of CreateFolderStructure
+        call createDirectories()
+        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine          
+            if (IV%RunOnCluster == 'Y') then
+                call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')   ! Submits create directory file
+            end if
+            call system('Communication')    ! Submits create directory file
+        else
+            call system('chmod a+x ./Communication')    
+            call system('./Communication')    ! Submits create directory file     
+        end if  
+    
+    end subroutine CreateFolderStructure
+    
     subroutine writeDatFile(ii)
     !Objective: Create Outputfile of each Snapshot as Input for the Pre Processor
     

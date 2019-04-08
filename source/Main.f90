@@ -59,7 +59,7 @@ program AerOpt
     
     ! ****Create Folder Structure for PrePro & Solver Output**** !
     print *, 'Create Directories'
-    call createDirectories()
+    call CreateFolderStructure()      
    
     ! *****Create Initial Nests for the Snapshots****** ! 
     print *, 'Start LHS Sampling - Create Initial Nests'
