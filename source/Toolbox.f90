@@ -1,7 +1,7 @@
 module Toolbox
-    
+
     type OptimizationVariables
-    
+
         integer, dimension(:), allocatable :: engInNodes           ! Engine inlet Nodes
         integer(kind = 4), dimension(8) :: timestart
         integer :: Gen
@@ -17,23 +17,23 @@ module Toolbox
         double precision, dimension(:), allocatable :: PolCoeff, PolCoeff2  ! Polynomial Coefficients for POD RBF interpolation
         double precision, dimension(:,:), allocatable :: Weights, Weights2  ! Weights for POD RBF interpolation
         double precision, dimension(:,:), allocatable :: Nests_Move, Nests              ! Nest regenerated with each generation
-        logical :: InitConv                                                 ! Initial Convergence Check - TRUE: yes 
-        
+        logical :: InitConv                                                 ! Initial Convergence Check - TRUE: yes
+
     end type OptimizationVariables
-    
+
     type(OptimizationVariables) :: OV
-    
-    
+
+
     type CreateSnapshotsVariables
-        
+
         double precision :: rn                                            ! Counts random numbers
         double precision, dimension(:,:), allocatable :: MxDisp           ! Matrix with min/max Displacements
         double precision, dimension(:,:), allocatable :: MxDisp_Move      ! Matrix with only moving min/max Displacements
         integer, dimension(:), allocatable :: cond                          ! Identifies zero/non-zero values
         double precision, dimension(:,:), allocatable :: Snapshots      ! Matrix containing the initial Nests
-        
+
     end type CreateSnapshotsVariables
-    
+
     type(CreateSnapshotsVariables) :: CS
 
 contains
@@ -51,7 +51,7 @@ contains
         linSpacing(1) = (max - min)/2
     else
         do a = 0, (NoInt - 1)
-            c = a/ real(NoInt - 1)  
+            c = a/ real(NoInt - 1)
             linSpacing(a+1) = max - (max - min)*c
         end do
     end if
@@ -100,7 +100,7 @@ contains
 0   <= dot_product(BC, BP) .and. &
     dot_product(BC, BP) <= dot_product(BC, BC)) then
         Rectcheck = 1
-    end if          
+    end if
 
     end function RectCheck
 
@@ -185,7 +185,7 @@ contains
     end if
 
     end subroutine QSort
-    
+
     recursive subroutine QSortInt(a,na, sel, ind)
     ! Objective: Sort/Order an Array in ascending order
 
@@ -264,12 +264,12 @@ contains
         else
             marker(i) = 0
             j = j + 1
-        end if   
+        end if
     end do
 
     allocate(vector_out(j))
     j = 1
-    do i = 1, sz            
+    do i = 1, sz
         if (marker(i) == 0) then
             vector_out(j) = vector_in(i)
             j = j + 1
@@ -277,7 +277,7 @@ contains
     end do
 
     end subroutine Unique
-    
+
     subroutine UniqueInt(vector_in, sz, vector_out)
 
     ! Variables
@@ -296,12 +296,12 @@ contains
         else
             marker(i) = 0
             j = j + 1
-        end if   
+        end if
     end do
 
     allocate(vector_out(j))
     j = 1
-    do i = 1, sz            
+    do i = 1, sz
         if (marker(i) == 0) then
             vector_out(j) = vector_in(i)
             j = j + 1
@@ -335,7 +335,7 @@ contains
     end do
 
     end subroutine randperm
-    
+
     subroutine timestamp ( )
 
     !*****************************************************************************80
@@ -348,7 +348,7 @@ contains
     !
     !  Licensing:
     !
-    !    This code is distributed under the GNU LGPL license. 
+    !    This code is distributed under the GNU LGPL license.
     !
     !  Modified:
     !
@@ -416,7 +416,7 @@ contains
         trim ( month(m) ), d, y, h, ':', n, ':', s, '.', mm, trim ( ampm )
 
       return
-      
+
     end subroutine timestamp
 
     subroutine DetermineStrLen(istr, i)
@@ -426,7 +426,7 @@ contains
     integer :: i
     character(len=:), allocatable :: istr
 
-    ! Body of DetermineStrLen     
+    ! Body of DetermineStrLen
     if (i < 10) then
         allocate(character(len=1) :: istr)
         write( istr, '(I1)' )  i
@@ -441,7 +441,7 @@ contains
         write( istr, '(I4)' )  i
     else
         allocate(character(len=5) :: istr)
-        write( istr, '(I5)' )  i        
+        write( istr, '(I5)' )  i
     end if
 
     end subroutine DetermineStrLen
@@ -489,7 +489,7 @@ contains
     end do
 
     if (abs(Det) < 1.5D-16) then
-        Det = 0    
+        Det = 0
     end if
 
     end function Det
@@ -523,7 +523,7 @@ contains
         DO I=1,J-1
             SUM = A(I,J)
             DO K=1,I-1
-                SUM = SUM - A(I,K)*A(K,J) 
+                SUM = SUM - A(I,K)*A(K,J)
             END DO ! k loop
             A(I,J) = SUM
         END DO ! i loop
@@ -531,7 +531,7 @@ contains
         DO I=J,N
             SUM = A(I,J)
             DO K=1,J-1
-                SUM = SUM - A(I,K)*A(K,J) 
+                SUM = SUM - A(I,K)*A(K,J)
             END DO ! k loop
             A(I,J) = SUM
             DUM = VV(I)*DABS(SUM)
@@ -539,7 +539,7 @@ contains
                 IMAX = I
                 AMAX = DUM
             END IF
-        END DO ! i loop  
+        END DO ! i loop
 
         IF(J.NE.IMAX) THEN
             DO K=1,N
@@ -559,16 +559,16 @@ contains
             DO I=J+1,N
                 A(I,J) = A(I,J)*DUM
             END DO ! i loop
-        END IF 
+        END IF
     END DO ! j loop
 
     RETURN
     END subroutine LUDCMP
-    
+
     ! Returns the inverse of a matrix calculated by finding the LU
     ! decomposition.  Depends on LAPACK.
     function inv(A) result(Ainv)
-    
+
       implicit none
       double precision, dimension(:,:), intent(in) :: A
       double precision, dimension(size(A,1),size(A,2)) :: Ainv
@@ -601,19 +601,19 @@ contains
          stop 'Matrix inversion failed!'
       end if
     end function inv
-    
+
     integer function fact(n)
-    
+
         implicit none
         integer, intent(in) :: n
         integer :: i, a
-        
+
         a = 1
         do i = 1, n
             a = a*i
         end do
         fact = a
-        
+
     end function fact
-    
+
     end module Toolbox

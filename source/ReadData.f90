@@ -1,39 +1,39 @@
 module ReadData
-    
+
     use InputData
     use Toolbox
     type ReadVariablesData
-    
+
         integer :: ne, np, nbf, nbc                                             ! Number of elements, Nodes/Points & boundary faces
-        integer, dimension(:), allocatable :: boundtype, boundpart              ! Boundary Information of Mesh: Type, Part of boundary    
-        integer, dimension(:,:), allocatable :: connec, bound                   ! Connectivity & Boundary Matrix of Fine Mesh    
+        integer, dimension(:), allocatable :: boundtype, boundpart              ! Boundary Information of Mesh: Type, Part of boundary
+        integer, dimension(:,:), allocatable :: connec, bound                   ! Connectivity & Boundary Matrix of Fine Mesh
         double precision, dimension(:,:), allocatable :: coord                  ! Coordinates Matrix of Mesh
         double precision, dimension(:,:), allocatable :: Coord_CN               ! desired Coordinates of the Control Nodes
         double precision, dimension(:,:), allocatable :: coord_temp             ! Coordinates Matrix of Mesh for temporary Mesh Movement
-        
+
     end type ReadVariablesData
-    
+
     type(ReadVariablesData) :: RD
     double precision, dimension(:,:), allocatable :: ArrayTemp
-    
+
 contains
-      
+
     subroutine SubReadData()
     ! Objective: Reads the Mesh data and Control Points Coordinates
-    
+
         ! Variables
         implicit none
         integer :: i, NoHeadLines, clean, NoColumns1, NoColumns2
         character(len=5) :: container
         double precision, dimension(:), allocatable :: Input
-        
+
         ! Body of ReadData
         NoColumns1 = 5
         NoColumns2 = 5
         clean = 4
         open(1, file= DataFolder//'/'//trim(IV%MeshFileName)//'.dat', form='formatted',status='old')
         write(*,*) 'File '//trim(IV%MeshFileName)//' opened...'
-        write(*,*) "" 
+        write(*,*) ""
         read(1,*) NoHeadLines
         do i = 1, NoHeadLines
             read(1,*) container
@@ -43,9 +43,9 @@ contains
                 clean = IV%NoDim + 1
             end if
         end do
-        
+
         ! Read in Header parameters and allocate arrays
-        read(1,*)        
+        read(1,*)
         read(1,*) RD%ne, RD%np, RD%nbf
         allocate(RD%connec(RD%ne,IV%NoDim+1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
@@ -57,45 +57,45 @@ contains
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         allocate(RD%boundtype(RD%nbf),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        
+
         ! Connectivities
         allocate(Input(NoColumns1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        read(1,*) 
+        read(1,*)
         do i = 1, RD%ne
             read(1, *) Input
             RD%connec(i,:) = Input(2:4)
         end do
         deallocate(Input)
-        
+
         ! Coordinates
         allocate(Input(NoColumns2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        read(1,*) 
+        read(1,*)
         do i = 1, RD%np
             read(1, *) Input
-            RD%coord(i,:) = Input(2:3)          
+            RD%coord(i,:) = Input(2:3)
         end do
 
         ! Trash
         if (clean == 4) then
-            read(1,*) 
+            read(1,*)
             do i = 1, RD%np
                 read(1, *)
-            end do 
+            end do
         end if
-        
+
         ! Boundary Faces
-        read(1,*) 
+        read(1,*)
         do i = 1, RD%nbf
             read(1, *) Input
             RD%bound(i,:) = Input(1:2)
             RD%boundtype(i) = Input(clean)
             ! RD%boundpart
         end do
-        deallocate(Input)        
+        deallocate(Input)
         close(1)
-    
+
         allocate(RD%Coord_CN(IV%NoCN,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         open(2, file= DataFolder//'/Control_Nodes.txt', form='formatted',status='old')
@@ -103,23 +103,23 @@ contains
             read(2, *) RD%Coord_CN(i,:)
         end do
         close(2)
-    
+
     end subroutine SubReadData
-    
+
     subroutine SubReadData_3D()
     ! Objective: Reads the Mesh data and Control Points Coordinates
-    
+
         ! Variables
         implicit none
         integer :: i, j, NoSurf
         double precision, dimension(:,:), allocatable :: Surf
-        
+
         ! Body of ReadData
         open(1, file= DataFolder//'/'//trim(IV%MeshFileName)//'.plt', form='unformatted',status='old')
         write(*,*) 'File '//trim(IV%MeshFileName)//' opened...'
-        write(*,*) ""      
+        write(*,*) ""
         read(1) RD%ne, RD%np, RD%nbf
-        
+
         allocate(RD%connec(RD%ne,IV%NoDim+1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         allocate(RD%coord(RD%np,IV%NoDim),stat=allocateStatus)
@@ -134,10 +134,10 @@ contains
         read(1) RD%coord
         read(1) RD%bound, RD%boundpart, RD%boundpart
         close(1)
-        
+
         open(1, file= DataFolder//'/'//trim(IV%MeshFileName)//'.bco', form='formatted',status='old')
         write(*,*) 'File '//trim(IV%MeshFileName)//' opened...'
-        write(*,*) ""      
+        write(*,*) ""
         read(1,*)
         read(1,*) NoSurf
         read(1,*)
@@ -154,7 +154,7 @@ contains
                 end if
             end do
         end do
-        
+
         allocate(RD%Coord_CN(IV%NoCN,IV%NoDim),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
         open(2, file= DataFolder//'/Control_Nodes.txt', form='formatted',status='old')
@@ -162,45 +162,45 @@ contains
             read(2, *) RD%Coord_CN(i,:)
         end do
         close(2)
-    
+
     end subroutine SubReadData_3D
-    
+
     subroutine CreateFolderStructure()
-    
+
         ! Variables
         implicit none
-    
+
         ! Body of CreateFolderStructure
         call createDirectories()
-        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine          
+        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
             if (IV%RunOnCluster == 'Y') then
                 call communicateWin2Lin(trim(IV%Username), trim(IV%Password), 'Communication', 'psftp')   ! Submits create directory file
             end if
             call system('Communication')    ! Submits create directory file
         else
-            call system('chmod a+x ./Communication')    
-            call system('./Communication')    ! Submits create directory file     
-        end if  
-    
+            call system('chmod a+x ./Communication')
+            call system('./Communication')    ! Submits create directory file
+        end if
+
     end subroutine CreateFolderStructure
-    
+
     subroutine writeDatFile(ii)
     !Objective: Create Outputfile of each Snapshot as Input for the Pre Processor
-    
+
         ! Variables
         implicit none
         integer :: ii, j
-    
+
         ! Body of writeDatFile
-        
-        ! Determine correct String      
-        call DetermineStrLen(istr, ii) 
-        
+
+        ! Determine correct String
+        call DetermineStrLen(istr, ii)
+
         open(99, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
         write(99,*) 2
         write(99,*) 'clean'
         write(99,*) 'David Naumann'
-        write(99,*) 'NoElem NoNodes NoBound'        
+        write(99,*) 'NoElem NoNodes NoBound'
         write(99,*) RD%ne, RD%np, RD%nbf
         write(99,*) 'Connectivities'
         do j = 1, RD%ne
@@ -215,27 +215,27 @@ contains
         do j = 1, RD%nbf
             write(99,*) RD%bound(j,:), RD%boundtype(j)
         end do
-10      format(2f12.7)        
+10      format(2f12.7)
         close(99)
         deallocate (istr)
-    
+
     end subroutine writeDatFile
-    
+
     subroutine readDatFile(ii)
-    
+
         ! Variables
         implicit none
         integer :: i, ii, NoHeadLines, clean, NoColumns1, NoColumns2
         character(len=5) :: container
         double precision, dimension(:), allocatable :: Input
-    
+
         ! Body of readDatFile
         NoColumns1 = 5
         NoColumns2 = 5
         clean = 4
-        
-        ! Determine correct String      
-        call DetermineStrLen(istr, ii) 
+
+        ! Determine correct String
+        call DetermineStrLen(istr, ii)
         open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat', form='formatted',status='unknown')
         read(1,*) NoHeadLines
         do i = 1, NoHeadLines
@@ -249,78 +249,78 @@ contains
         deallocate(istr)
 
         ! Read in Header parameters and allocate arrays
-        read(1,*)        
+        read(1,*)
         read(1,*)
      !   allocate(RD%coord_temp(RD%np,IV%NoDim),stat=allocateStatus)
      !   if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-         
+
         ! Connectivities
         allocate(Input(NoColumns1),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
-        read(1,*) 
+        read(1,*)
         do i = 1, RD%ne
             read(1, *) Input
         end do
         deallocate(Input)
-         
+
         ! Coordinates
         allocate(Input(NoColumns2),stat=allocateStatus)
         if(allocateStatus/=0) STOP "ERROR: Not enough memory in ReadData "
 
-        read(1,*) 
+        read(1,*)
         do i = 1, RD%np
             read(1, *) Input
-            RD%coord_temp(i,:) = Input(2:3)          
+            RD%coord_temp(i,:) = Input(2:3)
         end do
 
-	 deallocate(Input)
-	 close(1)
-       
+   deallocate(Input)
+   close(1)
+
     end subroutine readDatFile
-    
+
     subroutine writepltFile(ii)
     ! Objective: write 3D Mesh file (.plt) as Output
-    
+
         ! Variables
         implicit none
         integer :: ii, j
-    
+
         ! Body of writepltFile
-        ! Determine correct String      
-        call DetermineStrLen(istr, ii) 
-        
-        open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt', form='unformatted',status='unknown')    
+        ! Determine correct String
+        call DetermineStrLen(istr, ii)
+
+        open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.plt', form='unformatted',status='unknown')
         write(1) RD%ne, RD%np, RD%nbf
         write(1) RD%connec
         write(1) RD%coord_temp
         write(1) RD%bound, RD%boundpart, RD%boundpart
         close(1)
         deallocate (istr)
-        
+
     end subroutine writepltFile
-    
+
     subroutine writebcoFile(ii)
-    
+
         ! Variables
         implicit none
         integer :: ii
-        
+
         ! Body of writebcoFile
-        ! Determine correct String      
-        call DetermineStrLen(istr, ii) 
+        ! Determine correct String
+        call DetermineStrLen(istr, ii)
         call system('cp '//DataFolder//'/'//trim(IV%Meshfilename)//'.bco '//'"'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.bco"')
         deallocate(istr)
-    
+
     end subroutine writebcoFile
-    
+
     subroutine PreProInpFile()
     ! Objective: Create the Inputfile for the PreProcessor in Case of the Windows Executable
-    
+
         ! Variables
         implicit none
-    
+
         ! Body of PreProInpFile
-        open(11, file=newdir//'/'//InFolder//'/PreprocessingInput.txt', form='formatted',status='unknown')        
+        open(11, file=newdir//'/'//InFolder//'/PreprocessingInput.txt', form='formatted',status='unknown')
         write(11,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.dat'  ! Name of Input file
         write(11,*) 'f'                                     ! Hybrid Mesh?
         write(11,*) 1                                       ! Number of Grids
@@ -328,17 +328,17 @@ contains
         write(11,*) 0                                       ! Visualization Modes
         write(11,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.sol'  ! Output File name
         close(11)
-    
+
     end subroutine PreProInpFile
-    
+
     subroutine PreProInpFile_3D()
     ! Objective: Create the Inputfile for the PreProcessor in Case of the Windows Executable
-    
+
         ! Variables
         implicit none
-    
+
         ! Body of PreProInpFile
-        open(11, file=newdir//'/'//InFolder//'/PreprocessingInput.txt', form='formatted',status='unknown')        
+        open(11, file=newdir//'/'//InFolder//'/PreprocessingInput.txt', form='formatted',status='unknown')
         write(11,*) newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr  ! Name of Input files
         if (IV%Re == 0.0) then
             write(11,*) 1                       ! Inviscid
@@ -356,12 +356,12 @@ contains
         write(11,*) 1                           ! Starting step
         write(11,*) 1                           ! Number of steps per cycle
         close(11)
-    
+
     end subroutine PreProInpFile_3D
-    
+
     subroutine WriteSolverInpFile()
     ! Objective: Create Solver Input files
-    
+
         ! Variables
         implicit none
         character(len=7) :: strEFMF, strMa      ! String for Ma number & Engine Inlet Front Mass Flow Number
@@ -372,7 +372,7 @@ contains
         character(len=6) :: strmaxit            ! String for maximum Iterations
         character(len=1) :: strturbulencemodel  ! String for Turbulence model
         character(len=255) :: Output
-    
+
         ! Body of WriteSolverInpFile
         write( strEFMF, '(F7.3)' )  IV%engFMF
         write( strMa, '(F7.3)' )  IV%Ma
@@ -382,8 +382,8 @@ contains
         write( strGamma, '(F5.2)' )  IV%gamma
         write( strmaxit, '(I6)' )  IV%maxit
         write( strturbulencemodel, '(I1)' )  IV%turbulencemodel
-        
-        
+
+
         ! Create Input File for Solver
         open(5, file=newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//'.inp', form='formatted',status='unknown')
         write(5,*) '&inputVariables'
@@ -425,7 +425,7 @@ contains
         write(5,*) 'ivd%numberOfTriperations = 0,'
         write(5,*) '/'
         close(5)
-        
+
         ! Create Read File for Solver
         open(1, file=newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/SolverInput'//istr//'.sh', form='formatted',status='unknown')
         if (IV%SystemType == 'B') then
@@ -455,12 +455,12 @@ contains
             write(1,'(A)') newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.rsd'      ! Residual Filename
         end if
         close(1)
-    
+
     end subroutine WriteSolverInpFile
- 
+
     subroutine WriteSolverInpFile_3D()
     ! Objective: Create Solver Input files
-    
+
         ! Variables
         implicit none
         character(len=7) :: strEFMF, strMa      ! String for Ma number & Engine Inlet Front Mass Flow Number
@@ -471,7 +471,7 @@ contains
         character(len=5) :: strmaxit            ! String for maximum Iterations
         character(len=1) :: strturbulencemodel  ! String for Turbulence model
         character(len=3) :: strProcessors       ! String for Turbulence model
-    
+
         ! Body of WriteSolverInpFile
         write( strEFMF, '(F7.3)' )  IV%engFMF
         write( strMa, '(F7.3)' )  IV%Ma
@@ -481,8 +481,8 @@ contains
         write( strGamma, '(F5.2)' )  IV%gamma
         write( strmaxit, '(I5)' )  IV%maxit
         write( strturbulencemodel, '(I1)' )  IV%turbulencemodel
-        write( strProcessors, '(I3)' )  IV%NoProcessors      
-        
+        write( strProcessors, '(I3)' )  IV%NoProcessors
+
         ! Create Input File for Solver
         open(5, file=newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.inp', form='formatted',status='unknown')
         write(5,*) '&inputVariables'
@@ -510,27 +510,27 @@ contains
         write(5,*) 'ivd%movingwall = .true.,'                       !do you have wheels or rolling ground?
         write(5,*) '/'
         close(5)
-        
+
         ! Create Read File for Solver
         open(1, file=newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/run.inp', form='formatted',status='unknown')
             write(1,'(A)') trim(IV%filename)//istr
-        close(1)        
-    
+        close(1)
+
     end subroutine WriteSolverInpFile_3D
 
     subroutine writeBatchFile(start, ending)
-    
+
         ! Variables
         implicit none
         integer :: i, start, ending
         character(len=:), allocatable :: strProc, strwait, strStart, strEnd, istring, strCores
-    
+
         ! Body of writeBatchFile
         call DetermineStrLen(strStart, start)
         call DetermineStrLen(strCores, (ending-start +1))
         call DetermineStrLen(strEnd, ending)
         call DetermineStrLen(strProc, IV%NoProcessors)
-        call DetermineStrLen(strwait, IV%waitmax)  
+        call DetermineStrLen(strwait, IV%waitmax)
         if (IV%SystemType /= 'B') then
             open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/batchfile', form='formatted',status='unknown')
             write(1,*) '#PBS -N ' ,trim(IV%filename), istr
@@ -576,20 +576,20 @@ contains
             end do
         end if
         close(1)
-    
+
     end subroutine writeBatchFile
-    
+
     subroutine writeBatchFile_3D()
-    
+
         ! Variables
         implicit none
         character(len=:), allocatable :: strProc, strwait, strMemory
-    
+
         ! Body of writeBatchFile
         call DetermineStrLen(strProc, IV%NoProcessors)
         call DetermineStrLen(strwait, IV%waitmax)
         call DetermineStrLen(strMemory, IV%Memory)
-        open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/batchfile', form='formatted',status='unknown')  
+        open(1, file= newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/batchfile', form='formatted',status='unknown')
         if (IV%SystemType /= 'B') then
             write(1,*) '#PBS -N ' ,trim(IV%filename), istr
             write(1,*) '#PBS -q oh'
@@ -611,18 +611,18 @@ contains
             write(1,'(A)') 'mpirun -machinefile $LSB_DJOB_HOSTFILE -n '//strProc//' '//pathSolver
             !write(1,*) '#BSUB -n 1'
             !#BSUB -R "span[ptile=12]"
-            
+
         end if
         close(1)
-    
+
     end subroutine writeBatchFile_3D
-    
+
     subroutine generateUnkFile()
-    
+
         ! Variables
         implicit none
         integer :: i
-    
+
         ! Body of generateUnkFile
         do i = 1, IV%NoNests
             call DetermineStrLen(istr, i)
@@ -638,18 +638,18 @@ contains
             call system('mv '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr//'/'//trim(IV%filename)//istr//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk')
             deallocate(istr)
         end do
-        
+
     end subroutine generateUnkFile
-    
+
     subroutine createDirectories()
     ! Objective: Create Directories from Windows in Linux
-    
+
         ! Variables
         implicit none
         character(len=255) :: currentDir
         character(len=:), allocatable :: Output
         integer :: i
-        
+
         ! Body of createDirectories
         call getcwd(currentDir)
         if (IV%SystemType == 'W') then
@@ -672,29 +672,29 @@ contains
             deallocate(istr)
         end do
         close(1)
-        
-        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine          
+
+        if (IV%SystemType == 'W')   then    ! AerOpt is executed from a Windows machine
             call system('Communication')    ! Submits create directory file
         else
-            call system('chmod a+x ./Communication')    
-            call system('./Communication')    ! Submits create directory file     
-        end if 
-    
+            call system('chmod a+x ./Communication')
+            call system('./Communication')    ! Submits create directory file
+        end if
+
     end subroutine createDirectories
-    
+
     subroutine transferFilesWin()
     ! Objective: transfer File to send files from Windows to Linux
-    
+
         ! Variables
         implicit none
         character(len=255) :: currentDir
         integer :: i
-        
+
         ! Body of createDirectories
         call getcwd(currentDir)
-        
+
         open(1, file='Communication', form='formatted',status='unknown')
-        
+
         write(1,*) 'cd '
         write(1,*) 'cd ..'
         write(1,*) 'cd ', trim(IV%filepath)//'/'//newdir//'/'//InFolder
@@ -712,18 +712,18 @@ contains
         write(1, '(A)') 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//'.inp"'
         write(1, '(A)') 'put "'//trim(currentDir)//'/'//newdir//'/'//InFolder//'/batchfile.sh"'
         close(1)
-    
+
     end subroutine transferFilesWin
-    
+
     subroutine TriggerFile()
     ! Objectives: Triggerfile for Cluster Simulation & Parallelisation
-    
+
         ! Variables
         implicit none
-    
+
         ! Body of TriggerFile
         open(1, file='Communication', form='formatted',status='unknown')
-        
+
         if (IV%SystemType == 'Q') then
             write(1,*) 'cd '
             write(1,*) 'cd ..'
@@ -736,35 +736,35 @@ contains
             end if
         end if
         close(1)
-          
+
     end subroutine TriggerFile
-    
+
     subroutine TriggerFileQ()
     ! Objectives: Triggerfile for Cluster Simulation & Parallelisation
-    
+
         ! Variables
         implicit none
-    
+
         ! Body of TriggerFile
         open(1, file='Communication', form='formatted',status='unknown')
-        write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr 
-        write(1,'(A)') 'cd ../..' 
-        
+        write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir//'/'//InFolder//'/'//trim(IV%filename)//istr
+        write(1,'(A)') 'cd ../..'
+
         if (IV%SystemType /= 'B') then
             write(1,*) 'qsub batchfile'
         else
             write(1,*) 'sbatch batchfile'
         end if
         close(1)
-          
+
     end subroutine TriggerFileQ
-    
+
     subroutine TriggerFile2()
     ! Objectives: Triggerfile for noncluster Simulation
-    
+
         ! Variables
         implicit none
-    
+
         ! Body of TriggerFile
         open(1, file='Communication', form='formatted',status='unknown')
         write(1,*) 'cd '
@@ -773,16 +773,16 @@ contains
         write(1,*) 'cd ..'
         write(1,*) pathSolver
         close(1)
-                        
+
     end subroutine TriggerFile2
-    
+
     subroutine TransferSolutionOutput()
-    
+
         ! Variables
         implicit none
         character(len=:), allocatable :: Output
-        integer :: strOut      
-    
+        integer :: strOut
+
         ! Body of TransferSolutionOutput
         open(1, file='Communication', form='formatted',status='unknown')
         write(1,*) 'cd '
@@ -791,14 +791,14 @@ contains
         write(1, '(A)') 'get '//trim(IV%filename)//istr//'.unk' ! Put Commmands to Transfer Data from Output_Data Folder on Linux to Output_Folder on Windows
         write(1, '(A)') 'get '//trim(IV%filename)//istr//'.rsd'
         close(1)
-        
+
     end subroutine TransferSolutionOutput
-    
+
     subroutine DeleteLogFiles()
-    
+
         ! Variables
         implicit none
-    
+
         ! Body of DeleteLogFiles
         open(1, file='Communication', form='formatted',status='unknown')
         write(1,'(A)') 'chmod 777 '//trim(IV%filepath)//'/'//newdir//'/parallel_joblog*'
@@ -808,22 +808,22 @@ contains
         write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/output.*'
         write(1,'(A)') 'rm '//trim(IV%filepath)//'/'//newdir//'/parallel_joblog*'
         close(1)
-    
+
     end subroutine DeletelogFiles
 
     subroutine DeleteErrorFiles()
-    
+
         ! Variables
         implicit none
-    
+
         ! Body of DeleteErrorFiles
         open(1, file='Communication', form='formatted',status='unknown')
         write(1,'(A)') 'find '//trim(IV%filepath)//'/'//newdir//' -name "*.e*" -type f -delete'
         write(1,'(A)') 'find '//trim(IV%filepath)//'/'//newdir//' -name "*.o*" -type f -delete'
         close(1)
-    
+
     end subroutine DeleteErrorFiles
-       
+
     subroutine moveTopNestFilesLin(i, idx)
 
         ! Variables
@@ -832,11 +832,11 @@ contains
         character(len=255) :: Output
         character(len=:), allocatable :: NoGenstr
         character(len=:), allocatable :: indexStr
-        
+
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i)
-        call DetermineStrLen(NoGenstr, OV%Gen) 
-        call DetermineStrLen(indexStr, idx) 
+        call DetermineStrLen(NoGenstr, OV%Gen)
+        call DetermineStrLen(indexStr, idx)
         open(1, file='Communication'//indexStr, form='formatted',status='unknown')
         write(1, '(A)') 'cp '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
         write(1, '(A)') 'cp '//newdir//'/'//OutFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
@@ -850,7 +850,7 @@ contains
         deallocate(NoGenstr)
         call system('chmod a+x Communication'//indexStr)
         call system('./Communication'//indexStr)    ! Submits Move file
-        
+
     end subroutine moveTopNestFilesLin
 
     subroutine moveTopNestFilesLin_POD(i)
@@ -860,20 +860,20 @@ contains
         integer :: i
         character(len=255) :: Output
         character(len=:), allocatable :: NoGenstr
-        
+
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i)
-        call DetermineStrLen(NoGenstr, OV%Gen) 
+        call DetermineStrLen(NoGenstr, OV%Gen)
         open(1, file='Communication2', form='formatted',status='unknown')
-	 write(1, '(A)') 'mv '//newdir//'/POD_Pressure'//istr//'.txt "'//newdir//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
+   write(1, '(A)') 'mv '//newdir//'/POD_Pressure'//istr//'.txt "'//newdir//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
         call system('chmod a+x Communication2')
         call system('./Communication2')    ! Submits Move file
-       
+
     end subroutine moveTopNestFilesLin_POD
-    
+
     subroutine moveTopNestFilesWin(i, idx)
 
         ! Variables
@@ -881,11 +881,11 @@ contains
         integer :: i, idx
         character(len=:), allocatable :: NoGenstr
         character(len=:), allocatable :: indexStr
-        
+
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i)
         call DetermineStrLen(NoGenstr, OV%Gen)
-        call DetermineStrLen(indexStr, idx) 
+        call DetermineStrLen(indexStr, idx)
         open(1, file='Communication.bat', form='formatted',status='unknown')
         write(1, '(A)') 'move "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.unk" "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.unk"'
         write(1, '(A)') 'move "'//newdir//'\'//OutFolder//'\'//trim(IV%filename)//istr//'.rsd" "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'_'//indexStr//'.rsd"'
@@ -898,21 +898,21 @@ contains
         deallocate(istr)
         deallocate(NoGenstr)
         call system('Communication.bat')    ! Submits create directory file
-        
+
     end subroutine moveTopNestFilesWin
-    
+
     subroutine copyTopNestFilesLin(i)
 
         ! Variables
         implicit none
         integer :: i
         character(len=:), allocatable :: NoGenstr
-        
+
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i-1)
         call DetermineStrLen(NoGenstr, i)
-        
-        open(1, file='Communication', form='formatted',status='unknown')        
+
+        open(1, file='Communication', form='formatted',status='unknown')
         write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.unk "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk"'
         write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/'//trim(IV%filename)//istr//'.rsd "'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.rsd"'
         if (IV%NoDim == 2) then
@@ -925,7 +925,7 @@ contains
         deallocate(NoGenstr)
         call system('chmod a+x Communication')
         call system('./Communication')    ! Submits Move file
-        
+
     end subroutine copyTopNestFilesLin
 
     subroutine copyTopNestFilesLin_POD(i)
@@ -934,21 +934,21 @@ contains
         implicit none
         integer :: i
         character(len=:), allocatable :: NoGenstr
-        
+
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i-1)
         call DetermineStrLen(NoGenstr, i)
 
-        open(1, file='Communication2', form='formatted',status='unknown') 
-	 write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/POD_Pressure'//istr//'.txt "'//newdir//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
+        open(1, file='Communication2', form='formatted',status='unknown')
+   write(1, '(A)') 'cp '//newdir//'/'//TopFolder//'/POD_Pressure'//istr//'.txt "'//newdir//'/'//TopFolder//'/POD_Pressure'//NoGenstr//'.txt"'
         close(1)
         deallocate(istr)
         deallocate(NoGenstr)
         call system('chmod a+x Communication2')
         call system('./Communication2')    ! Submits Move file
-        
+
     end subroutine copyTopNestFilesLin_POD
-    
+
     subroutine copyTopNestFilesWin(i)
 
         ! Variables
@@ -956,12 +956,12 @@ contains
         integer :: i
         character(len=255) :: Output
         character(len=:), allocatable :: NoGenstr
-        
+
         ! Body of moveTopNestFiles
         call DetermineStrLen(istr, i-1)
         call DetermineStrLen(NoGenstr, i)
-        
-        open(1, file='Communication.bat', form='formatted',status='unknown')        
+
+        open(1, file='Communication.bat', form='formatted',status='unknown')
         write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.unk "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.unk"'
         write(1, '(A)') 'copy '//newdir//'\'//TopFolder//'\'//trim(IV%filename)//istr//'.rsd "'//newdir//'\'//TopFolder//'\'//trim(IV%filename)//NoGenstr//'.rsd"'
         if (IV%NoDim == 2) then
@@ -973,11 +973,11 @@ contains
         deallocate(istr)
         deallocate(NoGenstr)
         call system('Communication.bat >nul 2>&1')    ! Submits create directory file
-        
+
     end subroutine copyTopNestFilesWin
-    
+
     subroutine generateEnSightFileLin()
-    
+
        ! Variables
         implicit none
         character(len=:), allocatable :: NoGenstr
@@ -1006,17 +1006,17 @@ contains
         call system('mv *ENSIGHT* '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder)
         call system('rm '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.dat')
         call system('rm '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.resp')
-        deallocate(NoGenstr)       
-        
+        deallocate(NoGenstr)
+
     end subroutine generateEnSightFileLin
-    
+
     subroutine generateEnSightFileLin3D(i)
-    
+
        ! Variables
         implicit none
         integer :: i
         character(len=:), allocatable :: NoGenstr
-    
+
         ! Body of generateEnSightFile
         call DetermineStrLen(NoGenstr, OV%Gen)
         call DetermineStrLen(istr, i)
@@ -1035,17 +1035,17 @@ contains
         call system('mv *ENSIGHT* '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder)
         call system('rm '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.plt')
         call system('mv '//trim(IV%filepath)//'/'//trim(IV%filename)//NoGenstr//'.unk '//trim(IV%filepath)//'/'//newdir//'/'//TopFolder//'/'//trim(IV%filename)//NoGenstr//'.unk ')
-        deallocate(NoGenstr)       
-        
+        deallocate(NoGenstr)
+
     end subroutine generateEnSightFileLin3D
-        
+
     subroutine generateEnSightFileWin()
-! ALSO 3D 
+! ALSO 3D
        ! Variables
         implicit none
         character(len=:), allocatable :: NoGenstr
         logical :: exe_exists
-    
+
         ! Body of generateEnSightFile
         inquire(file=trim(IV%filepath)//'/Executables/engen_2D', exist=exe_exists)
         if(.not.exe_exists) then
@@ -1072,21 +1072,21 @@ contains
         write(1,'(A)') 'del '//trim(IV%filename)//NoGenstr//'.resp'
         close(1)
         call system('Communication.bat >nul 2>&1')
-        deallocate(NoGenstr)  
-        
+        deallocate(NoGenstr)
+
     end subroutine generateEnSightFileWin
-    
+
     subroutine writeFitnessandNestoutput()
-    
+
         ! Variables
         implicit none
         logical :: ex
-    
+
         ! Body of writeFitnessandNestoutput
         allocate(character(len=3) :: istr)
         write(istr, '(1f3.1)') IV%Ma
-        
-        inquire(file=newdir//'/Nests'//istr//'.txt', exist = ex)       
+
+        inquire(file=newdir//'/Nests'//istr//'.txt', exist = ex)
         if (ex == .true.) then
             open(19,file=newdir//'/FitnessAll.txt',form='formatted',status='old',position='append') ! Comment for GUI
             open(29,file=newdir//'/Nests'//istr//'.txt',form='formatted',status='old',position='append')
@@ -1096,21 +1096,21 @@ contains
             write(29,'(<IV%NoSnap>f17.10)') CS%Snapshots
             open(19,file=newdir//'/FitnessAll.txt', form='formatted',status='new')                   ! Comment for GUI
         end if
-        
+
         ! Store moved Nests in Output Analysis File
         write(29, *) 'Generation', OV%Gen
         write(29,'(<IV%NoNests>f17.10)') OV%Nests
         close(29)
-      
+
         ! Store Fitness values
         write(19,'(1I4)',advance="no") OV%Gen
-        write(19,'(<IV%NoNests>f17.10)') OV%Fi       
+        write(19,'(<IV%NoNests>f17.10)') OV%Fi
         if (IV%objectivefunction == 7) then
             write(19,'(<IV%NoNests>f17.10)') OV%Precoutput
         end if
         close(19)
         deallocate(istr)
-        
+
     end subroutine writeFitnessandNestoutput
-    
+
     end module ReadData
