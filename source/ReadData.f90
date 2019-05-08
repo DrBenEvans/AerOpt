@@ -724,16 +724,16 @@ contains
         ! Body of TriggerFile
         open(1, file='Communication', form='formatted',status='unknown')
 
+        write(1,*) 'cd '
+        write(1,*) 'cd ..'
         if (IV%SystemType == 'Q') then
-            write(1,*) 'cd '
-            write(1,*) 'cd ..'
             write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir
-
-            if (IV%SystemType /= 'B') then
-                write(1,*) 'qsub batchfile'
-            else
-                write(1,*) 'sbatch batchfile'
-            end if
+        elseif (IV%SystemType /= 'B') then
+            write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir
+            write(1,*) 'qsub batchfile'
+        else
+            write(1,'(A)') 'cd '//trim(IV%filepath)//'/'//newdir
+            write(1,*) 'sbatch batchfile'
         end if
         close(1)
 
