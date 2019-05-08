@@ -1,22 +1,22 @@
 #Compilers and flags
 
-MF	= ifort
+MF	= mpiifort
 MC	= cc
 ML	= ar
 RM	= rm
 MKL_INC = ${MKLROOT}/include
 MKL_LIB = ${MKLROOT}/lib/intel64
 
-FFLAGS	=  -r8 -O3 -mkl=sequential -I$(MKL_INC)/intel64/lp64 
-CFLAGS	=  -r8 -O3 
-#FFLAGS	= -g 
-#CFLAGS	= -g 
+FFLAGS	=  -O3 -I$(MKL_INC)/intel64/lp64
+CFLAGS	=  -r8 -O3
+#FFLAGS	= -g
+#CFLAGS	= -g
 LFLAGS	= crv
 
 #C and Fortran Object Files
 FOBJS	=  Toolbox.o  InputData.o  ReadData.o  CreateSnapshots.o FDGD.o  Smoothing.o  GenerateMesh.o  CFD.o  Optimization.o  Main.o
 
-OBJS	=  $(FOBJS) 
+OBJS	=  $(FOBJS)
 
 #Compile and link
 
@@ -31,10 +31,10 @@ comment:
 		echo " "
 		echo "   Makefile for AerOpt       "
 		echo "   ------------------------- "
-		echo "    clean  to remove object files "              
+		echo "    clean  to remove object files "
 		echo "    all    to compile and link "
 		echo " "
-		
+
 clean:
 	find .. -name '*.o' -delete
 
@@ -59,6 +59,3 @@ Optimization.o:
 Main.o:
 	$(MF) $(FFLAGS) -c Main.f90
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::#
-
-
-
