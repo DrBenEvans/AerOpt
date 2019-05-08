@@ -507,6 +507,7 @@ module FDGD
         ! Variables
         implicit none
         double precision :: xa, ya, za, xb, yb, zb, xc, yc, zc, xd, yd, zd, xp, yp, zp, S1, S2, S3, S4, S, e1, e2, e3, e4
+        double precision :: one
         integer :: NoNodesMove, i, j, NoP
         integer, dimension(NoP) :: RowIndex
         double precision, dimension(:,:), allocatable :: AreaCoeff
@@ -537,38 +538,38 @@ module FDGD
                 yd = DelaunayCoord(DelaunayElem(j,4),2)
                 zd = DelaunayCoord(DelaunayElem(j,4),3)
 
-                A(1,:) = (/ xa, ya, za, 1.0/)
-                A(2,:) = (/ xb, yb, zb, 1.0/)
-                A(3,:) = (/ xc, yc, zc, 1.0/)
-                A(4,:) = (/ xd, yd, zd, 1.0/)
+                A(1,:) = (/ xa, ya, za, one/)
+                A(2,:) = (/ xb, yb, zb, one/)
+                A(3,:) = (/ xc, yc, zc, one/)
+                A(4,:) = (/ xd, yd, zd, one/)
 
                 S = (1.0/6.0)*Det(A,4)
 
-                A(1,:) = (/ xp, yp, zp, 1.0/)
-                A(2,:) = (/ xb, yb, zb, 1.0/)
-                A(3,:) = (/ xc, yc, zc, 1.0/)
-                A(4,:) = (/ xd, yd, zd, 1.0/)
+                A(1,:) = (/ xp, yp, zp, one/)
+                A(2,:) = (/ xb, yb, zb, one/)
+                A(3,:) = (/ xc, yc, zc, one/)
+                A(4,:) = (/ xd, yd, zd, one/)
 
                 S1 = (1.0/6.0)*Det(A,4)
 
-                A(1,:) = (/ xa, ya, za, 1.0/)
-                A(2,:) = (/ xp, yp, zp, 1.0/)
-                A(3,:) = (/ xc, yc, zc, 1.0/)
-                A(4,:) = (/ xd, yd, zd, 1.0/)
+                A(1,:) = (/ xa, ya, za, one/)
+                A(2,:) = (/ xp, yp, zp, one/)
+                A(3,:) = (/ xc, yc, zc, one/)
+                A(4,:) = (/ xd, yd, zd, one/)
                 
                 S2 = (1.0/6.0)*Det(A,4)
 
-                A(1,:) = (/ xa, ya, za, 1.0/)
-                A(2,:) = (/ xb, yb, zb, 1.0/)
-                A(3,:) = (/ xp, yp, zp, 1.0/)
-                A(4,:) = (/ xd, yd, zd, 1.0/)
+                A(1,:) = (/ xa, ya, za, one/)
+                A(2,:) = (/ xb, yb, zb, one/)
+                A(3,:) = (/ xp, yp, zp, one/)
+                A(4,:) = (/ xd, yd, zd, one/)
 
                 S3 = (1.0/6.0)*Det(A,4)
 
-                A(1,:) = (/ xa, ya, za, 1.0/)
-                A(2,:) = (/ xb, yb, zb, 1.0/)
-                A(3,:) = (/ xc, yc, zc, 1.0/)
-                A(4,:) = (/ xp, yp, zp, 1.0/)
+                A(1,:) = (/ xa, ya, za, one/)
+                A(2,:) = (/ xb, yb, zb, one/)
+                A(3,:) = (/ xc, yc, zc, one/)
+                A(4,:) = (/ xp, yp, zp, one/)
 
                 S4 = (1.0/6.0)*Det(A,4)
 
@@ -733,6 +734,7 @@ module FDGD
         ! Variables
         implicit none
         double precision :: xa, ya, za, xb, yb, zb, xc, yc, zc, xd, yd, zd, S
+        double precision :: one
         integer :: j, NoElem, intersect
         double precision, dimension(:,:) :: DelaunayCoord
         double precision, dimension(4,4) :: A
@@ -752,10 +754,10 @@ module FDGD
             yc = DelaunayCoord(DelaunayElem(j,3),2)
             zc = DelaunayCoord(DelaunayElem(j,3),3)
 
-            A(1,:) = (/ xa, ya, za, 1.0/)
-            A(2,:) = (/ xb, yb, zb, 1.0/)
-            A(3,:) = (/ xc, yc, zc, 1.0/)
-            A(4,:) = (/ xd, yd, zd, 1.0/)
+            A(1,:) = (/ xa, ya, za, one/)
+            A(2,:) = (/ xb, yb, zb, one/)
+            A(3,:) = (/ xc, yc, zc, one/)
+            A(4,:) = (/ xd, yd, zd, one/)
 
             S = (1/6)*Det(A,4)
 
