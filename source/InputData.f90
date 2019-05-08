@@ -41,6 +41,8 @@ module InputData
         character(len=20) :: MeshFileName
         character(len=256) :: filepath  ! I/O filepath for communication
         character :: runOnCluster       ! Run On Cluster or Run on Engine?
+        character(len=256) :: clusterAddress
+        character(len=256) :: clusterPath
         character :: SystemType         ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)
         character(len=20) :: UserName   ! Putty Username - Cluster: egnaumann
         character(len=20) :: Password   ! Putty Password
@@ -126,6 +128,8 @@ contains
         IV%MeshFileName = 'Mesh'        ! Input file Mesh name
         IV%filepath = '/eng/cvcluster/egnaumann/AerOpt_3D'
         IV%runOnCluster = 'Y'           ! Run On Cluster or Run on Engine?
+        IV%clusterPath = 'AerOptTestMark'
+        IV%clusterAddress = 'encluster.swan.ac.uk'
         IV%SystemType = 'Q'             ! Windows('W'), Cluster/QSUB ('Q') or HPCWales/BSUB ('B') System? (Cluster, HPCWales = Linux, Visual Studio = Windows)
         IV%Account = 'scwXXXX'          ! Group account for slurm
         IV%UserName = 'egnaumann'       ! Putty Username - Cluster: egnaumann
